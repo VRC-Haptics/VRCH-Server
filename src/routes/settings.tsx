@@ -26,15 +26,15 @@ const SettingsItem: React.FC<Setting> = ({ title, help, type, getFunction, setFu
       <h3 className="font-semibold text-lg">{title}</h3>
       <h6 className="text-info text-sm p-1">{help}</h6>
 
-      <div className="h-fit rounded-md bg-base-200 p-4">
+      <div className="max-h-min rounded-md bg-base-200 p-1">
         {type === 'toggle' ? (
           <div className="form-control left">
             <label className="label cursor-pointer">
-              <input type="checkbox" className="toggle" value={getFunction} onChange={(e)=> setFunction(e.target.value)}/>
+              <input type="checkbox" className="toggle-primary" value={getFunction} onChange={(e)=> setFunction(e.target.value)}/>
             </label>
           </div>
         ) : (
-          <select className="select select-bordered" value={getFunction} onChange={(e) => setFunction(e.target.value)}>
+          <select className="select-primary rounded-md select-bordered" value={getFunction} onChange={(e) => setFunction(e.target.value)}>
             {options?.map((option, index) => (
               <option key={index} value={option}>
                 {option}
@@ -50,7 +50,7 @@ const SettingsItem: React.FC<Setting> = ({ title, help, type, getFunction, setFu
 // Component for a group of settings
 const SettingsGroup: React.FC<{ group: Group, settings: Setting[] }> = ({ group, settings }) => {
   return (
-    <div id= {group.title} className="h-full w-full px-4">
+    <div id= {group.title} className="h-fit w-full px-4">
       <div className="text-md font-bold w-fit text-center text-lg">
         <h2 title={group.help}>{group.title}</h2>
       </div>

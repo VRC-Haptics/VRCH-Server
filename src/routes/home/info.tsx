@@ -1,7 +1,5 @@
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect } from "react";
-import { Device } from "../../utils/commonClasses"
+import { DeviceContext } from "../../context/DevicesContext";
+import { useContext } from "react";
 
 interface InfoPageProps {
   selectedDevice: string | null;
@@ -9,19 +7,7 @@ interface InfoPageProps {
 
 
 export default function InfoPage({ selectedDevice }: InfoPageProps) {
-  const [devices, setDevices] = useState<Device[]>([]);
-
-  useEffect(() => {
-    // Fetch the device list from Rust
-    invoke<Device[]>('get_device_list')
-      .then((deviceList) => {
-        setDevices(deviceList);
-        console.log(deviceList);
-      })
-      .catch((error) => {
-        console.error("Failed to fetch devices:", error);
-      });
-  });
+  const devices = useContext(DeviceContext);
 
   function createInfo(mac_address: string) {
     const device = devices.find((device) => device.MAC === mac_address) 

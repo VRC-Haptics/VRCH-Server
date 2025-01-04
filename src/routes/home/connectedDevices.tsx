@@ -1,8 +1,6 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import clsx from "clsx";
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect } from "react";
-import { Device } from "../../utils/commonClasses"
+import { DeviceContext } from "../../context/DevicesContext";
 
 interface ConnectedDevicesProps {
   onSelectDevice: (deviceName: string) => void;
@@ -12,18 +10,7 @@ export default function ConnectedDevices({
   onSelectDevice,
 }: ConnectedDevicesProps) {
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-  const [devices, setDevices] = useState<Device[]>([]);
-
-  useEffect(() => {
-    // Fetch the device list from Rust
-    invoke<Device[]>('get_device_list')
-      .then((deviceList) => {
-        setDevices(deviceList);
-      })
-      .catch((error) => {
-        console.error("Failed to fetch devices:", error);
-      });
-  });
+  const devices = useContext(DeviceContext);
 
   return (
     <div
@@ -57,6 +44,7 @@ export default function ConnectedDevices({
             <div
               key={device.MAC}
               className={deviceClass}
+              title={device.MAC+"@"+device.IP}
               onClick={() => {
                 onSelectDevice(device.MAC);
                 setSelectedDevice(device.MAC);

@@ -36,7 +36,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <TauriProvider>
       <SettingsProvider>
-        <RouterProvider router={router} />
+          <RouterProvider router={router} />
       </SettingsProvider>
     </TauriProvider>
   </React.StrictMode>
