@@ -6,17 +6,23 @@ use tauri::{AppHandle, Emitter};
 
 use crate::haptic::Device;
 
-pub fn start_device_listener(app_handle: AppHandle, state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) {
-    let devices = state.inner().clone();
-
-    thread::spawn(move || {
-        let mut cmd = Command::new("sidecars/tracker-sidecar.exe")
+pub fn start_device_listener(app_handle: AppHandle, devices_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>, pid_state: tauri::State<'_, Arc<Mutex<u32>>>) {
+    let mut cmd = Command::new("sidecars/tracker-sidecar.exe")
             .arg("0")
             .arg("_haptics._udp.local")
             .arg("--debug")
             .stdout(Stdio::piped())
             .spawn()
             .expect("Failed to execute command");
+    {
+        let mut pid = pid_state.lock().unwrap();
+        *pid = cmd.id();
+    }
+    let devices = devices_state.inner().clone();
+
+
+
+    thread::spawn(move || {
 
         let stdout = cmd.stdout.take().unwrap();
         let reader = BufReader::new(stdout);
@@ -36,6 +42,7 @@ pub fn start_device_listener(app_handle: AppHandle, state: tauri::State<'_, Arc<
             let mut devices = devices.lock().unwrap();
             match log_type {
                 "_ADD" => {devices.push(device.clone());
+                    println!("device added: {:?}", device);
                     app_handle.emit("device-added", device).unwrap();}
                 "_RMV" => {devices.retain(|d| d.MAC != device.MAC);
                     app_handle.emit("device-removed", device).unwrap();}

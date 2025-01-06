@@ -26,4 +26,6 @@ tauri-plugin-os = "2.2.0"
 tauri-plugin-fs = "2.2.0"
 tauri-plugin-shell = "2.2.0"
 oyasumivr_oscquery = { git = "https://github.com/Raphiiko/oyasumivr_oscquery.git" }
+tokio = "1.42.0"
+rosc = "0.10.1"
 
