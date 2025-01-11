@@ -31,7 +31,10 @@ pub fn next_free_port_with_address(start_port: u16, address: IpAddr) -> Option<u
     loop {
         let socket_addr = SocketAddr::new(address, port);
         match TcpListener::bind(socket_addr) {
-            Ok(_) => return Some(port), // Successfully bound, port is free
+            Ok(socket ) => { // Successfully bound, port is free
+                drop(socket);
+                return Some(port)
+            } 
             Err(_) => {
                 if port == u16::MAX {
                     return None; // No free port found

@@ -20,8 +20,6 @@ pub fn start_device_listener(app_handle: AppHandle, devices_state: tauri::State<
     }
     let devices = devices_state.inner().clone();
 
-
-
     thread::spawn(move || {
 
         let stdout = cmd.stdout.take().unwrap();

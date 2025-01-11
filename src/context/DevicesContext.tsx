@@ -25,7 +25,7 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
     fetchDevices();
 
     // Polling interval
-    const intervalId = setInterval(fetchDevices, 100); // TODO: I give up trying to get this to work
+    const intervalId = setInterval(fetchDevices, 500); // TODO: I give up trying to get this to work without polling
     return () => clearInterval(intervalId);
   }, []);
 
@@ -35,4 +35,3 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
     </DeviceContext.Provider>
   );
 };
-
