@@ -1,18 +1,35 @@
 let Titles = "text-2xl font-bold padding-5 text-center";
 
 export const defaultDevice = {
-  MAC: "",
-  IP: "",
-  DisplayName: "",
-  Port: 0,
-  TTL: 0,
+  mac: "",
+  ip: "",
+  display_name: "",
+  port: 0,
+  ttl: 0,
+  addr_groups: [],
+  num_motors: 0,
 };
+
 export interface Device {
-  MAC: string;
-  IP: string;
-  DisplayName: string;
-  Port: number;
-  TTL: number;
+  mac: string;
+  ip: string;
+  display_name: string;
+  port: number;
+  ttl: number;
+  addr_groups: AddressGroup[];
+  num_motors: number;
+}
+
+export const defaultAddressGroup = {
+  name: "",
+  start: 0,
+  end: 0,
+}
+
+export interface AddressGroup {
+  name: string;
+  start: number;
+  end: number;
 }
 
 export interface Avatar {

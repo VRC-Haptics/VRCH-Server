@@ -38,7 +38,7 @@ pub fn get_vrc() -> VrcInfo {
         in_port: Some(recieving_port.to_owned()),
         out_port: None,
         avatar: None,
-        haptics_prefix: "avatars/parameters/h".to_string(),
+        haptics_prefix: "/avatars/parameters/h".to_string(),
         raw_parameters: raw_parameters,
     };
 }

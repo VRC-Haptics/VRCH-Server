@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Device {
-    pub MAC: String,
-    pub IP: String,
-    pub DisplayName: String,
-    pub Port: u16,
-    pub TTL: u32,
+    pub mac: String,
+    pub ip: String,
+    pub display_name: String,
+    pub port: u16,
+    pub ttl: u32,
     pub addr_groups: Vec<AddressGroup>, //group name and start and end number
     pub num_motors: u32,
     been_pinged: bool,
@@ -19,15 +19,26 @@ pub struct Device {
     cached_param: HashMap<String, OscType>,
 }
 
+pub struct Packet {
+    pub packet: Vec<u8>,
+}
+
+#[derive(Clone, Serialize, Debug, Deserialize)]
+pub struct AddressGroup {
+    pub name: String,
+    pub start: u32,
+    pub end: u32,
+}
+
 impl Device {
     /// Instantiate new device instance
     pub fn new(mac: String, ip: String, display_name: String, port: u16, ttl: u32) -> Device {
         return Device {
-            MAC: mac,
-            IP: ip,
-            DisplayName: display_name,
-            Port: port,
-            TTL: ttl,
+            mac: mac,
+            ip: ip,
+           display_name: display_name,
+            port: port,
+            ttl: ttl,
             addr_groups: Vec::new(),
             num_motors: 0,
             been_pinged: false,
@@ -43,6 +54,7 @@ impl Device {
     ) -> Option<Packet> {
         if !self.been_pinged {
             // first round through we ping
+            println!("tried to ping board");
             self.been_pinged = true;
             return Some(self.get_ping());
         }
@@ -112,6 +124,7 @@ impl Device {
 
     /// Triggers rebuilding of cache and motor parameters.
     /// Should be called anytime any sort of device parameters are chagned.
+    #[allow(dead_code)]
     pub fn purge_cache(&mut self) {
         self.cached_param.clear();
     }
@@ -133,7 +146,7 @@ impl Device {
     }
 
     pub fn get_ping(&self) -> Packet {
-        println!("sent ping to: {}", self.DisplayName);
+        println!("sent ping to: {}", self.display_name);
         let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
             addr: "/ping".to_string(),
             args: vec![OscType::Int(1000)],
@@ -141,15 +154,4 @@ impl Device {
         .unwrap();
         Packet { packet: msg_buf }
     }
-}
-
-pub struct Packet {
-    pub packet: Vec<u8>,
-}
-
-#[derive(Clone, Serialize, Debug, Deserialize)]
-pub struct AddressGroup {
-    pub name: String,
-    pub start: u32,
-    pub end: u32,
 }

@@ -32,7 +32,7 @@ export default function ConnectedDevices({
         </div>
       ) : (
         devices.map((device) => {
-          const isSelected = selectedDevice === device.MAC;
+          const isSelected = selectedDevice === device.mac;
           const deviceClass = clsx(
             "h-max rounded-md px-2 py-1",
             isSelected
@@ -42,15 +42,15 @@ export default function ConnectedDevices({
 
           return (
             <div
-              key={device.MAC}
+              key={device.mac}
               className={deviceClass}
-              title={device.MAC+"@"+device.IP}
+              title={device.mac+"@"+device.ip}
               onClick={() => {
-                onSelectDevice(device.MAC);
-                setSelectedDevice(device.MAC);
+                onSelectDevice(device.mac);
+                setSelectedDevice(device.mac);
               }}
             >
-              {device.DisplayName}
+              {device.display_name}
             </div>
           );
         })
