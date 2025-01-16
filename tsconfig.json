@@ -20,6 +20,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
+  "include": ["src", "patch-binpack.js"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

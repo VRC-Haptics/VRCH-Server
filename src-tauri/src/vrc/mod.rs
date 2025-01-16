@@ -1,6 +1,6 @@
 pub mod discovery;
 
-//use rosc::OscType;
+use discovery::OscQueryServer;
 use serde::Serialize;
 
 use crate::osc::server::OscServer;
@@ -11,6 +11,7 @@ use serde::Deserialize;
 #[derive(serde::Serialize, Debug, Clone)]
 pub struct  vrcInfo {
     osc_server: Option<OscServer>,
+    query_server: Option<OscQueryServer>,
     in_port: Option<u16>,
     out_port: Option<u16>,
     avatar: Option<avatar>,

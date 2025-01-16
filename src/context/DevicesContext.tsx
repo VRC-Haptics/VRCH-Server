@@ -15,7 +15,7 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
       try {
         const deviceList = await invoke<Device[]>('get_device_list');
         setDevices(deviceList);
-        console.log('Fetched devices:', deviceList);
+        //console.log('Fetched devices:', deviceList);
       } catch (error) {
         console.error("Failed to fetch devices:", error);
       }

@@ -38,13 +38,14 @@ pub fn close_vrc() {
 
 fn close_app(window: &Window) {
     let app_handle = window;
+    //cleanup haptics sidecar
     let state = app_handle.state::<Arc<Mutex<u32>>>();
     println!("Application is closing. Running cleanup...");
-    close_vrc();
-
-    //cleanup haptics sidecar
     let pid = state.lock().expect("couldn't get lock on pid");
     shutdown_device_listener(*pid).expect("Failed to kill haptics process");
+
+    //cleanup vrc
+    
 }
 
 fn main() {

@@ -1,8 +1,6 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import { invoke } from "@tauri-apps/api/core";
 import { defaultVrcInfo, VrcInfo } from '../utils/commonClasses';
-import { ReactNode } from 'react';
-
 
 export const VrcContext = createContext<VrcInfo>(defaultVrcInfo);
 
@@ -12,7 +10,7 @@ export const VrcProvider = ({ children }: { children: ReactNode }) => {
   const [vrcInfo, setVrcInfo] = useState<VrcInfo>(defaultVrcInfo);
 
   useEffect(() => {
-    const fetchDevices = async () => {
+    const fetchVrc = async () => {
       try {
         const newInfo = await invoke<VrcInfo>('get_vrc_info');
         setVrcInfo(newInfo);
@@ -23,10 +21,10 @@ export const VrcProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Initial fetch
-    fetchDevices();
+    fetchVrc();
 
     // Polling interval
-    const intervalId = setInterval(fetchDevices, 100);
+    const intervalId = setInterval(fetchVrc, 10000);
     return () => clearInterval(intervalId);
   }, []);
 
