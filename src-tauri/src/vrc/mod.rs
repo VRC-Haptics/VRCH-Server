@@ -1,36 +1,22 @@
 pub mod discovery;
 
 use discovery::OscQueryServer;
-use serde::Serialize;
-
+use serde::{ Serialize, Deserialize };
+use rosc::OscType;
 use crate::osc::server::OscServer;
-use std::collections::HashMap;
-
-use serde::Deserialize;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 #[derive(serde::Serialize, Debug, Clone)]
-pub struct  vrcInfo {
-    osc_server: Option<OscServer>,
-    query_server: Option<OscQueryServer>,
-    in_port: Option<u16>,
-    out_port: Option<u16>,
-    avatar: Option<avatar>,
-    raw_parameters: HashMap<String, OscType>,
-}
-
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum OscType { // rosc doesn't implement serde serialize
-    Int(i32),
-    Float(f32),
-    String(String),
-    Blob(Vec<u8>),
-    Long(i64),
-    Double(f64),
-    Char(char),
-    Bool(bool),
-    Nil,
-    Inf,
+pub struct  VrcInfo {
+    pub osc_server: Option<OscServer>,
+    pub query_server: Option<OscQueryServer>,
+    pub in_port: Option<u16>,
+    pub out_port: Option<u16>,
+    pub avatar: Option<avatar>,
+    pub raw_parameters: Arc<RwLock<HashMap<String, Vec<OscType>>>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

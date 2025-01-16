@@ -10,7 +10,7 @@ pub mod osc;
 
 //use local modules
 use haptic::{Device, mdns::start_device_listener};
-use vrc::{discovery::get_vrc, vrcInfo};
+use vrc::{discovery::get_vrc, VrcInfo};
 use util::shutdown_device_listener;
 
 //standard imports
@@ -24,7 +24,7 @@ fn get_device_list(state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Vec<Devi
 }
 
 #[tauri::command]
-fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<vrcInfo>>>) -> vrcInfo {
+fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
     let vrc_info = state.lock().unwrap();
     vrc_info.clone()
 }
@@ -44,14 +44,14 @@ fn close_app(window: &Window) {
     let pid = state.lock().expect("couldn't get lock on pid");
     shutdown_device_listener(*pid).expect("Failed to kill haptics process");
 
-    //cleanup vrc
-    
+    //cleanup vrc TODO:
+
 }
 
 fn main() {
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let child_pid: Arc<Mutex<u32>> = Arc::new(Mutex::new(0)); //the child pid for the haptics sub process
-    let vrc_info: Arc<Mutex<vrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
+    let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

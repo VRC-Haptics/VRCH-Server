@@ -30,5 +30,5 @@ tauri-plugin-shell = "2.2.0"
 # project stuff
 oyasumivr_oscquery = { git = "https://github.com/Raphiiko/oyasumivr_oscquery.git" }
 tokio = "1.42.0"
-rosc = "0.10.1"
+rosc = { git = "https://github.com/virtuallyaverage/rosc-serde.git" }
 

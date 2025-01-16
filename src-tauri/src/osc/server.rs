@@ -55,7 +55,9 @@ impl OscServer {
         self.close_handle = Some(tx);
 
         thread::spawn(move || {
-            let mut buf = [0u8; 1024];
+            //println!("Spawned UDP OSC Server on: {}", socket.local_addr().unwrap());
+
+            let mut buf = [0u8; rosc::decoder::MTU];
             loop {
                 // Check for stop signal
                 if let Ok(_) = rx.try_recv() {
@@ -114,9 +116,7 @@ fn handle_message(
     filter_prefix:&str
 ) {
     let address = &message.addr;
-    let args = &message.args;
 
-    println!("Got message: addr:{}, args:[{:?}]", address, &args);
     if filter_prefix == "".to_string() || address.starts_with(filter_prefix) {
         let cb = callback.lock().unwrap();
         cb(message);
