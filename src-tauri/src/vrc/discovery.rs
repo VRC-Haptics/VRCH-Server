@@ -38,6 +38,7 @@ pub fn get_vrc() -> VrcInfo {
         in_port: Some(recieving_port.to_owned()),
         out_port: None,
         avatar: None,
+        haptics_prefix: "avatars/parameters/h".to_string(),
         raw_parameters: raw_parameters,
     };
 }
@@ -73,7 +74,8 @@ impl OscQueryServer {
                     in_port, 
                     "./sidecars/vrc-sidecar.exe", // The (relative) path to the MDNS sidecar executable
                 ).await.unwrap();
-                println!("OscQuery Port: {} Host: {}", port, host);
+                let addr = format!("{}:{}", host, port);
+                println!("OscQuery on: {}", addr);
                 oyasumivr_oscquery::server::receive_vrchat_avatar_parameters().await; // /avatar/*, /avatar/parameters/*, etc.
                 oyasumivr_oscquery::server::advertise().await.unwrap();
             });

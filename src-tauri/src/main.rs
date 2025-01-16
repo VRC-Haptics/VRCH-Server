@@ -9,13 +9,16 @@ pub mod util;
 pub mod osc;
 
 //use local modules
-use haptic::{Device, mdns::start_device_listener};
-use vrc::{discovery::get_vrc, VrcInfo};
+use haptic::{ Device, mdns::start_device_listener };
+use vrc::{ discovery::get_vrc, VrcInfo };
 use util::shutdown_device_listener;
 
 //standard imports
-use std::sync::{Arc, Mutex};
-use tauri::{Manager, WindowEvent, Window};
+use std::sync::{ Arc, Mutex };
+use std::time::Duration;
+use std::net::UdpSocket;
+use tauri::{ Manager, Window, WindowEvent, App};
+use tokio::time::interval;
 
 #[tauri::command]
 fn get_device_list(state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Vec<Device> {
@@ -29,10 +32,30 @@ fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
     vrc_info.clone()
 }
 
-pub fn close_vrc() {
-    let tk_rt = tokio::runtime::Runtime::new().unwrap();
-    tk_rt.block_on(async {
-       oyasumivr_oscquery::server::deinit().await.expect("couldn't close vrc query");
+fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device>>>) {
+    tauri::async_runtime::spawn(async move {
+        let mut timer = interval(Duration::from_millis(10)); // 100 Hz
+        let device_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+        loop {
+            timer.tick().await;
+            {
+                let device_list = device_list.lock().unwrap();
+
+                let vrc_info = vrc_info.lock().unwrap();
+                let addresses = vrc_info.raw_parameters.as_ref();
+                let hashmap = addresses.read().expect("Poisoned OSC Hashmap");
+                
+                //tick each device
+                for device_ptr in device_list.iter() {
+                    let mut device = device_ptr;
+                    if let Some(packet) = device.tick(&hashmap, "/h".to_string()){
+                        if let Err(err) = device_socket.send_to(&packet.packet, format!("{}:{}", device.IP, device.Port)) {
+                            eprintln!("Failed to send to {}: {}", device.DisplayName, err);
+                        }
+                    }
+                }
+            }
+        }
     });
 }
 
@@ -57,9 +80,14 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
-        .manage(device_list)
+        .manage(device_list.clone())
         .manage(child_pid)
-        .manage(vrc_info)
+        .manage(vrc_info.clone())
+        .setup(move |_| {
+            // Start the periodic ticking
+            tick_devices(vrc_info.clone(), device_list.clone());
+            Ok(())
+        })
         .setup(|app| {
             let app_handle = app.app_handle();
             start_device_listener(app_handle.clone(), app.state(), app.state());

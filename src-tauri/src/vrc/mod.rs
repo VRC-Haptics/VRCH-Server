@@ -10,12 +10,13 @@ use std::{
 };
 
 #[derive(serde::Serialize, Debug, Clone)]
-pub struct  VrcInfo {
+pub struct VrcInfo {
     pub osc_server: Option<OscServer>,
     pub query_server: Option<OscQueryServer>,
     pub in_port: Option<u16>,
     pub out_port: Option<u16>,
     pub avatar: Option<avatar>,
+    pub haptics_prefix: String,
     pub raw_parameters: Arc<RwLock<HashMap<String, Vec<OscType>>>>,
 }
 
@@ -26,14 +27,6 @@ pub struct avatar {
     haptic_parameters: Option<Vec<String>>,
 }
 
-/* what is imported: 
-#[derive(serde::Serialize, Clone)]
-pub struct OscServer {
-    port: u16,
-    address: Ipv4Addr,
-    #[serde(skip)]
-    close_handle: Option<mpsc::Sender<()>>,
-    #[serde(skip)]
-    on_receive: Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
+pub struct Parameters {
+    strength: f32,
 }
- */
