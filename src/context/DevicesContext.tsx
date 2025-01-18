@@ -1,9 +1,18 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect, useContext, Dispatch, SetStateAction } from 'react';
 import { invoke } from "@tauri-apps/api/core";
-import { Device } from '../utils/commonClasses';
 import { ReactNode } from 'react';
+import { Device } from '../utils/commonClasses';
 
-export const DeviceContext = createContext<Device[]>([]);
+interface DeviceContextValue {
+  devices: Device[];
+  setDevices: Dispatch<SetStateAction<Device[]>>;
+}
+
+export const DeviceContext = createContext<DeviceContextValue>({
+  devices: [],
+  // By default, no-op to avoid undefined behavior outside the provider
+  setDevices: () => {},
+});
 
 export const useDeviceContext = () => useContext(DeviceContext);
 
@@ -15,7 +24,6 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
       try {
         const deviceList = await invoke<Device[]>('get_device_list');
         setDevices(deviceList);
-        //console.log('Fetched devices:', deviceList);
       } catch (error) {
         console.error("Failed to fetch devices:", error);
       }
@@ -25,12 +33,12 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
     fetchDevices();
 
     // Polling interval
-    const intervalId = setInterval(fetchDevices, 500); // TODO: I give up trying to get this to work without polling
+    const intervalId = setInterval(fetchDevices, 500);
     return () => clearInterval(intervalId);
   }, []);
 
   return (
-    <DeviceContext.Provider value={devices}>
+    <DeviceContext.Provider value={{ devices, setDevices }}>
       {children}
     </DeviceContext.Provider>
   );

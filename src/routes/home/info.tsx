@@ -1,45 +1,50 @@
-import { DeviceContext } from "../../context/DevicesContext";
-import { useContext } from "react";
+import { useDeviceContext } from "../../context/DevicesContext";
+import { AddressGroupsEditor } from "./info/groups";
+import RawDeviceInfo from "./info/raw";
+import { Device, AddressGroup } from "../../utils/commonClasses"; // Adjust path
 
 interface InfoPageProps {
   selectedDevice: string | null;
 }
 
 export default function InfoPage({ selectedDevice }: InfoPageProps) {
-  const devices = useContext(DeviceContext);
+  // Instead of just `devices`, now we get both
+  const { devices, setDevices } = useDeviceContext();
 
   function createInfo(mac_address: string) {
-    const device = devices.find((device) => device.mac === mac_address);
+    const device = devices.find((d) => d.mac === mac_address);
+
     if (device == null) {
       return (
         <div id="defaultInfoCard" className="text-center">
           <h1 className="text-lg">Welcome To VRC Haptics!</h1>
-          <p className="">
-            Make sure you device is connected to the same wifi network and then
-            select it from the connected devices tab. Your device info will pop
-            up here.
+          <p>
+            Make sure your device is connected to the same wifi network
+            and then select it from the connected devices tab. 
+            Your device info will pop up here.
           </p>
         </div>
       );
     } else {
+      // Handler to update the device's AddressGroups in context
+      const handleGroupsChange = (newGroups: AddressGroup[]) => {
+        setDevices((prev) =>
+          prev.map((dev) =>
+            dev.mac === device.mac
+              ? { ...dev, addr_groups: newGroups }
+              : dev
+          )
+        );
+      };
+
       return (
-        <div id={device.mac}>
-          <p>Firmware Name: {device.display_name}</p>
-          <p>IP: {device.ip}</p>
-          <p>MAC Address: {device.mac}</p>
-          <p>Client Port: {device.port}</p>
-          <p>TTL: {device.ttl}</p>
-          <p>Number of Motors: {device.num_motors}</p>
-          <div>
-            <p>Address Groups:</p>
-            {device.addr_groups.map((group, index) => (
-              <div key={index} style={{ marginLeft: "1em" }}>
-                <p>Name: {group.name}</p>
-                <p>Start: {group.start}</p>
-                <p>End: {group.end}</p>
-              </div>
-            ))}
-          </div>
+        <div id="DeviceInfoCard" className="overflow-y-scroll h-full">
+          <AddressGroupsEditor 
+            initialGroups={device.addr_groups} 
+            onChange={handleGroupsChange} 
+          />
+          <div className="flex-grow"></div>
+          <RawDeviceInfo device={device} />
         </div>
       );
     }
@@ -62,7 +67,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
         ) : (
           <div id="defaultInfoCard" className="text-center">
             <h1 className="text-lg">Welcome To VRC Haptics!</h1>
-            <p className="">
+            <p>
               Make sure you device is connected to the same wifi network and
               then select it from the connected devices tab. Your device info
               will pop up here.

@@ -146,7 +146,6 @@ impl Device {
     }
 
     pub fn get_ping(&self) -> Packet {
-        println!("sent ping to: {}", self.display_name);
         let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
             addr: "/ping".to_string(),
             args: vec![OscType::Int(1000)],

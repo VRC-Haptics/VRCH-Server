@@ -1,6 +1,6 @@
-import { useContext, useState } from "react";
+import { useState } from "react";
 import clsx from "clsx";
-import { DeviceContext } from "../../context/DevicesContext";
+import { useDeviceContext } from "../../context/DevicesContext";
 
 interface ConnectedDevicesProps {
   onSelectDevice: (deviceName: string) => void;
@@ -10,7 +10,7 @@ export default function ConnectedDevices({
   onSelectDevice,
 }: ConnectedDevicesProps) {
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-  const devices = useContext(DeviceContext);
+  const { devices, setDevices } = useDeviceContext();
 
   return (
     <div
@@ -34,10 +34,10 @@ export default function ConnectedDevices({
         devices.map((device) => {
           const isSelected = selectedDevice === device.mac;
           const deviceClass = clsx(
-            "h-max rounded-md px-2 py-1",
+            "h-max rounded-md px-2 py-1 hover:bg-base-200",
             isSelected
               ? "bg-base-300 border-2 border-dotted border-base-300"
-              : "bg-base-100"
+              : "bg-base-100 "
           );
 
           return (
