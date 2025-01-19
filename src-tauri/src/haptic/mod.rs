@@ -1,6 +1,6 @@
 pub mod mdns;
 
-use std::{collections::HashMap, io::Read};
+use std::collections::HashMap;
 
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use serde::{Deserialize, Serialize};

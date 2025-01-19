@@ -10,7 +10,7 @@ export default function ConnectedDevices({
   onSelectDevice,
 }: ConnectedDevicesProps) {
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-  const { devices, setDevices } = useDeviceContext();
+  const { devices } = useDeviceContext();
 
   return (
     <div

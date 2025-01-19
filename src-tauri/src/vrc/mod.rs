@@ -27,6 +27,7 @@ pub struct avatar {
     haptic_parameters: Option<Vec<String>>,
 }
 
+#[allow(dead_code)]
 pub struct Parameters {
     strength: f32,
 }

@@ -1,7 +1,7 @@
 import { useDeviceContext } from "../../context/DevicesContext";
 import { AddressGroupsEditor } from "./info/groups";
 import RawDeviceInfo from "./info/raw";
-import { Device, AddressGroup } from "../../utils/commonClasses"; // Adjust path
+import { AddressGroup } from "../../utils/commonClasses"; // Adjust path
 import { invoke } from "@tauri-apps/api/core";
 
 interface InfoPageProps {
@@ -10,7 +10,7 @@ interface InfoPageProps {
 
 export default function InfoPage({ selectedDevice }: InfoPageProps) {
   // Instead of just `devices`, now we get both
-  const { devices, setDevices } = useDeviceContext();
+  const { devices } = useDeviceContext();
 
   function createInfo(mac_address: string) {
     const device = devices.find((d) => d.mac === mac_address);

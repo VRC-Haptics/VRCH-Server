@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { invoke } from "@tauri-apps/api/core";
 import { defaultVrcInfo, VrcInfo } from '../utils/commonClasses';
 
@@ -6,7 +6,7 @@ export const VrcContext = createContext<VrcInfo>(defaultVrcInfo);
 
 export const useVrcContext = () => useContext(VrcContext);
 
-export const VrcProvider = ({ children }: { children: ReactNode }) => {
+export const VrcProvider = ({ children }: { children: ReactNode}) => {
   const [vrcInfo, setVrcInfo] = useState<VrcInfo>(defaultVrcInfo);
 
   useEffect(() => {
