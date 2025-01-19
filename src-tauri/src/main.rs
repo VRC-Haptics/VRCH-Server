@@ -83,7 +83,7 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
     io::stdout().flush().unwrap();
 
     tauri::async_runtime::spawn(async move {
-        let mut timer = tokio::time::interval(Duration::from_millis(100)); // 10 Hz
+        let mut timer = tokio::time::interval(Duration::from_millis(10)); // 100 Hz
         let device_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
         loop {
