@@ -22,11 +22,7 @@ export default function RawDeviceInfo({ device }: rawDeviceInfoProps) {
                 <div>
                     <p>Address Groups:</p>
                     {device.addr_groups.map((group, index) => (
-                    <div key={index} style={{ marginLeft: "1em" }}>
-                        <p>Name: {group.name}</p>
-                        <p>Start: {group.start}</p>
-                        <p>End: {group.end}</p>
-                    </div>
+                      <p key={index}>{"    "}{group.name}@{group.start} -{">"} {group.end}</p>
                     ))}
                 </div>
             </div>

@@ -14,7 +14,6 @@ export const VrcProvider = ({ children }: { children: ReactNode }) => {
       try {
         const newInfo = await invoke<VrcInfo>('get_vrc_info');
         setVrcInfo(newInfo);
-        console.log('Fetched info', newInfo);
       } catch (error) {
         console.error("Failed to fetch devices:", error);
       }

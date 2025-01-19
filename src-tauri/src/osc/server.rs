@@ -1,10 +1,10 @@
-use std::net::{UdpSocket, Ipv4Addr};
-use std::thread;
-use std::sync::{Arc, Mutex};
 use std::fmt;
+use std::net::{Ipv4Addr, UdpSocket};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
+use rosc::{OscMessage, OscPacket};
 use tokio::sync::mpsc;
-use rosc::{OscPacket, OscMessage};
 
 #[derive(serde::Serialize, Clone)]
 pub struct OscServer {
@@ -69,7 +69,11 @@ impl OscServer {
                     Ok((size, _src)) => {
                         if let Ok((left_over, packet)) = rosc::decoder::decode_udp(&buf[..size]) {
                             if !left_over.is_empty() {
-                                println!("leftover bytes: {} on socket: {}", String::from_utf8_lossy(left_over), socket.local_addr().unwrap().to_string());
+                                println!(
+                                    "leftover bytes: {} on socket: {}",
+                                    String::from_utf8_lossy(left_over),
+                                    socket.local_addr().unwrap().to_string()
+                                );
                             }
                             handle_packet(packet, &on_receive, &filter_prefix);
                         }
@@ -92,16 +96,15 @@ impl OscServer {
 
 /// recursively handle packets
 fn handle_packet(
-    packet: OscPacket, 
-    callback: &Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>, 
-    filter_prefix:&str, 
+    packet: OscPacket,
+    callback: &Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
+    filter_prefix: &str,
 ) {
     match packet {
         OscPacket::Bundle(bundle) => {
             for packet in bundle.content {
                 handle_packet(packet, callback, filter_prefix);
             }
-
         }
         OscPacket::Message(message) => {
             handle_message(message, callback, filter_prefix);
@@ -111,9 +114,9 @@ fn handle_packet(
 
 /// handle the messages with a callback.
 fn handle_message(
-    message: OscMessage, 
-    callback: &Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>, 
-    filter_prefix:&str
+    message: OscMessage,
+    callback: &Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
+    filter_prefix: &str,
 ) {
     let address = &message.addr;
 

@@ -2,6 +2,7 @@ import { useDeviceContext } from "../../context/DevicesContext";
 import { AddressGroupsEditor } from "./info/groups";
 import RawDeviceInfo from "./info/raw";
 import { Device, AddressGroup } from "../../utils/commonClasses"; // Adjust path
+import { invoke } from "@tauri-apps/api/core";
 
 interface InfoPageProps {
   selectedDevice: string | null;
@@ -28,13 +29,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
     } else {
       // Handler to update the device's AddressGroups in context
       const handleGroupsChange = (newGroups: AddressGroup[]) => {
-        setDevices((prev) =>
-          prev.map((dev) =>
-            dev.mac === device.mac
-              ? { ...dev, addr_groups: newGroups }
-              : dev
-          )
-        );
+        invoke("update_device_groups", {mac: device.mac, groups: newGroups});
       };
 
       return (

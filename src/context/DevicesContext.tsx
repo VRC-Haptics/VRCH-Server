@@ -10,20 +10,32 @@ interface DeviceContextValue {
 
 export const DeviceContext = createContext<DeviceContextValue>({
   devices: [],
-  // By default, no-op to avoid undefined behavior outside the provider
   setDevices: () => {},
 });
 
 export const useDeviceContext = () => useContext(DeviceContext);
 
 export const DeviceProvider = ({ children }: { children: ReactNode }) => {
-  const [devices, setDevices] = useState<Device[]>([]);
+  //real state
+  const [internalDevices, setInternalDevices] = useState<Device[]>([]);
+
+  // Wrap the original setter
+  const setDevices = async (valueOrUpdater: SetStateAction<Device[]>) => {
+    setInternalDevices(valueOrUpdater);
+
+    // invoke rust
+    try {
+      await invoke('invalidate_cache');
+    } catch (err) {
+      console.error("Failed to invalidate address cache:", err);
+    }
+  };
 
   useEffect(() => {
     const fetchDevices = async () => {
       try {
         const deviceList = await invoke<Device[]>('get_device_list');
-        setDevices(deviceList);
+        setInternalDevices(deviceList);
       } catch (error) {
         console.error("Failed to fetch devices:", error);
       }
@@ -38,7 +50,7 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <DeviceContext.Provider value={{ devices, setDevices }}>
+    <DeviceContext.Provider value={{ devices: internalDevices, setDevices }}>
       {children}
     </DeviceContext.Provider>
   );

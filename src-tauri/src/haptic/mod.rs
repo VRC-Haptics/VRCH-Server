@@ -1,6 +1,6 @@
 pub mod mdns;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use serde::{Deserialize, Serialize};
@@ -31,12 +31,13 @@ pub struct AddressGroup {
 }
 
 impl Device {
+    #[allow(dead_code)]
     /// Instantiate new device instance
     pub fn new(mac: String, ip: String, display_name: String, port: u16, ttl: u32) -> Device {
         return Device {
             mac: mac,
             ip: ip,
-           display_name: display_name,
+            display_name: display_name,
             port: port,
             ttl: ttl,
             addr_groups: Vec::new(),
@@ -60,6 +61,9 @@ impl Device {
         }
 
         if self.cached_param.is_empty() {
+            //only rebuild parameters if the cache ahs been purged
+            //println!("Cache empty, groups: {:?}", self.addr_groups);
+
             //create motor addresses
             let mut ttl_motors = 0;
             let mut motor_addresses: Vec<String> = Vec::new();
@@ -68,7 +72,7 @@ impl Device {
                 ttl_motors += group.end - group.start + 1;
                 for index in group.start..group.end + 1 {
                     let i: String = index.to_string();
-                    motor_addresses.push(format!("{}{}{}{}", prefix, group.name, "_", i));
+                    motor_addresses.push(format!("{}/{}{}{}", prefix, group.name, "_", i));
                 }
             }
 
@@ -78,29 +82,33 @@ impl Device {
             for address in motor_addresses {
                 self.cached_param.insert(address, OscType::Float(0.));
             }
+            println!("Cached Parameters: {:?}", self.cached_param);
 
             self.num_motors = ttl_motors;
         }
 
         let mut send_flag = false;
-        for (address, old) in self.cached_param.iter_mut() {
-            if let Some(new_vec) = addresses.get(address) {
-                let new = new_vec.first().expect("Empty message at motor send");
-                match (old.to_owned(), new) {
-                    (OscType::Float(ref mut old_float), OscType::Float(new_float)) => {
-                        if *old_float != *new_float {
-                            *old_float = *new_float;
-                            send_flag = true;
+        for (address, old_param) in self.cached_param.iter_mut() {
+            if let Some(new_values) = addresses.get(address) {
+                if let Some(new_value) = new_values.first() {
+                    match (old_param, new_value) {
+                        (OscType::Float(ref mut old_float), OscType::Float(new_float)) => {
+                            // Compare; update if different
+                            if *old_float != *new_float {
+                                *old_float = *new_float;
+                                send_flag = true;
+                            }
+                        },
+                        _ => {
+                            unreachable!("Expected only OscType::Float variants in both old and new values");
                         }
                     }
-                    _ => unreachable!(
-                        "Expected only OscType::Float variants in both old and new values"
-                    ),
                 }
             }
         }
 
         if send_flag {
+            println!("Cache after: {:?}", self.cached_param);
             let updated_floats: Vec<f32> = self
                 .param_index
                 .iter()
@@ -113,9 +121,14 @@ impl Device {
                 })
                 .collect();
 
+            println!("Updated floats: {:?}", updated_floats);
             let hex_message = self.compile_to_bytes(updated_floats);
+            println!("Hex Message: {}", hex_message);
+
+            let message = rosc::OscMessage{addr:"/h".to_string(), args:vec![OscType::String(hex_message)] };
+            let packet = rosc::OscPacket::Message(message);
             return Some(Packet {
-                packet: hex_message,
+                packet: rosc::encoder::encode(&packet).unwrap(),
             });
         }
 
@@ -123,13 +136,14 @@ impl Device {
     }
 
     /// Triggers rebuilding of cache and motor parameters.
-    /// Should be called anytime any sort of device parameters are chagned.
+    /// Should be called anytime any sort of device parameters are changed.
     #[allow(dead_code)]
     pub fn purge_cache(&mut self) {
+        println!("{} purged cache: {:?}", self.mac, self.cached_param);
         self.cached_param.clear();
     }
 
-    fn compile_to_bytes(&self, float_array: Vec<f32>) -> Vec<u8> {
+    fn compile_to_bytes(&self, float_array: Vec<f32>) -> String {
         let out = float_array
             .iter()
             .map(|&num| {
@@ -142,7 +156,7 @@ impl Device {
             })
             // Concatenate all hexadecimal substrings into one
             .collect::<String>();
-        return out.into_bytes();
+        return out;
     }
 
     pub fn get_ping(&self) -> Packet {

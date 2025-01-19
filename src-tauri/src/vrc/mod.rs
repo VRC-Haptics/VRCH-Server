@@ -1,9 +1,9 @@
 pub mod discovery;
 
-use discovery::OscQueryServer;
-use serde::{ Serialize, Deserialize };
-use rosc::OscType;
 use crate::osc::server::OscServer;
+use discovery::OscQueryServer;
+use rosc::OscType;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
