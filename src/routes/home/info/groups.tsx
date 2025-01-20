@@ -2,61 +2,38 @@
 import React, { useState } from "react";
 import {
   AddressGroup,
+  Device,
 } from "../../../utils/commonClasses"; // or your own path
 
 import { AiOutlineClose } from "react-icons/ai";
 
 interface AddressGroupsEditorProps {
-  initialGroups?: AddressGroup[];
-  onChange?: (groups: AddressGroup[]) => void;
+  addGroup: (group: AddressGroup) => void;
+  rmvGroup: (group: AddressGroup) => void;
+  selectedDevice: Device;
 }
 
 export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
-  initialGroups = [],
-  onChange,
+  addGroup,
+  rmvGroup,
+  selectedDevice,
 }) => {
-  const [groups, setGroups] = useState<AddressGroup[]>(initialGroups);
-
-    // Local state for adding a new group
-    const [newGroup, setNewGroup] = useState<AddressGroup>({
-      name: "",
-      start: 0,
-      end: 0,
-    });
-
-  const removeGroup = (rmv: AddressGroup) => {
-    var rmv_index = 0;
-    const group_removed = groups.find((group, index) => {
-      if (group.name === rmv.name && group.start === rmv.start && group.end === rmv.end) {
-        rmv_index = index;
-        return true;
-      }
-    });
-
-    if (group_removed) { //make sure that the group was in our list
-      const newGroups = [...groups];
-      newGroups.splice(rmv_index, 1);
-      setGroups(newGroups);
-      onChange?.(newGroups);
-    }
-    
-  };
-
-  const addGroup = (name: string, start: number, end: number) => {
-    const newGroups = [...groups, { name:name, start:start, end:end }];
-    setGroups(newGroups);
-    onChange?.(newGroups);
-  };
+  // Local state for adding a new group
+  const [newGroup, setNewGroup] = useState<AddressGroup>({
+    name: "",
+    start: 0,
+    end: 0,
+  });
 
   return (
     <div className="p-2 space-y-4 min-w-full mx-auto">
       <div className="flex flex-col items-center justify-between bg-base-300 rounded-md p-1">
         <p className="text-md font-bold">Address Groups</p>
         <div className="flex ">
-          {groups.length === 0 ? (
+          {selectedDevice.addr_groups.length === 0 ? (
             <p className="text-sm text-gray-500">No Address Groups yet.</p>
           ) : (
-            groups.map((group) => {
+            selectedDevice.addr_groups.map((group) => {
               return (
                 <div className="flex flex-row items-center">
                   <p className="text-sm">
@@ -64,7 +41,7 @@ export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
                   </p>
                   <button
                     className="btn btn-primary btn-ghost btn-sm"
-                    onClick={(_) => removeGroup(group)}
+                    onClick={(_) => rmvGroup(group)}
                   >
                     <AiOutlineClose size={15} />
                   </button>
@@ -133,8 +110,7 @@ export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
                 type="button"
                 className="btn btn-success mt-4 md:mt-0"
                 onClick={() => {
-                  // Call your addGroup function
-                  addGroup(newGroup.name, newGroup.start, newGroup.end);
+                  addGroup(newGroup);
                   // Reset the newGroup fields
                   setNewGroup({ name: "", start: 0, end: 0 });
                 }}

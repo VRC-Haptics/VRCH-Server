@@ -15,28 +15,27 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   function createInfo(mac_address: string) {
     const device = devices.find((d) => d.mac === mac_address);
 
-    if (device == null) {
-      return (
-        <div id="defaultInfoCard" className="text-center">
-          <h1 className="text-lg">Welcome To VRC Haptics!</h1>
-          <p>
-            Make sure your device is connected to the same wifi network
-            and then select it from the connected devices tab. 
-            Your device info will pop up here.
-          </p>
-        </div>
-      );
-    } else {
+    if (device != null) {
       // Handler to update the device's AddressGroups in context
-      const handleGroupsChange = (newGroups: AddressGroup[]) => {
-        invoke("update_device_groups", {mac: device.mac, groups: newGroups});
+      const addGroup = (group: AddressGroup) => {
+        device.addr_groups.push(group)
+        invoke("update_device_groups", {mac: device.mac, groups: device.addr_groups});
       };
+
+      const rmvGroup = (group: AddressGroup) => {
+        const index = device.addr_groups.indexOf(group);
+        if (index !== -1) {
+          device.addr_groups.splice(index, 1);
+        } 
+        invoke("update_device_groups", {mac: device.mac, groups: device.addr_groups});
+      }
 
       return (
         <div id="DeviceInfoCard" className="overflow-y-scroll h-full">
           <AddressGroupsEditor 
-            initialGroups={device.addr_groups} 
-            onChange={handleGroupsChange} 
+            addGroup={addGroup}
+            rmvGroup={rmvGroup}
+            selectedDevice={device}
           />
           <div className="flex-grow"></div>
           <RawDeviceInfo device={device} />

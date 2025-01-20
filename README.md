@@ -27,7 +27,8 @@ Once installed, it should be as simple as opening the application and assigning 
 - `pnpm run tauri dev` -> Start the dev server. 
 
 #### Build:
-- `pnpm run tauri build` -> Builds installer under: `./`
+- `pnpm i` -> Install dependencies (both rust and node)
+- `pnpm run tauri build` -> Builds installer under: `./src-tauri/target/release/bundle/<some_subfolder>`
 
 #### Sidecars:
 This project has two C# sidecars, for mdns discovery (since rust sucks with it). 

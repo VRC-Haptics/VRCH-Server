@@ -4,6 +4,8 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter};
+use std::os::windows::process::CommandExt;
+use winapi::um::winbase;
 
 use crate::haptic::Device;
 use crate::recall_device_group;
@@ -19,6 +21,7 @@ pub fn start_device_listener(
         .arg("_haptics._udp.local")
         .arg("--debug")
         .stdout(Stdio::piped())
+        .creation_flags(winbase::CREATE_NO_WINDOW)
         .spawn()
         .expect("Failed to execute command");
     {
