@@ -1,25 +1,56 @@
 use crate::osc::server::OscServer;
 use crate::util::next_free_port;
 use crate::VrcInfo;
+use crate::vrc::Parameters;
 
 use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::{collections::HashMap, net::Ipv4Addr};
 
 use oyasumivr_oscquery;
-use rosc::OscMessage;
+use rosc::{ OscMessage, OscType };
 use serde;
 
 pub fn get_vrc() -> VrcInfo {
     let raw_parameters = Arc::new(RwLock::new(HashMap::new()));
-    let haptics_prefix = "/avatar/parameters/h".to_string();
+    let raw_menu = Arc::new(RwLock::new(Parameters::new()));
+    let first_message = Arc::new(RwLock::new(false));
+
+    let haptics_prefix = "/avatar/parameters/h";
+    let haptics_menu_prefix = "/avatar/parameters/h_param";
+    let haptics_prefix_clone = haptics_prefix.to_string();
 
     let raw_params_for_callback = raw_parameters.clone();
+    let raw_menu_for_callback = raw_menu.clone();
+    let first_message_callback = first_message.clone();
     let on_receive = move |msg: OscMessage| {
-        if msg.addr.starts_with(&haptics_prefix) {
+        if *first_message_callback.read().unwrap() == false {
+            *first_message_callback.write().unwrap() = true;
+        }
+
+        if msg.addr.starts_with(haptics_prefix) {
             let mut params = raw_params_for_callback.write().unwrap();
             params.insert(msg.addr.clone(), msg.args.clone());
-            //println!("Wrote: {}", msg.addr);
+        }
+        
+        if msg.addr.starts_with(haptics_menu_prefix) {
+            //println!("in menu prefix: {}", msg.addr);
+            let mut menu = raw_menu_for_callback.write().unwrap();
+
+           //see if it needs to be put in the parameters
+            for (_, (param, value)) in menu.parameters.iter_mut() {
+                if param == &msg.addr {
+                    match msg.args.first().expect("No value with menu parameter").to_owned() {
+                        OscType::Float(msg_float) => {
+                            *value = msg_float;
+                        },
+                        _ => {
+                            unreachable!("Expected only OscType::Float in menu parameters");
+                        }
+                    }
+                    break;
+                }
+            } 
         }
     };
 
@@ -32,12 +63,14 @@ pub fn get_vrc() -> VrcInfo {
     osc_server.start();
 
     return VrcInfo {
+        vrc_connected: false,
         osc_server: Some(vrc_server),
         query_server: Some(osc_server),
         in_port: Some(recieving_port.to_owned()),
         out_port: None,
         avatar: None,
-        haptics_prefix: "/avatar/parameters/h".to_string(),
+        haptics_prefix: haptics_prefix_clone,
+        menu_parameters: raw_menu,
         raw_parameters: raw_parameters,
     };
 }

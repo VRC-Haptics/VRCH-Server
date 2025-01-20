@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use serde::{Deserialize, Serialize};
 
+use crate::vrc::Parameters;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Device {
     pub mac: String,
@@ -17,6 +19,7 @@ pub struct Device {
     been_pinged: bool,
     param_index: Vec<String>, //indexed parameters by group order
     cached_param: HashMap<String, OscType>,
+    cached_menu: Parameters,
 }
 
 pub struct Packet {
@@ -45,24 +48,26 @@ impl Device {
             been_pinged: false,
             param_index: Vec::new(),
             cached_param: HashMap::new(),
+            cached_menu: Parameters::new(), //reuse so that we only have to edit in one place
         };
     }
 
     pub fn tick(
         &mut self,
         addresses: &HashMap<String, Vec<rosc::OscType>>,
+        menu: &Parameters,
         prefix: String,
     ) -> Option<Packet> {
         if !self.been_pinged {
             // first round through we ping
-            println!("tried to ping board");
+            println!("tried to ping board: {}@{}", self.display_name, self.mac);
             self.been_pinged = true;
             return Some(self.get_ping());
         }
 
         if self.cached_param.is_empty() {
-            //only rebuild parameters if the cache ahs been purged
-            //println!("Cache empty, groups: {:?}", self.addr_groups);
+            //only rebuild parameters if the cache has been purged
+            //println!("Cache empty, building groups: {:?}", self.addr_groups);
 
             //create motor addresses
             let mut ttl_motors = 0;
@@ -82,12 +87,15 @@ impl Device {
             for address in motor_addresses {
                 self.cached_param.insert(address, OscType::Float(0.));
             }
-            println!("Cached Parameters: {:?}", self.cached_param);
+            //println!("Cached Parameters: {:?}", self.cached_param);
 
             self.num_motors = ttl_motors;
+
+            return Some(self.send_zero());
         }
 
         let mut send_flag = false;
+        //see if motors updated
         for (address, old_param) in self.cached_param.iter_mut() {
             if let Some(new_values) = addresses.get(address) {
                 if let Some(new_value) = new_values.first() {
@@ -98,9 +106,34 @@ impl Device {
                                 *old_float = *new_float;
                                 send_flag = true;
                             }
-                        },
+                        }
                         _ => {
-                            unreachable!("Expected only OscType::Float variants in both old and new values");
+                            unreachable!(
+                                "Expected only OscType::Float variants in both old and new values"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        //see if menu updated
+        for (name, (addr, value)) in self.cached_menu.parameters.iter_mut() {
+            if let Some(new_values) = addresses.get(addr) {
+                if let Some(new_value) = new_values.first() {
+                    match new_value {
+                        OscType::Float(new_value) => {
+                            // Compare; update if different
+                            if *value != *new_value {
+                                *value = *new_value;
+                                println!("set:{name} to: {}", value);
+                                send_flag = true;
+                            }
+                        }
+                        _ => {
+                            unreachable!(
+                                "Expected only OscType::Float variants in both old and new values"
+                            );
                         }
                     }
                 }
@@ -108,24 +141,29 @@ impl Device {
         }
 
         if send_flag {
-            println!("Cache after: {:?}", self.cached_param);
+            let offset = 0.1; //self.cached_menu.get("offset"); I give up
+            let intensity = self.cached_menu.get("intensity");
+            //println!("Cache after: {:?}", self.cached_param);
             let updated_floats: Vec<f32> = self
                 .param_index
                 .iter()
                 .filter_map(|address| {
                     if let Some(OscType::Float(value)) = self.cached_param.get(address) {
-                        Some(*value)
+                        Some(*value * intensity * offset)
                     } else {
                         None
                     }
                 })
                 .collect();
 
-            println!("Updated floats: {:?}", updated_floats);
+            //println!("Updated floats: {:?}", updated_floats);
             let hex_message = self.compile_to_bytes(updated_floats);
-            println!("Hex Message: {}", hex_message);
+            //println!("Hex Message: {}", hex_message);
 
-            let message = rosc::OscMessage{addr:"/h".to_string(), args:vec![OscType::String(hex_message)] };
+            let message = rosc::OscMessage {
+                addr: "/h".to_string(),
+                args: vec![OscType::String(hex_message)],
+            };
             let packet = rosc::OscPacket::Message(message);
             return Some(Packet {
                 packet: rosc::encoder::encode(&packet).unwrap(),
@@ -163,6 +201,15 @@ impl Device {
         let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
             addr: "/ping".to_string(),
             args: vec![OscType::Int(1000)],
+        }))
+        .unwrap();
+        Packet { packet: msg_buf }
+    }
+
+    fn send_zero(&self) -> Packet {
+        let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: "/h".to_string(),
+            args: vec![rosc::OscType::String("0".repeat((self.num_motors * 4).try_into().unwrap()))],
         }))
         .unwrap();
         Packet { packet: msg_buf }

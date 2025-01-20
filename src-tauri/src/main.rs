@@ -94,9 +94,15 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
 
                 let addresses = vrc_info_guard.raw_parameters.as_ref();
                 let hashmap = addresses.read().expect("Poisoned OSC Hashmap");
+                let menu = vrc_info_guard.menu_parameters.as_ref();
+                let menu_parameters = menu.read().expect("couldnt get guard");
 
                 for device in device_list_guard.iter_mut() {
-                    if let Some(packet) = device.tick(&hashmap, "/avatar/parameters/h".to_string()) {
+                    if let Some(packet) = device.tick(
+                         &hashmap, 
+                         &menu_parameters,
+                        "/avatar/parameters/h".to_string()
+                    ) {
                         if let Err(err) = device_socket
                             .send_to(&packet.packet, format!("{}:{}", device.ip, device.port))
                         {

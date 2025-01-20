@@ -9,6 +9,7 @@ use winapi::um::winbase;
 
 use crate::haptic::Device;
 use crate::recall_device_group;
+use crate::vrc::Parameters;
 use serde_json::Value;
 
 pub fn start_device_listener(
@@ -101,6 +102,7 @@ fn make_new_device(raw: &str, app_handle: &tauri::AppHandle) -> Device {
         been_pinged: false,
         param_index: Vec::new(),
         cached_param: HashMap::new(),
+        cached_menu: Parameters::new(),
     };
 
     // Try to recall saved groups
