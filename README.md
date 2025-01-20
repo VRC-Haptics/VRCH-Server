@@ -14,7 +14,6 @@ Grab the installer from the releases page and it should install on windows.
 
 Once installed, it should be as simple as opening the application and assigning which parameters you want your device tied to. Here are the basics:
 
-- **KNOWN BUG:** The group editor does not reflect applied groups, check the Raw Data dropdown for the groups actually used in the program. (I am new to react, so help would be much appreciated)
 - All parameters must have a base of `/h`, parameters without this prefix are not currently tracked by the program.
 - Since it is possible to have a large number of haptic nodes, the parameters are divided up into groups, and are formatted like so: Group{`Front@0:15`}; `/h/Front_0, /h/Front_1, ...., /h/Front_15`
   - Singular nodes can be represented by: Group{`Front@0:0`}
