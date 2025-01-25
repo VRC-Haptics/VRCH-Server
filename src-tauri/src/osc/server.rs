@@ -1,11 +1,9 @@
 use std::fmt;
 use std::net::{Ipv4Addr, UdpSocket};
-use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use rosc::{OscMessage, OscPacket};
-use tokio::sync::mpsc;
 
 #[derive(serde::Serialize, Clone)]
 pub struct OscServer {

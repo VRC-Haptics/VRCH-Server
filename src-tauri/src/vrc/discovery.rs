@@ -3,15 +3,12 @@ use crate::util::next_free_port;
 use crate::VrcInfo;
 use crate::vrc::Parameters;
 
-use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::{collections::HashMap, net::Ipv4Addr};
-use std::time::Duration;
 use oyasumivr_oscquery;
 use rosc::{ OscMessage, OscType };
 use serde;
-use tokio::time;
 
 pub fn get_vrc() -> VrcInfo {
     let raw_parameters = Arc::new(RwLock::new(HashMap::new()));

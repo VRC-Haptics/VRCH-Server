@@ -15,7 +15,7 @@ use vrc::{discovery::get_vrc, VrcInfo};
 
 //standard imports
 use std::net::UdpSocket;
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::thread;
 use std::io::{self, Write};
