@@ -8,7 +8,7 @@ use std::{
     collections::HashMap, sync::{Arc, RwLock}
 };
 
-#[derive(serde::Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct VrcInfo {
     pub vrc_connected: bool,
     pub osc_server: Option<OscServer>,

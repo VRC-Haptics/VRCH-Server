@@ -3,19 +3,18 @@ use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Emitter};
 use std::os::windows::process::CommandExt;
 use winapi::um::winbase;
 
 use crate::haptic::Device;
-use crate::recall_device_group;
+use crate::Config;
 use crate::vrc::Parameters;
 use serde_json::Value;
 
 pub fn start_device_listener(
-    app_handle: AppHandle,
-    devices_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-    pid_state: tauri::State<'_, Arc<Mutex<u32>>>,
+    devices_lock: Arc<Mutex<Vec<Device>>>,
+    pid_lock:  Arc<Mutex<u32>>,
+    config: Config,
 ) {
     let mut cmd = Command::new("sidecars/tracker-sidecar.exe")
         .arg("0")
@@ -26,10 +25,9 @@ pub fn start_device_listener(
         .spawn()
         .expect("Failed to execute command");
     {
-        let mut pid = pid_state.lock().unwrap();
+        let mut pid = pid_lock.lock().unwrap();
         *pid = cmd.id();
     }
-    let devices = devices_state.inner().clone();
 
     thread::spawn(move || {
         let stdout = cmd.stdout.take().unwrap();
@@ -46,18 +44,16 @@ pub fn start_device_listener(
 
             // split off debug message
             let raw = split.to_owned().nth(1).unwrap();
-            let device = make_new_device(raw, &app_handle);
+            let device = make_new_device(&config, raw);
 
-            let mut devices = devices.lock().unwrap();
+            let mut devices = devices_lock.lock().unwrap();
             match log_type {
                 "_ADD" => {
                     devices.push(device.clone());
                     println!("device added: {:?}", device);
-                    app_handle.emit("device-added", device).unwrap();
                 }
                 "_RMV" => {
                     devices.retain(|d| d.mac != device.mac);
-                    app_handle.emit("device-removed", device).unwrap();
                 }
                 "_DBUG" => println!("Debug messsage from sidecar: {}", raw),
                 &_ => println!(
@@ -69,7 +65,7 @@ pub fn start_device_listener(
     });
 }
 
-fn make_new_device(raw: &str, app_handle: &tauri::AppHandle) -> Device {
+fn make_new_device(config: &Config, raw: &str) -> Device {
     let parsed: Value = serde_json::from_str(raw).unwrap();
 
     // Extract fields required by Device::new()
@@ -94,7 +90,7 @@ fn make_new_device(raw: &str, app_handle: &tauri::AppHandle) -> Device {
     let mut new_device = Device {
         mac: mac,
         ip: ip,
-        display_name: display_name,
+        display_name: display_name.clone(),
         port: port,
         ttl: ttl,
         addr_groups: Vec::new(),
@@ -106,9 +102,14 @@ fn make_new_device(raw: &str, app_handle: &tauri::AppHandle) -> Device {
     };
 
     // Try to recall saved groups
-    if let Some(old_groups) = recall_device_group(app_handle, &new_device.mac) {
-        new_device.addr_groups.extend(old_groups);
-    }
-
+    let old_groups = config.devices.to_owned().into_iter().find(|d| {d.name == display_name});
+    match old_groups {
+        None => println!("Couldn't find groups for device: {}", display_name),
+        Some(conf) => {
+            println!("Found configuration groups: {:?}", conf.groups);
+            new_device.addr_groups.extend(conf.groups);
+        }
+    };
+    
     return new_device;
 }

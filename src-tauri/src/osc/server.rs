@@ -1,5 +1,6 @@
 use std::fmt;
 use std::net::{Ipv4Addr, UdpSocket};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -12,7 +13,7 @@ pub struct OscServer {
     pub address: Ipv4Addr,
     pub filter_prefix: String,
     #[serde(skip)]
-    close_handle: Option<mpsc::Sender<()>>,
+    live_flag: Arc<AtomicBool>,
     #[serde(skip)]
     on_receive: Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
 }
@@ -22,7 +23,6 @@ impl fmt::Debug for OscServer {
         f.debug_struct("OscServer")
             .field("port", &self.port)
             .field("address", &self.address)
-            .field("close_handle", &self.close_handle)
             .field("on_receive", &"Function Pointer")
             .finish()
     }
@@ -30,15 +30,15 @@ impl fmt::Debug for OscServer {
 
 impl OscServer {
     /// create new Osc Server, it will need to be started with the start() command
-    pub fn new<F>(port: u16, address: Ipv4Addr, on_receive: F) -> Self
+    pub fn new<F>(port: u16, address: Ipv4Addr, on_receive: F, live_flag: Arc<AtomicBool>) -> Self
     where
         F: Fn(OscMessage) + Send + Sync + 'static,
     {
         OscServer {
             port,
             address,
-            close_handle: None,
             filter_prefix: "".to_string(),
+            live_flag,
             on_receive: Arc::new(Mutex::new(on_receive)),
         }
     }
@@ -50,9 +50,8 @@ impl OscServer {
 
         let on_receive = Arc::clone(&self.on_receive);
         let filter_prefix = self.filter_prefix.clone();
-
-        let (tx, mut rx) = mpsc::channel(1);
-        self.close_handle = Some(tx);
+        let flag = Arc::clone(&self.live_flag);
+        let port = Arc::new(self.port);
 
         thread::spawn(move || {
             //println!("Spawned UDP OSC Server on: {}", socket.local_addr().unwrap());
@@ -60,10 +59,10 @@ impl OscServer {
             let mut buf = [0u8; rosc::decoder::MTU];
             loop {
                 // Check for stop signal
-                if let Ok(_) = rx.try_recv() {
-                    println!("Stopping server thread.");
+                if !flag.load(std::sync::atomic::Ordering::SeqCst) {
+                    println!("Killed server listening on: {}", port);
                     break;
-                }
+                };
 
                 match socket.recv_from(&mut buf) {
                     Ok((size, _src)) => {
@@ -84,13 +83,6 @@ impl OscServer {
                 }
             }
         });
-    }
-
-    //kills the server thread.
-    pub fn stop(&mut self) {
-        if let Some(handle) = self.close_handle.take() {
-            let _ = handle.send(());
-        }
     }
 }
 

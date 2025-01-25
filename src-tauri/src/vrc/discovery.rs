@@ -3,6 +3,7 @@ use crate::util::next_free_port;
 use crate::VrcInfo;
 use crate::vrc::Parameters;
 
+use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::{collections::HashMap, net::Ipv4Addr};
@@ -11,7 +12,7 @@ use oyasumivr_oscquery;
 use rosc::{ OscMessage, OscType };
 use serde;
 
-pub fn get_vrc() -> VrcInfo {
+pub fn get_vrc(live_flag: Arc<AtomicBool>) -> VrcInfo {
     let raw_parameters = Arc::new(RwLock::new(HashMap::new()));
     let raw_menu = Arc::new(RwLock::new(Parameters::new()));
     let first_message = Arc::new(RwLock::new(false));
@@ -56,7 +57,7 @@ pub fn get_vrc() -> VrcInfo {
 
     //create server before starting anything
     let recieving_port = next_free_port(1000).unwrap();
-    let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
+    let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive, live_flag);
     vrc_server.start();
 
     let mut osc_server = OscQueryServer::new(recieving_port);

@@ -1,4 +1,7 @@
-# VRC Haptics
+# VRC Haptics Headless
+
+THIS IS THE HEAD-LESS VERSION OF VRCH. IT IS CLI ONLY. FOR THE FULL APP GO HERE:
+[MAIN branch](https://github.com/virtuallyaverage/vrch-gui)
 
 A GUI interface for providing osc haptics from Vrchat.
 

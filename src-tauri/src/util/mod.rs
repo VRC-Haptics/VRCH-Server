@@ -1,7 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::process::Command;
 
-#[tauri::command]
 pub fn shutdown_device_listener(pid: u32) -> Result<(), String> {
     #[cfg(windows)]
     {
