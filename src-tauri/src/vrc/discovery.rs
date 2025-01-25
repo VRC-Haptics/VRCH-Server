@@ -7,12 +7,13 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::{collections::HashMap, net::Ipv4Addr};
-
+use std::time::Duration;
 use oyasumivr_oscquery;
 use rosc::{ OscMessage, OscType };
 use serde;
+use tokio::time;
 
-pub fn get_vrc(live_flag: Arc<AtomicBool>) -> VrcInfo {
+pub fn get_vrc() -> VrcInfo {
     let raw_parameters = Arc::new(RwLock::new(HashMap::new()));
     let raw_menu = Arc::new(RwLock::new(Parameters::new()));
     let first_message = Arc::new(RwLock::new(false));
@@ -57,7 +58,7 @@ pub fn get_vrc(live_flag: Arc<AtomicBool>) -> VrcInfo {
 
     //create server before starting anything
     let recieving_port = next_free_port(1000).unwrap();
-    let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive, live_flag);
+    let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
     vrc_server.start();
 
     let mut osc_server = OscQueryServer::new(recieving_port);
@@ -92,9 +93,7 @@ impl OscQueryServer {
     }
 
     pub fn start(&mut self) {
-        let (tx, rx) = mpsc::channel();
         let in_port = self.recv_port.clone();
-        self.stop_sender = Some(tx);
 
         thread::spawn(move || {
             println!("Spawned VRC Advertising on port:{}", in_port);
@@ -114,16 +113,6 @@ impl OscQueryServer {
                 oyasumivr_oscquery::server::receive_vrchat_avatar_parameters().await; // /avatar/*, /avatar/parameters/*, etc.
                 oyasumivr_oscquery::server::advertise().await.unwrap();
             });
-
-            loop {
-                // Check for stop signal
-                if let Ok(_) = rx.try_recv() {
-                    tk_rt.block_on(async {
-                        let _ = oyasumivr_oscquery::server::deinit().await;
-                    });
-                    break;
-                }
-            }
         });
     }
 

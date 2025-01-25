@@ -133,30 +133,19 @@ fn main() {
     }
     println!("Config: {:?}", config);
 
-    let running = Arc::new(AtomicBool::new(true)); // Flag to signal running state
-
-    // Clone the flag for the `Ctrl+C` handler
-    let running_ctrlc = running.clone();
-
-    // Register Ctrl+C handler
-    ctrlc::set_handler(move || {
-        println!("Ctrl+C pressed. Shutting down...");
-        running_ctrlc.store(false, Ordering::SeqCst);
-    }).expect("Error setting Ctrl+C handler");
-
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let child_pid: Arc<Mutex<u32>> = Arc::new(Mutex::new(0)); //the child pid for the haptics sub process
+
+    let handlers_pid = child_pid.clone();
+    ctrlc::set_handler(move || {
+        println!("Ctrl+C pressed. Shutting down...");
+        close_app(handlers_pid.clone());
+    }).expect("Error setting Ctrl+C handler");
     
     // start advertising and listening for vrc
-    let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc(running.clone()))); //the vrc state
+    let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); // spawns a thread for advertising
 
     // start devices ticking and listening for added devices.
-    tick_devices(vrc_info.clone(), device_list.clone());
-    start_device_listener(device_list, child_pid.clone(), config);
-
-    // Wait for the flag to turn false
-    while running.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_millis(100));
-    };
-    close_app(child_pid);
+    tick_devices(vrc_info.clone(), device_list.clone()); // spawns thread that periodically ticks devices
+    start_device_listener(device_list, child_pid.clone(), config); // spawns thread that modifies the device list
 }

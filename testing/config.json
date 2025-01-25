@@ -1,0 +1,14 @@
+{
+  "devices": [
+    {
+      "mac": "",
+      "name": "vest_f",
+      "groups": [{ "name": "Front", "start": 0, "end": 15 }]
+    },
+    {
+        "mac": "",
+        "name": "vest_b",
+        "groups": [{ "name": "Back", "start": 0, "end": 15 }]
+    }
+  ]
+}

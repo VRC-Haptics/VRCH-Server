@@ -13,8 +13,6 @@ pub struct OscServer {
     pub address: Ipv4Addr,
     pub filter_prefix: String,
     #[serde(skip)]
-    live_flag: Arc<AtomicBool>,
-    #[serde(skip)]
     on_receive: Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
 }
 
@@ -30,7 +28,7 @@ impl fmt::Debug for OscServer {
 
 impl OscServer {
     /// create new Osc Server, it will need to be started with the start() command
-    pub fn new<F>(port: u16, address: Ipv4Addr, on_receive: F, live_flag: Arc<AtomicBool>) -> Self
+    pub fn new<F>(port: u16, address: Ipv4Addr, on_receive: F) -> Self
     where
         F: Fn(OscMessage) + Send + Sync + 'static,
     {
@@ -38,7 +36,6 @@ impl OscServer {
             port,
             address,
             filter_prefix: "".to_string(),
-            live_flag,
             on_receive: Arc::new(Mutex::new(on_receive)),
         }
     }
@@ -50,7 +47,6 @@ impl OscServer {
 
         let on_receive = Arc::clone(&self.on_receive);
         let filter_prefix = self.filter_prefix.clone();
-        let flag = Arc::clone(&self.live_flag);
         let port = Arc::new(self.port);
 
         thread::spawn(move || {
@@ -59,10 +55,6 @@ impl OscServer {
             let mut buf = [0u8; rosc::decoder::MTU];
             loop {
                 // Check for stop signal
-                if !flag.load(std::sync::atomic::Ordering::SeqCst) {
-                    println!("Killed server listening on: {}", port);
-                    break;
-                };
 
                 match socket.recv_from(&mut buf) {
                     Ok((size, _src)) => {
