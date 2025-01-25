@@ -15,7 +15,7 @@ use vrc::{discovery::get_vrc, VrcInfo};
 
 //standard imports
 use std::net::UdpSocket;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Condvar};
 use std::time::Duration;
 use std::thread;
 use std::io::{self, Write};
@@ -87,7 +87,6 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
 }
 
 fn close_app(child_pid: Arc<Mutex<u32>>) {
-    println!("Application is closing. Running cleanup...");
     let pid = child_pid.lock().expect("couldn't get lock on pid");
     shutdown_device_listener(*pid).expect("Failed to kill haptics process");
 
@@ -136,11 +135,18 @@ fn main() {
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let child_pid: Arc<Mutex<u32>> = Arc::new(Mutex::new(0)); //the child pid for the haptics sub process
 
-    let handlers_pid = child_pid.clone();
+    // Shared flag to indicate when to shut down
+    let shutdown_pair = Arc::new((Mutex::new(false), Condvar::new()));
+    let shutdown_pair_clone = shutdown_pair.clone();
+
     ctrlc::set_handler(move || {
         println!("Ctrl+C pressed. Shutting down...");
-        close_app(handlers_pid.clone());
+        let (lock, cvar) = &*shutdown_pair_clone;
+        let mut shutdown = lock.lock().unwrap();
+        *shutdown = true;
+        cvar.notify_one(); // Notify the main thread to exit
     }).expect("Error setting Ctrl+C handler");
+    
     
     // start advertising and listening for vrc
     let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); // spawns a thread for advertising
@@ -148,4 +154,15 @@ fn main() {
     // start devices ticking and listening for added devices.
     tick_devices(vrc_info.clone(), device_list.clone()); // spawns thread that periodically ticks devices
     start_device_listener(device_list, child_pid.clone(), config); // spawns thread that modifies the device list
+
+    // Block the main thread until shutdown is triggered
+    let (lock, cvar) = &*shutdown_pair;
+    let mut shutdown = lock.lock().unwrap();
+    while !*shutdown {
+        shutdown = cvar.wait(shutdown).unwrap();
+    }
+
+    // Perform any necessary cleanup
+    println!("Application is closing. Running cleanup...");
+    close_app(child_pid);
 }

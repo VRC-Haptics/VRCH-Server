@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+#testing files
+/testing/testing/*
+!/testing/testing/testing.vtuneproj
