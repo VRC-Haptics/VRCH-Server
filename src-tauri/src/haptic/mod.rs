@@ -12,6 +12,7 @@ pub struct Device {
     pub mac: String,
     pub ip: String,
     pub display_name: String,
+    pub full_name: String,
     pub port: u16,
     pub ttl: u32,
     pub addr_groups: Vec<AddressGroup>, //group name and start and end number
@@ -36,11 +37,14 @@ pub struct AddressGroup {
 impl Device {
     #[allow(dead_code)]
     /// Instantiate new device instance
-    pub fn new(mac: String, ip: String, display_name: String, port: u16, ttl: u32) -> Device {
+    pub fn new(mac: String, ip: String, port: u16, ttl: u32, full_name: String) -> Device {
+        let display_name = full_name.split(".").next().unwrap().to_string();
+        println!("created display_name: {}", display_name);
         return Device {
             mac: mac,
             ip: ip,
             display_name: display_name,
+            full_name: full_name,
             port: port,
             ttl: ttl,
             addr_groups: Vec::new(),
@@ -55,12 +59,12 @@ impl Device {
     pub fn tick(
         &mut self,
         addresses: &HashMap<String, Vec<rosc::OscType>>,
+        #[allow(unused_variables)]
         menu: &Parameters,
         prefix: String,
     ) -> Option<Packet> {
         if !self.been_pinged {
             // first round through we ping
-            println!("tried to ping board: {}@{}", self.display_name, self.mac);
             self.been_pinged = true;
             return Some(self.get_ping());
         }
