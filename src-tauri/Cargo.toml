@@ -33,4 +33,5 @@ tokio = "1.42.0"
 rosc = { git = "https://github.com/virtuallyaverage/rosc-serde.git" }
 tauri-plugin-store = "2"
 winapi = {version = "0.3.9", features = ["winbase"] }
+mdns-sd = "0.13.2"
 

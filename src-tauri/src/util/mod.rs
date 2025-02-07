@@ -1,30 +1,4 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
-use std::process::Command;
-
-#[tauri::command]
-pub fn shutdown_device_listener(pid: u32) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/F"])
-            .spawn()
-            .expect("Failed to kill process")
-            .wait()
-            .expect("Failed to wait on child process");
-    }
-
-    #[cfg(unix)]
-    {
-        Command::new("kill")
-            .args(["-s", "SIGINT", &pid.to_string()])
-            .spawn()
-            .expect("Failed to kill process")
-            .wait()
-            .expect("Failed to wait on child process");
-    }
-
-    Ok(())
-}
 
 pub fn next_free_port_with_address(start_port: u16, address: IpAddr) -> Option<u16> {
     let mut port = start_port;

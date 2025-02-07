@@ -48,6 +48,7 @@ impl Parameters {
         return value;
     }
 
+    #[allow(dead_code)]
     pub fn addr(&self, param_name: &str) -> String {
         return self.parameters.get(param_name).unwrap().0.clone();
     }
