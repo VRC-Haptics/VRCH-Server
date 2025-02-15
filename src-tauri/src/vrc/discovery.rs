@@ -1,5 +1,4 @@
 use crate::osc::server::OscServer;
-use crate::util::next_free_port;
 use crate::VrcInfo;
 use crate::vrc::Parameters;
 
@@ -69,12 +68,12 @@ pub fn get_vrc() -> VrcInfo {
     };
 
     //create server before starting anything
-    let recieving_port = next_free_port(1000).unwrap();
+    let recieving_port = 9001;
     let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
     vrc_server.start();
 
     let mut osc_server = OscQueryServer::new(recieving_port);
-    osc_server.start();
+    //osc_server.start();
 
     return VrcInfo {
         vrc_connected: false,

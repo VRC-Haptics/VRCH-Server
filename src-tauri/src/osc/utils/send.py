@@ -2,7 +2,7 @@ from pythonosc import udp_client
 import time
 
 # Create an OSC client
-client = udp_client.SimpleUDPClient("127.0.0.1", 1000)
+client = udp_client.SimpleUDPClient("0.0.0.0", 1000)
 
 # Send "hello" message at 2Hz
 while True:

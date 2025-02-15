@@ -1,11 +1,13 @@
 pub mod mdns;
+mod recv;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::{Duration, SystemTime}};
 
+use recv::DeviceConnManager;
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use serde::{Deserialize, Serialize};
 
-use crate::vrc::Parameters;
+use crate::{util::next_free_port, vrc::Parameters};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Device {
@@ -17,6 +19,9 @@ pub struct Device {
     pub ttl: u32,
     pub addr_groups: Vec<AddressGroup>, //group name and start and end number
     pub num_motors: u32,
+    pub conn_manager: DeviceConnManager,
+    pub is_alive: bool,
+    pub kill_me: bool,
     been_pinged: bool,
     param_index: Vec<String>, //indexed parameters by group order
     cached_param: HashMap<String, OscType>,
@@ -37,17 +42,20 @@ pub struct AddressGroup {
 impl Device {
     #[allow(dead_code)]
     /// Instantiate new device instance
-    pub fn new(mac: String, ip: String, port: u16, ttl: u32, full_name: String) -> Device {
+    pub fn new(mac: String, ip: String, send_port: u16, ttl: u32, full_name: String) -> Device {
         let display_name = full_name.split(".").next().unwrap().to_string();
-        println!("created display_name: {}", display_name);
+        let recv_port = next_free_port(1000).unwrap();
         return Device {
             mac: mac,
-            ip: ip,
+            ip: ip.clone(),
             display_name: display_name,
             full_name: full_name,
-            port: port,
+            port: send_port,
             ttl: ttl,
             addr_groups: Vec::new(),
+            conn_manager: DeviceConnManager::new(recv_port, "/hrtbt".to_string()),
+            is_alive: true,
+            kill_me: false,
             num_motors: 0,
             been_pinged: false,
             param_index: Vec::new(),
@@ -69,8 +77,22 @@ impl Device {
             return Some(self.get_ping());
         }
 
+        // manage hrtbt
+        let now = SystemTime::now();
+        let then = self.conn_manager.last_hrtbt.lock().unwrap();
+        let diff = now.duration_since(*then).unwrap();
+        let ttl = Duration::from_secs(2); // 2 heartbeats missed consecutively
+        if diff > ttl && self.is_alive {
+            self.is_alive = false;
+            self.been_pinged = false;
+            return None; // return early and ping next time
+        } else if diff < ttl && !self.is_alive {
+            self.is_alive = true;
+        };
+
+        //only rebuild parameters if the cache has been purged
         if self.cached_param.is_empty() {
-            //only rebuild parameters if the cache has been purged
+            
             println!("Cache empty, building groups: {:?}", self.addr_groups);
 
             //create motor addresses
@@ -98,8 +120,8 @@ impl Device {
             return Some(self.send_zero());
         }
 
-        let mut send_flag = false;
         //see if motors updated
+        let mut send_flag = false;
         for (address, old_param) in self.cached_param.iter_mut() {
             if let Some(new_values) = addresses.get(address) {
                 if let Some(new_value) = new_values.first() {
@@ -144,6 +166,8 @@ impl Device {
             }
         }
 
+
+        // send packet
         if send_flag {
             let offset = 1.; //self.cached_menu.get("offset"); I give up
             let intensity = self.cached_menu.get("intensity");
@@ -204,7 +228,7 @@ impl Device {
     pub fn get_ping(&self) -> Packet {
         let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
             addr: "/ping".to_string(),
-            args: vec![OscType::Int(1000)],
+            args: vec![OscType::Int(self.conn_manager.recv_port as i32)],
         }))
         .unwrap();
         Packet { packet: msg_buf }

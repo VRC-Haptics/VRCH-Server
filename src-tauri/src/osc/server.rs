@@ -30,6 +30,7 @@ impl fmt::Debug for OscServer {
 
 impl OscServer {
     /// create new Osc Server, it will need to be started with the start() command
+    /// THE ADDRESS IS USUALLY JUST "0.0.0.0". THIS IS THE ADDRESS WE OWN.
     pub fn new<F>(port: u16, address: Ipv4Addr, on_receive: F) -> Self
     where
         F: Fn(OscMessage) + Send + Sync + 'static,

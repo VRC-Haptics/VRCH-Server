@@ -22,6 +22,13 @@ pub fn start_device_listener(
                 match event {
                     ServiceEvent::ServiceResolved(info) => {
                         let mut lock = devices.lock().unwrap();
+                        let mac = info.get_property_val_str("MAC").expect("couldn't get MAC records");
+                        // debounce (if we kept heartbeat)
+                        for device in lock.iter() {
+                            if device.mac == mac {
+                                return;
+                            }
+                        }
                         println!("Added device: {}", info.get_fullname());
                         let built_device = info_to_device(info, &app_handle);
                         app_handle.emit("device-added", built_device.clone()).unwrap();
@@ -42,7 +49,7 @@ pub fn start_device_listener(
                 let devices_lock = devices.lock().expect("couldn't get lock on services");
                 for service in devices_lock.iter() {
                     let name = &service.full_name;
-                    let response = daemon.verify(name.to_string(), Duration::from_secs(2));
+                    let response = daemon.verify(name.to_string(), Duration::from_secs(7));
                     match response {
                         Ok(_) => (),
                         Err(error) => match_error(error),

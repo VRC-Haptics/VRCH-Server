@@ -111,7 +111,11 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
                 let menu = vrc_info_guard.menu_parameters.as_ref();
                 let menu_parameters = menu.read().expect("couldn't get guard");
 
+                // Remove devices that need to be killed.
+                device_list_guard.retain(|device| !device.kill_me);
+
                 for device in device_list_guard.iter_mut() {
+
                     if let Some(packet) = device.tick(
                          &hashmap, 
                          &menu_parameters,
@@ -138,8 +142,6 @@ fn main() {
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
 
-    tick_devices(vrc_info.clone(), device_list.clone());
-
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
@@ -147,8 +149,9 @@ fn main() {
         .plugin(tauri_plugin_os::init())
         .manage(device_list.clone())
         .manage(vrc_info.clone())
-        .setup(|app| {
+        .setup(move |app| {
             let app_handle = app.handle();
+            tick_devices(vrc_info.clone(), device_list.clone());
             start_device_listener(app_handle.clone(), app.state(), 2);
             Ok(())
         })
