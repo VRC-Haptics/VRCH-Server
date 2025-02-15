@@ -71,7 +71,7 @@ impl Device {
 
         if self.cached_param.is_empty() {
             //only rebuild parameters if the cache has been purged
-            //println!("Cache empty, building groups: {:?}", self.addr_groups);
+            println!("Cache empty, building groups: {:?}", self.addr_groups);
 
             //create motor addresses
             let mut ttl_motors = 0;
@@ -91,7 +91,7 @@ impl Device {
             for address in motor_addresses {
                 self.cached_param.insert(address, OscType::Float(0.));
             }
-            //println!("Cached Parameters: {:?}", self.cached_param);
+            println!("Cached Parameters: {:?}", self.cached_param);
 
             self.num_motors = ttl_motors;
 
@@ -145,7 +145,7 @@ impl Device {
         }
 
         if send_flag {
-            let offset = 0.1; //self.cached_menu.get("offset"); I give up
+            let offset = 1.; //self.cached_menu.get("offset"); I give up
             let intensity = self.cached_menu.get("intensity");
             //println!("Cache after: {:?}", self.cached_param);
             let updated_floats: Vec<f32> = self

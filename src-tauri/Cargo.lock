@@ -4460,6 +4460,7 @@ version = "0.1.0"
 dependencies = [
  "mdns-sd",
  "oyasumivr_oscquery",
+ "regex",
  "rosc",
  "serde",
  "serde_json",

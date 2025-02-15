@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_store::StoreExt;
-
+use rosc::OscType;
 use std::io::{self, Write};
 
 #[tauri::command]
@@ -66,6 +66,21 @@ fn recall_device_group(handle: &AppHandle, mac: &String) -> Option<Vec<AddressGr
 }
 
 #[tauri::command]
+async fn set_address(
+    vrc_mutex: tauri::State<'_, Arc<Mutex<VrcInfo>>>,
+    address: String,
+    percentage: f32,
+) -> Result<(), ()> {
+    let vrc =  vrc_mutex.lock().unwrap();
+    let mut parameters = vrc.raw_parameters.as_ref().write().unwrap();
+
+    println!("set parameter: {:?}, to {:?}", address, percentage);
+    parameters.insert(address, vec![OscType::Float(percentage)]);
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn invalidate_cache(
     devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
 ) -> Result<(), ()> {
@@ -94,7 +109,7 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
                 let addresses = vrc_info_guard.raw_parameters.as_ref();
                 let hashmap = addresses.read().expect("Poisoned OSC Hashmap");
                 let menu = vrc_info_guard.menu_parameters.as_ref();
-                let menu_parameters = menu.read().expect("couldnt get guard");
+                let menu_parameters = menu.read().expect("couldn't get guard");
 
                 for device in device_list_guard.iter_mut() {
                     if let Some(packet) = device.tick(
@@ -141,7 +156,8 @@ fn main() {
             get_device_list,
             get_vrc_info,
             invalidate_cache,
-            update_device_groups
+            update_device_groups,
+            set_address
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {

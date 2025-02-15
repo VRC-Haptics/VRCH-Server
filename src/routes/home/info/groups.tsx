@@ -26,9 +26,9 @@ export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
   });
 
   return (
-    <div className="p-2 space-y-4 min-w-full mx-auto">
+    <div className="p-2 min-w-full mx-auto">
+      <p className="text-md font-bold">Set Address Groups</p>
       <div className="flex flex-col items-center justify-between bg-base-300 rounded-md p-1">
-        <p className="text-md font-bold">Address Groups</p>
         <div className="flex ">
           {selectedDevice.addr_groups.length === 0 ? (
             <p className="text-sm text-gray-500">No Address Groups yet.</p>
@@ -60,13 +60,14 @@ export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
                   type="text"
                   className="input input-bordered w-full"
                   value={newGroup.name}
+                  placeholder="Enter group name"
                   onChange={(e) =>
                     setNewGroup((prev) => ({ ...prev, name: e.target.value }))
                   }
                 />
               </div>
 
-              <div className="form-control w-full max-w-xs">
+              <div className="form-control w-auto max-w-xs">
                 <label className="label">
                   <span className="label-text font-semibold">Start</span>
                 </label>
@@ -83,7 +84,7 @@ export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
                 />
               </div>
 
-              <div className="form-control w-full max-w-xs">
+              <div className="form-control w-auto max-w-xs">
                 <label className="label">
                   <span className="label-text font-semibold">End</span>
                 </label>

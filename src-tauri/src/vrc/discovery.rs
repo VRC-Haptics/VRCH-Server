@@ -8,8 +8,18 @@ use std::thread;
 use std::{collections::HashMap, net::Ipv4Addr};
 
 use oyasumivr_oscquery;
+use oyasumivr_oscquery::{ OSCMethodAccessType, OSCMethod };
 use rosc::{ OscMessage, OscType };
 use serde;
+
+use regex::Regex;
+
+fn remove_version(path: &str) -> String {
+    // This regex matches "VF" followed by exactly two digits.
+    let re = Regex::new(r"VF\d{2}").unwrap();
+    // Replace all matches with an empty string.
+    re.replace_all(path, "").to_string()
+}
 
 pub fn get_vrc() -> VrcInfo {
     let raw_parameters = Arc::new(RwLock::new(HashMap::new()));
@@ -24,22 +34,26 @@ pub fn get_vrc() -> VrcInfo {
     let raw_menu_for_callback = raw_menu.clone();
     let first_message_callback = first_message.clone();
     let on_receive = move |msg: OscMessage| {
+        
+        let addr = remove_version(&msg.addr);
+
         if *first_message_callback.read().unwrap() == false {
             *first_message_callback.write().unwrap() = true;
         }
 
-        if msg.addr.starts_with(haptics_prefix) {
+        if addr.starts_with(haptics_prefix) {
             let mut params = raw_params_for_callback.write().unwrap();
             params.insert(msg.addr.clone(), msg.args.clone());
+            println!("Found address: {:?}", addr);
         }
         
-        if msg.addr.starts_with(haptics_menu_prefix) {
-            //println!("in menu prefix: {}", msg.addr);
+        if addr.starts_with(haptics_menu_prefix) {
+            println!("in menu prefix: {}", addr);
             let mut menu = raw_menu_for_callback.write().unwrap();
 
            //see if it needs to be put in the parameters
             for (_, (param, value)) in menu.parameters.iter_mut() {
-                if param == &msg.addr {
+                if param == &addr {
                     match msg.args.first().expect("No value with menu parameter").to_owned() {
                         OscType::Float(msg_float) => {
                             *value = msg_float;
@@ -110,7 +124,13 @@ impl OscQueryServer {
                 .unwrap();
                 let addr = format!("{}:{}", host, port);
                 println!("OscQuery on: {}", addr);
-                oyasumivr_oscquery::server::receive_vrchat_avatar_parameters().await; // /avatar/*, /avatar/parameters/*, etc.
+                oyasumivr_oscquery::server::add_osc_method(OSCMethod {
+                    description: Some("Haptics Specific Parameters".to_string()),
+                    address: "/avatar/parameters/h".to_string(),
+                    ad_type: OSCMethodAccessType::Write,
+                    value_type: None,
+                    value: None,
+                }).await; // /avatar/*, /avatar/parameters/*, etc.
                 oyasumivr_oscquery::server::advertise().await.unwrap();
             });
 

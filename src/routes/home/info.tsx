@@ -3,6 +3,8 @@ import { AddressGroupsEditor } from "./info/groups";
 import RawDeviceInfo from "./info/raw";
 import { AddressGroup } from "../../utils/commonClasses"; // Adjust path
 import { invoke } from "@tauri-apps/api/core";
+import { addressBuilder } from "../../utils/address_builder";
+import { TestAddress } from "./info/test_motors";
 
 interface InfoPageProps {
   selectedDevice: string | null;
@@ -30,13 +32,19 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
         invoke("update_device_groups", {mac: device.mac, groups: device.addr_groups});
       }
 
+      const fireGroup = (group_name: string, index: number, percentage: number) => {
+        const address = addressBuilder(group_name, index);
+        invoke("set_address", {address: address, percentage: percentage});
+      }
+
       return (
-        <div id="DeviceInfoCard" className="overflow-y-scroll h-full">
+        <div id="DeviceInfoCard" className="flex flex-col overflow-y-scroll h-full">
           <AddressGroupsEditor 
             addGroup={addGroup}
             rmvGroup={rmvGroup}
             selectedDevice={device}
           />
+          <TestAddress fireAddress={fireGroup}></TestAddress>
           <div className="flex-grow"></div>
           <RawDeviceInfo device={device} />
         </div>
