@@ -50,17 +50,11 @@ export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
             })
           )}
         </div>
-      </div>
-      {/* Editor for adding new groups */}
-      <div className="collapse bg-base-100 rounded-md hover:bg-base-300">
-        <input type="checkbox" />
-        <div className="collapse-title font-medium">Add Group</div>
-        <div className="collapse-content bg-base-300 rounded-md text-sm">
-          <div className="grid gap-4">
-            <div className="p-4 border border-base-300 rounded-lg flex flex-col md:flex-row md:items-end md:space-x-4">
+        <div className="grid">
+            <div className="border border-base-300 flex flex-col md:flex-row md:items-end md:space-x-1">
               <div className="form-control w-full max-w-xs">
                 <label className="label">
-                  <span className="label-text font-semibold">Group Name</span>
+                  <span className="label-text font-semibold">Name</span>
                 </label>
                 <input
                   type="text"
@@ -119,7 +113,6 @@ export const AddressGroupsEditor: React.FC<AddressGroupsEditorProps> = ({
               </button>
             </div>
           </div>
-        </div>
       </div>
     </div>
   );
