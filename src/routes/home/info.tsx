@@ -44,7 +44,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
             rmvGroup={rmvGroup}
             selectedDevice={device}
           />
-          <TestAddress fireAddress={fireGroup}></TestAddress>
+          <TestAddress fireAddress={fireGroup} selectedDevice={device}></TestAddress>
           <div className="flex-grow"></div>
           <RawDeviceInfo device={device} />
         </div>
