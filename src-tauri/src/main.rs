@@ -13,7 +13,7 @@ use haptic::{mdns::start_device_listener, AddressGroup, Device};
 use vrc::{discovery::get_vrc, VrcInfo};
 
 //standard imports
-use serde_json::{from_value, json};
+use serde_json::{ json};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -34,6 +34,53 @@ fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
     vrc_info.clone()
 }
 
+/// Helper to set store values
+fn set_device_store_field<T: serde::Serialize>(
+    window: &tauri::Window,
+    mac: &str,
+    field: &str,
+    value: T,
+) {
+    let app_handle = window.app_handle();
+    let store = app_handle
+        .store("known_devices.json")
+        .expect("couldn't access known_devices.json");
+
+    // Try to retrieve the existing device data.
+    let mut device_data = store
+        .get(mac)
+        .unwrap();
+
+    // Ensure we have a JSON object.
+    if !device_data.is_object() {
+        device_data = json!({});
+    }
+
+    // Insert or update the field.
+    if let Some(map) = device_data.as_object_mut() {
+        map.insert(field.to_string(), serde_json::to_value(value).unwrap());
+    }
+
+    // Write back the updated device data.
+    store.set(mac, device_data);
+}
+
+fn get_device_store_field<T: serde::de::DeserializeOwned>(
+    app_handle: &tauri::AppHandle,
+    mac: &str,
+    field: &str,
+) -> Option<T> {
+    let store = app_handle
+        .store("known_devices.json")
+        .expect("couldn't access known_devices.json");
+
+    let device_data = store.get(mac).unwrap();
+    let map = device_data.as_object()?;
+
+    map.get(field)
+        .and_then(|value| serde_json::from_value(value.clone()).ok())
+}
+
 #[tauri::command]
 async fn update_device_groups(
     window: tauri::Window,
@@ -41,28 +88,39 @@ async fn update_device_groups(
     groups: Vec<AddressGroup>,
     devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
 ) -> Result<(), ()> {
-    let app_handle = window.app_handle();
-    let store = app_handle
-        .store("known_devices.json")
-        .expect("couldn't access known_devices.json");
-
     let mut devices = devices_mutex.lock().unwrap();
     if let Some(existing) = devices.iter_mut().find(|d| d.mac == mac) {
         existing.addr_groups = groups.clone();
-        store.set(mac, json!(groups));
-        println!("updated groups to: {:?}", groups);
+        // Update the "addr_groups" field without losing other data.
+        set_device_store_field(&window, &mac, "addr_groups", groups);
+        println!("updated groups to: {:?}", existing.addr_groups);
         existing.purge_cache();
     }
     Ok(())
 }
 
+#[tauri::command]
+async fn update_device_multiplier(
+    mac: String,
+    multiplier: f32,
+    devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+    window: tauri::Window,
+) -> Result<(), ()> {
+    let mut devices_lock = devices_store.lock().unwrap();
+    if let Some(dev) = devices_lock.iter_mut().find(|d| d.mac == mac) {
+        dev.sens_mult = multiplier;
+        set_device_store_field(&window, &mac, "sens_mult", multiplier);
+    }
+    Ok(())
+}
+
+
 fn recall_device_group(handle: &AppHandle, mac: &String) -> Option<Vec<AddressGroup>> {
     let store = handle.store("known_devices.json").unwrap();
-    if let Some(old_groups) = store.get(mac) {
-        return Some(from_value(old_groups).unwrap());
-    } else {
-        return None;
-    }
+    // Retrieve the stored device data
+    let device_data = store.get(mac)?;
+    let groups_value = device_data.as_object()?.get("addr_groups")?;
+    serde_json::from_value(groups_value.clone()).ok()
 }
 
 #[tauri::command]
@@ -152,7 +210,7 @@ fn main() {
         .setup(move |app| {
             let app_handle = app.handle();
             tick_devices(vrc_info.clone(), device_list.clone());
-            start_device_listener(app_handle.clone(), app.state(), 2);
+            start_device_listener(app_handle.clone(), app.state(), 4);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -160,7 +218,8 @@ fn main() {
             get_vrc_info,
             invalidate_cache,
             update_device_groups,
-            set_address
+            set_address, 
+            update_device_multiplier,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {

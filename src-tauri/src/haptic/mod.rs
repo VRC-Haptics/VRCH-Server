@@ -22,6 +22,7 @@ pub struct Device {
     pub conn_manager: DeviceConnManager,
     pub is_alive: bool,
     pub kill_me: bool,
+    pub sens_mult: f32,
     been_pinged: bool,
     param_index: Vec<String>, //indexed parameters by group order
     cached_param: HashMap<String, OscType>,
@@ -56,6 +57,7 @@ impl Device {
             conn_manager: DeviceConnManager::new(recv_port, "/hrtbt".to_string()),
             is_alive: true,
             kill_me: false,
+            sens_mult: 1.,
             num_motors: 0,
             been_pinged: false,
             param_index: Vec::new(),
@@ -78,9 +80,15 @@ impl Device {
         }
 
         // manage hrtbt
+        /*
         let now = SystemTime::now();
         let then = self.conn_manager.last_hrtbt.lock().unwrap();
-        let diff = now.duration_since(*then).unwrap();
+        let diff = now.duration_since(*then).unwrap(); // this unwrap causes errors:
+        /* Deal with this when the heartbeat is actually usefull
+        thread 'tokio-runtime-worker' panicked at src\haptic\mod.rs:85:46:
+        called `Result::unwrap()` on an `Err` value: SystemTimeError(1.8403481s)
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+         */
         let ttl = Duration::from_secs(2); // 2 heartbeats missed consecutively
         if diff > ttl && self.is_alive {
             self.is_alive = false;
@@ -89,9 +97,10 @@ impl Device {
         } else if diff < ttl && !self.is_alive {
             self.is_alive = true;
         };
+        */
 
         //only rebuild parameters if the cache has been purged
-        if self.cached_param.is_empty() {
+        if self.cached_param.is_empty() && self.addr_groups.len() != 0 {
             
             println!("Cache empty, building groups: {:?}", self.addr_groups);
 
@@ -168,8 +177,8 @@ impl Device {
 
 
         // send packet
-        if send_flag {
-            let offset = 1.; //self.cached_menu.get("offset"); I give up
+        //if send_flag {
+            let offset = self.sens_mult; //self.cached_menu.get("offset"); I give up
             let intensity = self.cached_menu.get("intensity");
             //println!("Cache after: {:?}", self.cached_param);
             let updated_floats: Vec<f32> = self
@@ -196,7 +205,7 @@ impl Device {
             return Some(Packet {
                 packet: rosc::encoder::encode(&packet).unwrap(),
             });
-        }
+        //}
 
         return None;
     }

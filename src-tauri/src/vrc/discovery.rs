@@ -43,7 +43,6 @@ pub fn get_vrc() -> VrcInfo {
         if addr.starts_with(haptics_prefix) {
             let mut params = raw_params_for_callback.write().unwrap();
             params.insert(msg.addr.clone(), msg.args.clone());
-            println!("Found address: {:?}", addr);
         }
         
         if addr.starts_with(haptics_menu_prefix) {

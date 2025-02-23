@@ -30,7 +30,6 @@ export const TestAddress: React.FC<TestAddressProps> = ({ fireAddress, selectedD
   };
 
   // TODO: This should really be put in the overall game settings, not here
-  selectedDevice.addr_groups
   return (
     <div id="AddressTester" className="p-2 min-w-full mx-auto">
       <p className="text-md font-bold">Test Address</p>

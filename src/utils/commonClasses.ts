@@ -8,6 +8,7 @@ export const defaultDevice = {
   ttl: 0,
   addr_groups: [],
   num_motors: 0,
+  sens_mult: 1.0,
 };
 
 export interface Device {
@@ -18,6 +19,7 @@ export interface Device {
   ttl: number;
   addr_groups: AddressGroup[];
   num_motors: number;
+  sens_mult: number;
 }
 
 export const defaultAddressGroup = {

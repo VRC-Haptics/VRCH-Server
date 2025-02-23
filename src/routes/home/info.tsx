@@ -5,6 +5,7 @@ import { AddressGroup } from "../../utils/commonClasses"; // Adjust path
 import { invoke } from "@tauri-apps/api/core";
 import { addressBuilder } from "../../utils/address_builder";
 import { TestAddress } from "./info/test_motors";
+import { DeviceOffset } from "./info/set_offset";
 
 interface InfoPageProps {
   selectedDevice: string | null;
@@ -45,6 +46,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
             selectedDevice={device}
           />
           <TestAddress fireAddress={fireGroup} selectedDevice={device}></TestAddress>
+          <DeviceOffset selectedDevice={device}></DeviceOffset>
           <div className="flex-grow"></div>
           <RawDeviceInfo device={device} />
         </div>

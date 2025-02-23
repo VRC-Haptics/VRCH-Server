@@ -2,7 +2,7 @@ use std::{sync::{Arc, Mutex}, time::Duration};
 use tauri::{AppHandle, Emitter};
 use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
 
-use crate::haptic::Device;
+use crate::{get_device_store_field, haptic::Device};
 use crate::recall_device_group;
 
 pub fn start_device_listener(
@@ -76,6 +76,11 @@ fn info_to_device(info: ServiceInfo, app_handle: &tauri::AppHandle) -> Device {
     // Try to recall saved groups
     if let Some(old_groups) = recall_device_group(app_handle, &new_device.mac) {
         new_device.addr_groups.extend(old_groups);
+    }
+
+    //try to recall saved offset
+    if let Some(old_offset) = get_device_store_field(app_handle, mac, "sens_mult") {
+        new_device.sens_mult = old_offset;
     }
 
     return new_device;
