@@ -1,8 +1,13 @@
 use std::{sync::{Arc, Mutex}, time::Duration};
+use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
+use std::collections::HashSet;
+use std::io;
+use if_addrs::get_if_addrs;
 use tauri::{AppHandle, Emitter};
-use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
+use serde_json::Value;
+use winapi::um::minwinbase::GetFileExMaxInfoLevel;
 
-use crate::{get_device_store_field, haptic::Device};
+use crate::haptic::Device;
 use crate::recall_device_group;
 
 pub fn start_device_listener(
@@ -14,74 +19,94 @@ pub fn start_device_listener(
     let devices = devices_state.inner().clone();
 
     std::thread::spawn(move || {
-        let daemon = ServiceDaemon::new().expect("Failed to create daemon");
-        let reciever = daemon.browse("_haptics._udp.local.").unwrap();
-
+        
+        // Bind to all interfaces on port 8888.
+        // This lets us receive packets sent to port 8888.
+        let socket = UdpSocket::bind("0.0.0.0:8888").unwrap();
+        let multicast_addr = Ipv4Addr::new(239, 0, 0, 1);
+        multicast_all_interfaces(&socket, &multicast_addr).ok();
+        
+        println!("Listening for multicast messages on {}:8888...", multicast_addr);
+        
+        // Buffer to store incoming data.
+        let mut buf = [0u8; 1024];
+        
+        // Main loop: receive and process incoming packets.
         loop {
-            if let Ok(event) = reciever.recv_timeout(Duration::from_secs(refresh_delay)) {
-                match event {
-                    ServiceEvent::ServiceResolved(info) => {
+            match socket.recv_from(&mut buf) {
+                Ok((size, addr)) => {
+                    let received = String::from_utf8_lossy(&buf[..size]);
+
+                    // Parse JSON
+                    if let Ok(json) = serde_json::from_str::<Value>(&received) {
+                        let mac = json["mac"].as_str().unwrap_or("UNKNOWN_MAC").to_string();
+                        let ip = json["ip"].as_str().unwrap_or("UNKNOWN_IP").to_string();
+                        let name = json["name"].as_str().unwrap_or("Unknown Device").to_string();
+                        let port:u16 = json["port"].as_u64().unwrap_or(1027) as u16;
                         let mut lock = devices.lock().unwrap();
-                        let mac = info.get_property_val_str("MAC").expect("couldn't get MAC records");
-                        // debounce (if we kept heartbeat)
-                        for device in lock.iter() {
-                            if device.mac == mac {
-                                return;
+
+                        // Check if device already exists
+                        if !lock.iter().any(|d| d.mac == mac) {
+                            println!("New device found: {} at {}", name, ip);
+
+                            let mut new_device = Device::new(mac.clone(), ip.clone(), port, 0, name.clone());
+                            
+                            // Try to recall saved groups
+                            if let Some(old_groups) = recall_device_group(&app_handle, &new_device.mac) {
+                                new_device.addr_groups.extend(old_groups);
                             }
+
+                            //try to recall saved offset
+                            if let Some(old_offset) = crate::get_device_store_field(&app_handle, &mac, "sens_mult") {
+                                new_device.sens_mult = old_offset;
+                            }
+
+                            app_handle.emit("device-added", new_device.clone()).unwrap();
+                            lock.push(new_device);
+                        } else {
+                            // If the device already exists, probably needs a reset
+                            if let Some(dev) = lock.iter_mut().find(|d| (d.mac == mac)) {
+                                dev.been_pinged = false;
+                            }
+                            println!("Multicast for {}, which already exists", name);
+
                         }
-                        println!("Added device: {}", info.get_fullname());
-                        let built_device = info_to_device(info, &app_handle);
-                        app_handle.emit("device-added", built_device.clone()).unwrap();
-                        lock.push(built_device);
+                    } else {
+                        println!("Invalid JSON received: {}", received);
                     }
-                    ServiceEvent::ServiceRemoved(_, full_name) => {
-                        let mut lock = devices.lock().unwrap();
-                        if let Some(index) = lock.iter().position(|device| device.full_name == full_name) {
-                            let device = lock.remove(index);
-                            println!("removing device: {}@{}", device.display_name, device.ip);
-                            // Emit the removed device
-                            app_handle.emit("device-removed", device).unwrap();
-                        }
-                    }
-                    _ => ()
                 }
-            } else {
-                let devices_lock = devices.lock().expect("couldn't get lock on services");
-                for service in devices_lock.iter() {
-                    let name = &service.full_name;
-                    let response = daemon.verify(name.to_string(), Duration::from_secs(7));
-                    match response {
-                        Ok(_) => (),
-                        Err(error) => match_error(error),
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::WouldBlock {
+                        println!("Timed out");
                     }
                 }
             }
-        }
+        } 
     });
 }
 
-fn match_error(err: mdns_sd::Error) {
-    match err {
-        mdns_sd::Error::Again => println!("Couldn't send query for service"),
-        mdns_sd::Error::Msg(msg) => println!("verify failed with messge: {}", msg),
-        mdns_sd::Error::ParseIpAddr(msg) => println!("Failed to parse ip adress: {}", msg),
-        _ => println!("Unknown error verifying"),
-    }
-}
+/// Joins the socket to the multicast group on all eligible IPv4 interfaces.
+fn multicast_all_interfaces(socket: &UdpSocket, multicast_addr: &Ipv4Addr) -> io::Result<()> {
+    let interfaces = get_if_addrs()?;
+    // it's just for the debug statement
+    // because why not?
+    let names_set: HashSet<String> = interfaces.iter()
+    .map(|iface| iface.name.clone())
+    .collect();
+    let names: Vec<String> = names_set.into_iter().collect();
 
-fn info_to_device(info: ServiceInfo, app_handle: &tauri::AppHandle) -> Device {
-    let mac = info.get_property_val_str("MAC").expect("couldn't get MAC records");
-    let ip = info.get_addresses_v4().iter().next().unwrap().to_string();
-    let mut new_device = Device::new(mac.to_string(), ip, info.get_port(), info.get_host_ttl(), info.get_fullname().to_string());
-    // Try to recall saved groups
-    if let Some(old_groups) = recall_device_group(app_handle, &new_device.mac) {
-        new_device.addr_groups.extend(old_groups);
+    println!("Searching Interfaces: {:?}", names);
+    for iface in interfaces {
+        // Check for IPv4 addresses.
+        if let if_addrs::IfAddr::V4(v4_addr) = &iface.addr {
+            if !iface.is_loopback() {
+                println!("Joining multicast group on interface: {}", v4_addr.ip);
+                // Attempt to join multicast group on this interface.
+                if let Err(e) = socket.join_multicast_v4(multicast_addr, &v4_addr.ip) {
+                    eprintln!("Failed to join multicast on interface {}: {}", v4_addr.ip, e);
+                }
+            }
+        }
     }
-
-    //try to recall saved offset
-    if let Some(old_offset) = get_device_store_field(app_handle, mac, "sens_mult") {
-        new_device.sens_mult = old_offset;
-    }
-
-    return new_device;
+    Ok(())
 }

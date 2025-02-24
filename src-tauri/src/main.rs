@@ -13,14 +13,15 @@ use haptic::{mdns::start_device_listener, AddressGroup, Device};
 use vrc::{discovery::get_vrc, VrcInfo};
 
 //standard imports
-use serde_json::{ json};
+use rosc::OscType;
+use serde_json::json;
+use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Manager, Window, WindowEvent};
+use tauri::{Emitter, AppHandle, Manager, Window, WindowEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_store::StoreExt;
-use rosc::OscType;
-use std::io::{self, Write};
 
 #[tauri::command]
 fn get_device_list(state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Vec<Device> {
@@ -47,9 +48,7 @@ fn set_device_store_field<T: serde::Serialize>(
         .expect("couldn't access known_devices.json");
 
     // Try to retrieve the existing device data.
-    let mut device_data = store
-        .get(mac)
-        .unwrap();
+    let mut device_data = store.get(mac).unwrap();
 
     // Ensure we have a JSON object.
     if !device_data.is_object() {
@@ -114,7 +113,6 @@ async fn update_device_multiplier(
     Ok(())
 }
 
-
 fn recall_device_group(handle: &AppHandle, mac: &String) -> Option<Vec<AddressGroup>> {
     let store = handle.store("known_devices.json").unwrap();
     // Retrieve the stored device data
@@ -129,7 +127,7 @@ async fn set_address(
     address: String,
     percentage: f32,
 ) -> Result<(), ()> {
-    let vrc =  vrc_mutex.lock().unwrap();
+    let vrc = vrc_mutex.lock().unwrap();
     let mut parameters = vrc.raw_parameters.as_ref().write().unwrap();
 
     println!("set parameter: {:?}, to {:?}", address, percentage);
@@ -150,9 +148,10 @@ async fn invalidate_cache(
     Ok(())
 }
 
-fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device>>>) {
+fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device>>>, app: &tauri::AppHandle) {
     println!("starting tick");
     io::stdout().flush().unwrap();
+    let app_handle = app.clone();
 
     tauri::async_runtime::spawn(async move {
         let mut timer = tokio::time::interval(Duration::from_millis(10)); // 100 Hz
@@ -170,14 +169,28 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
                 let menu_parameters = menu.read().expect("couldn't get guard");
 
                 // Remove devices that need to be killed.
-                device_list_guard.retain(|device| !device.kill_me);
+                // Collect removed devices (dead devices).
+                let removed_devices: Vec<Device> = device_list_guard
+                    .iter()
+                    .filter(|device| !device.is_alive)
+                    .cloned()
+                    .collect();
+
+                // Print the removed devices.
+                for device in &removed_devices {
+                    println!("Removed device: {:?}", device.full_name);
+                    // NOTE: ALWAYS EMIT DEVICE-REMOVED or added, otherwise many issues.....
+                    app_handle.emit("device-removed", device).unwrap();
+                }
+
+                // Retain only the alive devices.
+                device_list_guard.retain(|device| device.is_alive);
 
                 for device in device_list_guard.iter_mut() {
-
                     if let Some(packet) = device.tick(
-                         &hashmap, 
-                         &menu_parameters,
-                        "/avatar/parameters/h".to_string()
+                        &hashmap,
+                        &menu_parameters,
+                        "/avatar/parameters/h".to_string(),
                     ) {
                         if let Err(err) = device_socket
                             .send_to(&packet.packet, format!("{}:{}", device.ip, device.port))
@@ -196,11 +209,29 @@ fn close_app(_: &Window) {
     //cleanup vrc TODO:
 }
 
+fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
+    let vrc_lock = vrc.lock().unwrap();
+    if vrc_lock.in_port.unwrap() != 9001 {
+        app.dialog()
+            .message(format!(
+                "Default VRC ports busy, expect higher latency. Port: {}",
+                vrc_lock.in_port.unwrap()
+            ))
+            .kind(MessageDialogKind::Warning)
+            .title("Ports Unavailable")
+            .show(|result| match result {
+                true => (),
+                false => (),
+            });
+    }
+}
+
 fn main() {
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
@@ -209,8 +240,9 @@ fn main() {
         .manage(vrc_info.clone())
         .setup(move |app| {
             let app_handle = app.handle();
-            tick_devices(vrc_info.clone(), device_list.clone());
+            tick_devices(vrc_info.clone(), device_list.clone(), app_handle);
             start_device_listener(app_handle.clone(), app.state(), 4);
+            throw_vrc_notif(app_handle, vrc_info.clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -218,7 +250,7 @@ fn main() {
             get_vrc_info,
             invalidate_cache,
             update_device_groups,
-            set_address, 
+            set_address,
             update_device_multiplier,
         ])
         .on_window_event(|window, event| {

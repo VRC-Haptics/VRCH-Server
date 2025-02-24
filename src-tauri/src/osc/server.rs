@@ -6,6 +6,8 @@ use std::thread;
 use rosc::{OscMessage, OscPacket};
 use tokio::sync::mpsc;
 
+use crate::util::next_free_port_with_address;
+
 #[derive(serde::Serialize, Clone)]
 pub struct OscServer {
     pub port: u16,
@@ -45,9 +47,22 @@ impl OscServer {
     }
 
     /// Starts a server listening in a new thread.
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> u16 {
+        let mut used_port = self.port;
         let addr = format!("{}:{}", self.address, self.port);
-        let socket = UdpSocket::bind(addr).expect("Couldn't bind to address");
+        let socket = match UdpSocket::bind(&addr) {
+            Ok(s) => s,
+            Err(_) => {
+                // The desired port is not available. Look for a fallback.
+                if let Some(free_port) = next_free_port_with_address(self.port, std::net::IpAddr::V4(self.address)) {
+                    used_port = free_port;
+                    let addr = format!("{}:{}", self.address, free_port);
+                    UdpSocket::bind(&addr).unwrap() //assume we will be able to bind to thisone
+                } else {
+                    panic!("Couldn't find free port");
+                }
+            }
+        };
 
         let on_receive = Arc::clone(&self.on_receive);
         let filter_prefix = self.filter_prefix.clone();
@@ -56,7 +71,7 @@ impl OscServer {
         self.close_handle = Some(tx);
 
         thread::spawn(move || {
-            //println!("Spawned UDP OSC Server on: {}", socket.local_addr().unwrap());
+            println!("Spawned UDP OSC Server on: {}", socket.local_addr().unwrap());
 
             let mut buf = [0u8; rosc::decoder::MTU];
             loop {
@@ -85,6 +100,7 @@ impl OscServer {
                 }
             }
         });
+        return used_port;
     }
 
     //kills the server thread.

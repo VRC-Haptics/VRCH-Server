@@ -46,3 +46,11 @@ impl DeviceConnManager {
         }
     }
 }
+
+impl Drop for DeviceConnManager {
+    fn drop(&mut self) {
+        if let Some(ref mut server) = self.server {
+            server.stop();
+        }
+    }
+}

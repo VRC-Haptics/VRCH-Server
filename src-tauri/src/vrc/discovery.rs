@@ -69,16 +69,19 @@ pub fn get_vrc() -> VrcInfo {
     //create server before starting anything
     let recieving_port = 9001;
     let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
-    vrc_server.start();
+    let port_used = vrc_server.start();
 
     let mut osc_server = OscQueryServer::new(recieving_port);
-    //osc_server.start();
+    if port_used != recieving_port {
+        osc_server.start();
+        println!("Not using VRC dedicated ports, expect slower operations.");
+    }
 
     return VrcInfo {
         vrc_connected: false,
         osc_server: Some(vrc_server),
         query_server: Some(osc_server),
-        in_port: Some(recieving_port.to_owned()),
+        in_port: Some(port_used),
         out_port: None,
         avatar: None,
         haptics_prefix: haptics_prefix_clone,
