@@ -236,6 +236,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_blec::init())
         .manage(device_list.clone())
         .manage(vrc_info.clone())
         .setup(move |app| {
