@@ -1,6 +1,6 @@
 pub mod mdns;
 mod recv;
-//mod btle;
+mod btle;
 
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -12,22 +12,89 @@ use serde::{Deserialize, Serialize};
 use crate::{util::next_free_port, vrc::Parameters};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+enum DeviceType {
+    Wifi(WifiDevice),
+    Ble(BleDevice),
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Device {
-    pub mac: String,
-    pub ip: String,
-    pub display_name: String,
-    pub full_name: String,
-    pub port: u16,
-    pub ttl: u32,
-    pub addr_groups: Vec<AddressGroup>, //group name and start and end number
+    /// ID garunteed to be unique to that device 
+    pub id: String,
+    /// user-facing name 
+    pub name: String,
+    /// number of motors this device controls
     pub num_motors: u32,
-    pub conn_manager: DeviceConnManager,
+    /// Not garunteed to change on death, but device should be removed if false
     pub is_alive: bool,
+    /// Factors that are used in the modulation of devices
+    pub factors: OutputFactors,
+    pub device_type: DeviceType,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Factors that affect or modulate output of Devices
+pub struct OutputFactors {
+    /// group name and start and end number
+    pub addr_groups: Vec<AddressGroup>, 
+    /// sensitivity multiplier (power limiter)
     pub sens_mult: f32,
-    been_pinged: bool,
-    param_index: Vec<String>, //indexed parameters by group order
-    cached_param: HashMap<String, OscType>,
+    /// indexed parameters by group order
+    param_index: Vec<String>,
+    /// Menu parameters from last tick
     cached_menu: Parameters,
+    /// All OSC parameters that have modified a value, and their last known values
+    cached_param: HashMap<String, OscType>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WifiDevice {
+    pub mac: String,
+    pub ip: Option<String>,
+    pub recv_port: Option<u16>,
+    pub port: u16,
+    pub been_pinged: bool,
+    pub is_alive: bool,
+    connection_manager: DeviceConnManager,
+}
+
+/// Called on every server frame
+trait Tick {
+    fn tick(&mut self,
+        addresses: &HashMap<String, Vec<rosc::OscType>>,
+        menu: &Parameters,
+        prefix: String,
+    );
+}
+
+/// Called slightly before shutdown or when deleting a device. 
+trait Stop {
+    fn stop(&mut self);
+}
+
+// Delegate the Tick trait implementation to the inner types.
+impl Tick for DeviceType {
+    fn tick(&mut self,
+        addresses: &HashMap<String, Vec<OscType>>,
+        menu: &Parameters,
+        prefix: String,
+    ) {
+        match self {
+            DeviceType::Wifi(dev) => dev.tick(addresses, menu, prefix),
+            DeviceType::Ble(dev) => dev.tick(addresses, menu, prefix),
+        }
+    }
+}
+
+// Delegate the Stop trait implementation to the inner types.
+impl Stop for DeviceType {
+    fn stop(&mut self) {
+        match self {
+            Device::Wifi(dev) => dev.stop(),
+            Device::Ble(dev) => dev.stop(),
+        }
+    }
 }
 
 pub struct Packet {
@@ -41,7 +108,7 @@ pub struct AddressGroup {
     pub end: u32,
 }
 
-impl Device {
+impl WifiDevice {
     #[allow(dead_code)]
     /// Instantiate new device instance
     pub fn new(mac: String, ip: String, send_port: u16, ttl: u32, full_name: String) -> Device {

@@ -9,15 +9,19 @@ use crate::osc::server::OscServer;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeviceConnManager {
+    pub mac: String,
+    pub ip: Option<String>,
     pub last_hrtbt: Arc<Mutex<SystemTime>>,
-    pub hrtbt_address: String,
-    pub recv_port: u16,
+    pub hrtbt_address: Option<String>,
+    pub recv_port: Option<u16>,
+    pub full_name: String,
+    pub port: u16,
     #[serde(skip)]
     server: Option<OscServer>,
 }
 
 impl DeviceConnManager {
-    pub fn new(port: u16, hrtbt_addr: String) -> DeviceConnManager {
+    pub fn new(port: u16, hrtbt_addr: String, mac: String, ip: String, ) -> DeviceConnManager {
         let start_time = SystemTime::now();
         let last_hrtbt: Arc<Mutex<SystemTime>>= Arc::new(Mutex::new(start_time));
         let recieved_params: Arc<RwLock<HashMap<String, (Vec<OscType>, SystemTime)>>> = Arc::new(RwLock::new(HashMap::new()));
@@ -39,6 +43,7 @@ impl DeviceConnManager {
         let mut server = OscServer::new(port, Ipv4Addr::from_str("0.0.0.0").unwrap(), on_receive);
         server.start();
         DeviceConnManager {
+
             last_hrtbt: last_hrtbt,
             recv_port: port,
             hrtbt_address: hrtbt_addr,
