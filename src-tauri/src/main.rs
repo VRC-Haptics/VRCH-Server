@@ -4,14 +4,16 @@
 
 // make local modules available
 mod haptic;
+pub mod mapping;
 pub mod osc;
 pub mod util;
 mod vrc;
+mod bhaptics;
 
 //use local modules
 use haptic::{mdns::start_device_listener, AddressGroup, Device};
 use vrc::{discovery::get_vrc, VrcInfo};
-
+use bhaptics::discovery::Bhaptics;
 //standard imports
 use rosc::OscType;
 use serde_json::json;
@@ -229,6 +231,8 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 fn main() {
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
+    let baptics: Arc<Mutex<Bhaptics>> = Arc::new(Mutex::new(Bhaptics::new()));
+
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -260,4 +264,7 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    let lock = baptics.lock().unwrap();
+    lock.do_something();
 }
