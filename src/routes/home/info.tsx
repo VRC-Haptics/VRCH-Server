@@ -1,10 +1,6 @@
 import { useDeviceContext } from "../../context/DevicesContext";
-import { AddressGroupsEditor } from "./info/groups";
 import RawDeviceInfo from "./info/raw";
-import { AddressGroup } from "../../utils/commonClasses"; // Adjust path
-import { invoke } from "@tauri-apps/api/core";
-import { addressBuilder } from "../../utils/address_builder";
-import { TestAddress } from "./info/test_motors";
+import DeviceJsonUpload from "./info/upload_map";
 import { DeviceOffset } from "./info/set_offset";
 
 interface InfoPageProps {
@@ -15,38 +11,16 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   // Instead of just `devices`, now we get both
   const { devices } = useDeviceContext();
 
-  function createInfo(mac_address: string) {
-    const device = devices.find((d) => d.mac === mac_address);
+  function createInfo(device_id: string) {
+    const device = devices.find((d) => d.id === device_id);
 
     if (device != null) {
-      // Handler to update the device's AddressGroups in context
-      const addGroup = (group: AddressGroup) => {
-        device.addr_groups.push(group)
-        invoke("update_device_groups", {mac: device.mac, groups: device.addr_groups});
-      };
-
-      const rmvGroup = (group: AddressGroup) => {
-        const index = device.addr_groups.indexOf(group);
-        if (index !== -1) {
-          device.addr_groups.splice(index, 1);
-        } 
-        invoke("update_device_groups", {mac: device.mac, groups: device.addr_groups});
-      }
-
-      const fireGroup = (group_name: string, index: number, percentage: number) => {
-        const address = addressBuilder(group_name, index);
-        invoke("set_address", {address: address, percentage: percentage});
-      }
-
       return (
         <div id="DeviceInfoCard" className="flex flex-col overflow-y-scroll h-full">
-          <AddressGroupsEditor 
-            addGroup={addGroup}
-            rmvGroup={rmvGroup}
-            selectedDevice={device}
-          />
-          <TestAddress fireAddress={fireGroup} selectedDevice={device}></TestAddress>
+          {//<TestAddress fireAddress={fireGroup} selectedDevice={device}></TestAddress>
+          }
           <DeviceOffset selectedDevice={device}></DeviceOffset>
+          <DeviceJsonUpload device={device}></DeviceJsonUpload>
           <div className="flex-grow"></div>
           <RawDeviceInfo device={device} />
         </div>

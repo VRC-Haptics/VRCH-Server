@@ -1,38 +1,104 @@
 let Titles = "text-2xl font-bold padding-5 text-center";
 
-export const defaultDevice = {
-  mac: "",
-  ip: "",
-  display_name: "",
-  port: 0,
-  ttl: 0,
-  addr_groups: [],
-  num_motors: 0,
-  sens_mult: 1.0,
-};
+// Represents the factors that modulate device output.
+export interface OutputFactors {
+  sens_mult: number;
+  user_sense: number;
+}
 
-export interface Device {
+// The possible node groups (as string literals) corresponding to the Rust enum.
+export type NodeGroup =
+  | "Head"
+  | "ArmRight"
+  | "ArmLeft"
+  | "TorsoRight"
+  | "TorsoLeft"
+  | "TorsoFront"
+  | "TorsoBack"
+  | "LegRight"
+  | "LegLeft"
+  | "FootRight"
+  | "FootLeft";
+
+// Represents a haptic node in space.
+export interface HapticNode {
+  x: number;
+  y: number;
+  z: number;
+  groups: NodeGroup[];
+}
+
+// Represents the mapping configuration for a device.
+export interface HapticMap {
+  game_map: HapticNode[] | null;
+  device_map: HapticNode[] | null;
+  game_intensity: number[];
+  last_sent: number[];
+  falloff_distance: number;
+  merge_distance: number;
+  sigma: number;
+}
+
+// Represents the Wifi device fields.
+// Note: for SystemTime we use a string representation (e.g. ISO 8601) on the TS side.
+export interface WifiDevice {
   mac: string;
   ip: string;
-  display_name: string;
-  port: number;
-  ttl: number;
-  addr_groups: AddressGroup[];
-  num_motors: number;
-  sens_mult: number;
-}
-
-export const defaultAddressGroup = {
-  name: "",
-  start: 0,
-  end: 0,
-}
-
-export interface AddressGroup {
   name: string;
-  start: number;
-  end: number;
+  been_pinged: boolean;
+  last_queried: string;
+  send_port: number;
+  // connection_manager is omitted intentionally since it’s internal.
 }
+
+// The DeviceType is currently an enum with a Wifi variant.
+export type DeviceType = {
+  variant: "Wifi";
+  value: WifiDevice;
+};
+
+// This mirrors the Rust Device struct.
+export interface Device {
+  id: string;
+  name: string;
+  num_motors: number;
+  is_alive: boolean;
+  factors: OutputFactors;
+  map: HapticMap;
+  device_type: DeviceType;
+}
+
+// A default instance for convenience.
+export const defaultDevice: Device = {
+  id: "",
+  name: "",
+  num_motors: 0,
+  is_alive: false,
+  factors: {
+    sens_mult: 1.0,
+    user_sense: 1.0,
+  },
+  map: {
+    game_map: null,
+    device_map: null,
+    game_intensity: [],
+    last_sent: [],
+    falloff_distance: 0,
+    merge_distance: 0,
+    sigma: 0,
+  },
+  device_type: {
+    variant: "Wifi",
+    value: {
+      mac: "",
+      ip: "",
+      name: "",
+      been_pinged: false,
+      last_queried: "", // populate with an ISO string timestamp when available
+      send_port: 0,
+    },
+  },
+};
 
 export interface Avatar {
   avatar_id: string;

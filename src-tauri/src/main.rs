@@ -10,10 +10,12 @@ pub mod util;
 mod vrc;
 mod bhaptics;
 
-//use local modules
-use haptic::{mdns::start_device_listener, AddressGroup, Device};
-use vrc::{discovery::get_vrc, VrcInfo};
-use bhaptics::discovery::Bhaptics;
+// local modules
+use haptic::{ Device, DeviceType };
+use mapping::haptic_node::HapticNode;
+use haptic::wifi::discovery::start_wifi_listener;
+use vrc::{ discovery::get_vrc, VrcInfo };
+
 //standard imports
 use rosc::OscType;
 use serde_json::json;
@@ -82,45 +84,50 @@ fn get_device_store_field<T: serde::de::DeserializeOwned>(
         .and_then(|value| serde_json::from_value(value.clone()).ok())
 }
 
+#[derive(serde::Deserialize, Debug)]
+struct DeviceMapUpload {
+    device_map: Vec<HapticNode>,
+}
+ 
 #[tauri::command]
-async fn update_device_groups(
-    window: tauri::Window,
-    mac: String,
-    groups: Vec<AddressGroup>,
+async fn upload_device_map(
+    id: String,
+    config_json: String,
     devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-) -> Result<(), ()> {
+) -> Result<(), String> {
+    println!("commanded to upload");
+    let upload: DeviceMapUpload = serde_json::from_str(&config_json)
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    
     let mut devices = devices_mutex.lock().unwrap();
-    if let Some(existing) = devices.iter_mut().find(|d| d.mac == mac) {
-        existing.addr_groups = groups.clone();
-        // Update the "addr_groups" field without losing other data.
-        set_device_store_field(&window, &mac, "addr_groups", groups);
-        println!("updated groups to: {:?}", existing.addr_groups);
-        existing.purge_cache();
+    if let Some(device) = devices.iter_mut().find(|d| d.id == id) {
+        device.map.set_device_map(upload.device_map);
+
+        //propogate changes if necessary
+        match &mut device.device_type {
+            DeviceType::Wifi(wifi) => {
+                wifi.push_map = true;
+            }
+        }
+    } else {
+        return Err(format!("No Device with id: {}", id));
     }
     Ok(())
 }
 
 #[tauri::command]
 async fn update_device_multiplier(
-    mac: String,
+    device_id: String,
     multiplier: f32,
     devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
     window: tauri::Window,
 ) -> Result<(), ()> {
     let mut devices_lock = devices_store.lock().unwrap();
-    if let Some(dev) = devices_lock.iter_mut().find(|d| d.mac == mac) {
-        dev.sens_mult = multiplier;
-        set_device_store_field(&window, &mac, "sens_mult", multiplier);
+    if let Some(dev) = devices_lock.iter_mut().find(|d| d.id == device_id) {
+        dev.factors.sens_mult = multiplier;
+        set_device_store_field(&window, &device_id, "sens_mult", multiplier);
     }
     Ok(())
-}
-
-fn recall_device_group(handle: &AppHandle, mac: &String) -> Option<Vec<AddressGroup>> {
-    let store = handle.store("known_devices.json").unwrap();
-    // Retrieve the stored device data
-    let device_data = store.get(mac)?;
-    let groups_value = device_data.as_object()?.get("addr_groups")?;
-    serde_json::from_value(groups_value.clone()).ok()
 }
 
 #[tauri::command]
@@ -138,19 +145,7 @@ async fn set_address(
     Ok(())
 }
 
-#[tauri::command]
-async fn invalidate_cache(
-    devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-) -> Result<(), ()> {
-    let mut devices = devices_mutex.lock().unwrap();
-    let iterator = devices.iter_mut();
-    for device in iterator {
-        device.purge_cache();
-    }
-    Ok(())
-}
-
-fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device>>>, app: &tauri::AppHandle) {
+fn tick_devices(device_list: Arc<Mutex<Vec<Device>>>, app: &tauri::AppHandle) {
     println!("starting tick");
     io::stdout().flush().unwrap();
     let app_handle = app.clone();
@@ -163,12 +158,6 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
             timer.tick().await;
             {
                 let mut device_list_guard = device_list.lock().unwrap();
-                let vrc_info_guard = vrc_info.lock().expect("couldn't get mutable");
-
-                let addresses = vrc_info_guard.raw_parameters.as_ref();
-                let hashmap = addresses.read().expect("Poisoned OSC Hashmap");
-                let menu = vrc_info_guard.menu_parameters.as_ref();
-                let menu_parameters = menu.read().expect("couldn't get guard");
 
                 // Remove devices that need to be killed.
                 // Collect removed devices (dead devices).
@@ -180,25 +169,26 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
 
                 // Print the removed devices.
                 for device in &removed_devices {
-                    println!("Removed device: {:?}", device.full_name);
+                    println!("Removed device: {:?}", device.name);
                     // NOTE: ALWAYS EMIT DEVICE-REMOVED or added, otherwise many issues.....
                     app_handle.emit("device-removed", device).unwrap();
                 }
 
-                // Retain only the alive devices.
+                // Remove dead devices
                 device_list_guard.retain(|device| device.is_alive);
 
                 for device in device_list_guard.iter_mut() {
-                    if let Some(packet) = device.tick(
-                        &hashmap,
-                        &menu_parameters,
-                        "/avatar/parameters/h".to_string(),
-                    ) {
-                        if let Err(err) = device_socket
-                            .send_to(&packet.packet, format!("{}:{}", device.ip, device.port))
-                        {
-                            eprintln!("Failed to send to {}: {}", device.display_name, err);
-                        }
+
+                    // handle device specific tick functions
+                    match &mut device.device_type {
+                        DeviceType::Wifi(wifi_device) => {
+                            // Send packet if we got one from tick
+                           if let Some(packet) = wifi_device.tick(&mut device.is_alive, &mut device.factors, &mut device.map) {
+                                let addr = format!("{}:{}", wifi_device.ip, wifi_device.send_port);
+                                // TODO: Actually error handle
+                                let _ = device_socket.send_to(&packet.packet, addr);
+                           }
+                        },
                     }
                 }
             }
@@ -231,7 +221,7 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 fn main() {
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
-    let baptics: Arc<Mutex<Bhaptics>> = Arc::new(Mutex::new(Bhaptics::new()));
+    //let baptics: Arc<Mutex<Bhaptics>> = Arc::new(Mutex::new(Bhaptics::new()));
 
 
     tauri::Builder::default()
@@ -240,21 +230,19 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_blec::init())
         .manage(device_list.clone())
         .manage(vrc_info.clone())
         .setup(move |app| {
             let app_handle = app.handle();
-            tick_devices(vrc_info.clone(), device_list.clone(), app_handle);
-            start_device_listener(app_handle.clone(), app.state(), 4);
+            tick_devices(device_list.clone(), app_handle);
+            start_wifi_listener(app_handle.clone(), app.state());
             throw_vrc_notif(app_handle, vrc_info.clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_device_list,
             get_vrc_info,
-            invalidate_cache,
-            update_device_groups,
+            upload_device_map,
             set_address,
             update_device_multiplier,
         ])
@@ -266,6 +254,6 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    let lock = baptics.lock().unwrap();
-    lock.do_something();
+    //let lock = baptics.lock().unwrap();
+    //lock.do_something();
 }

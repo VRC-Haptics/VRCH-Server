@@ -7,8 +7,7 @@ pub const BEE_HAPTICS_UUID: &str = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 pub async fn start_bt() -> Result<(), btleplug::Error> {
     let uuid = Uuid::parse_str(&BEE_HAPTICS_UUID);
     let handler = tauri_plugin_blec::get_handler().unwrap();
-    handler.
-    handler.discover_services(address)
+    handler.discover_services(address);
     // get the first bluetooth adapter
     let adapters = manager.adapters().await?;
     let central: Adapter = adapters.into_iter().nth(0).unwrap();
