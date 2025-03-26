@@ -1,11 +1,11 @@
-use std::sync::{Arc, Mutex};
-use std::net::{Ipv4Addr, UdpSocket};
-use std::io;
 use if_addrs::get_if_addrs;
-use tauri::{AppHandle, Emitter};
 use serde_json::Value;
+use std::io;
+use std::net::{Ipv4Addr, UdpSocket};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter};
 
-use crate::haptic::{Device, WifiDevice, DeviceType};
+use crate::haptic::{Device, DeviceType, WifiDevice};
 
 pub fn start_wifi_listener(
     app_handle: AppHandle,
@@ -14,16 +14,18 @@ pub fn start_wifi_listener(
     let devices = devices_state.inner().clone();
 
     std::thread::spawn(move || {
-        
         // Bind to all interfaces on port 8888 and register for multicast.
         let socket = UdpSocket::bind("0.0.0.0:8888").unwrap();
         let multicast_addr = Ipv4Addr::new(239, 0, 0, 1);
         multicast_all_interfaces(&socket, &multicast_addr).ok();
-        println!("Listening for multicast messages on {}:8888...", multicast_addr);
-        
+        println!(
+            "Listening for multicast messages on {}:8888...",
+            multicast_addr
+        );
+
         // Buffer to store incoming data.
         let mut buf = [0u8; 1024];
-        
+
         // Main loop: receive and process incoming packets.
         loop {
             match socket.recv_from(&mut buf) {
@@ -34,34 +36,41 @@ pub fn start_wifi_listener(
                     if let Ok(json) = serde_json::from_str::<Value>(&received) {
                         let mac = json["mac"].as_str().unwrap_or("UNKNOWN_MAC").to_string();
                         let ip = json["ip"].as_str().unwrap_or("UNKNOWN_IP").to_string();
-                        let name = json["name"].as_str().unwrap_or("Unknown Device").to_string();
-                        let port:u16 = json["port"].as_u64().unwrap_or(1027) as u16;
+                        let name = json["name"]
+                            .as_str()
+                            .unwrap_or("Unknown Device")
+                            .to_string();
+                        let port: u16 = json["port"].as_u64().unwrap_or(1027) as u16;
                         let mut lock = devices.lock().unwrap();
 
                         // Check if device already exists
                         if !lock.iter().any(|d| d.id == mac) {
                             println!("New device found: {} at {}", name, ip);
 
-                            let new_device = WifiDevice::new(mac.clone(), ip.clone(), port, name.clone());
+                            let new_device =
+                                WifiDevice::new(mac.clone(), ip.clone(), port, name.clone());
                             let mut full_device = Device::from_wifi(new_device, &app_handle);
 
                             //try to recall saved offset
-                            if let Some(old_offset) = crate::get_device_store_field(&app_handle, &mac, "sens_mult") {
+                            if let Some(old_offset) =
+                                crate::get_device_store_field(&app_handle, &mac, "sens_mult")
+                            {
                                 full_device.factors.sens_mult = old_offset;
                             }
 
-                            app_handle.emit("device-added", full_device.clone()).unwrap();
+                            app_handle
+                                .emit("device-added", full_device.clone())
+                                .unwrap();
                             lock.push(full_device);
                         } else {
                             // If the device already exists, probably needs a reset
                             if let Some(dev) = lock.iter_mut().find(|d| (d.id == mac)) {
                                 match &mut dev.device_type {
-                                    DeviceType::Wifi( ex) => ex.been_pinged = false,
+                                    DeviceType::Wifi(ex) => ex.been_pinged = false,
                                     //_ => panic!("Unexpected device type with same ID as new wifi device"),
                                 }
                             }
                             println!("Multicast for {}, which already exists", name);
-
                         }
                     } else {
                         println!("Invalid JSON received: {}", received);
@@ -73,7 +82,7 @@ pub fn start_wifi_listener(
                     }
                 }
             }
-        } 
+        }
     });
 }
 
@@ -87,7 +96,10 @@ fn multicast_all_interfaces(socket: &UdpSocket, multicast_addr: &Ipv4Addr) -> io
                 println!("Joining multicast group on interface: {}", v4_addr.ip);
                 // Attempt to join multicast group on this interface.
                 if let Err(e) = socket.join_multicast_v4(multicast_addr, &v4_addr.ip) {
-                    eprintln!("Failed to join multicast on interface {}: {}", v4_addr.ip, e);
+                    eprintln!(
+                        "Failed to join multicast on interface {}: {}",
+                        v4_addr.ip, e
+                    );
                 }
             }
         }

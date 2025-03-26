@@ -54,7 +54,9 @@ impl OscServer {
             Ok(s) => s,
             Err(_) => {
                 // The desired port is not available. Look for a fallback.
-                if let Some(free_port) = next_free_port_with_address(self.port, std::net::IpAddr::V4(self.address)) {
+                if let Some(free_port) =
+                    next_free_port_with_address(self.port, std::net::IpAddr::V4(self.address))
+                {
                     used_port = free_port;
                     let addr = format!("{}:{}", self.address, free_port);
                     UdpSocket::bind(&addr).unwrap() //assume we will be able to bind to thisone
@@ -71,7 +73,10 @@ impl OscServer {
         self.close_handle = Some(tx);
 
         thread::spawn(move || {
-            println!("Spawned UDP OSC Server on: {}", socket.local_addr().unwrap());
+            println!(
+                "Spawned UDP OSC Server on: {}",
+                socket.local_addr().unwrap()
+            );
 
             let mut buf = [0u8; rosc::decoder::MTU];
             loop {

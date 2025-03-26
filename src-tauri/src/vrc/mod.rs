@@ -5,7 +5,8 @@ use discovery::OscQueryServer;
 use rosc::OscType;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap, sync::{Arc, RwLock}
+    collections::HashMap,
+    sync::{Arc, RwLock},
 };
 
 #[derive(serde::Serialize, Debug, Clone)]
@@ -34,12 +35,20 @@ pub struct Parameters {
 }
 
 impl Parameters {
-    pub fn new() -> Parameters{
-        let mut param = Parameters{parameters: HashMap::new()};
-        param.parameters.insert("intensity".to_string(), ("/avatar/parameters/h_param/Intensity".to_string(), 1.));
-        param.parameters.insert("offset".to_string(), ("/avatar/parameters/h_param/Offset".to_string(), 1.));
+    pub fn new() -> Parameters {
+        let mut param = Parameters {
+            parameters: HashMap::new(),
+        };
+        param.parameters.insert(
+            "intensity".to_string(),
+            ("/avatar/parameters/h_param/Intensity".to_string(), 1.),
+        );
+        param.parameters.insert(
+            "offset".to_string(),
+            ("/avatar/parameters/h_param/Offset".to_string(), 1.),
+        );
 
-        return param
+        return param;
     }
 
     pub fn get(&self, param_name: &str) -> f32 {

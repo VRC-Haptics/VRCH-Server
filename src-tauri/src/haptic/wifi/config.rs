@@ -1,7 +1,7 @@
-use serde::{Deserialize, Deserializer};
-use serde::de::Error as SerdeError;
-use std::convert::TryInto;
 use crate::mapping::haptic_node::HapticNode;
+use serde::de::Error as SerdeError;
+use serde::{Deserialize, Deserializer};
+use std::convert::TryInto;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 /// Wifi Device config struct
@@ -29,12 +29,12 @@ where
 {
     // First, deserialize the field as a String.
     let s = String::deserialize(deserializer)?;
-    
+
     // Ensure the hex string has an even length.
     if s.len() % 2 != 0 {
         return Err(D::Error::custom("Hex string has an odd length"));
     }
-    
+
     // Convert the hex string to a Vec<u8>
     let mut bytes = Vec::with_capacity(s.len() / 2);
     for i in (0..s.len()).step_by(2) {
@@ -43,12 +43,14 @@ where
             .map_err(|_| D::Error::custom("Invalid hex value in node_map"))?;
         bytes.push(byte);
     }
-    
+
     // Check that the byte array length is a multiple of 8.
     if bytes.len() % 8 != 0 {
-        return Err(D::Error::custom("Invalid node_map length: must be a multiple of 8 bytes"));
+        return Err(D::Error::custom(
+            "Invalid node_map length: must be a multiple of 8 bytes",
+        ));
     }
-    
+
     // Process the bytes in 8-byte chunks to create HapticNode instances.
     let nodes = bytes
         .chunks_exact(8)
@@ -59,6 +61,6 @@ where
             Ok(HapticNode::from_bytes(arr))
         })
         .collect::<Result<Vec<_>, D::Error>>()?;
-    
+
     Ok(nodes)
 }

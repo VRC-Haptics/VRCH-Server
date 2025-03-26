@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket, TcpListener};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, UdpSocket};
 
 pub fn next_free_port_with_address(start_port: u16, address: IpAddr) -> Option<u16> {
     let mut port = start_port;

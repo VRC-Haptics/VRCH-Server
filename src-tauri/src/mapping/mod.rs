@@ -56,17 +56,39 @@ impl NodeGroup {
     /// Converts a bitflag back into a vector of NodeGroup variants.
     pub fn from_bitflag(flag: u16) -> Vec<NodeGroup> {
         let mut groups = Vec::new();
-        if flag & (1 << 0) != 0 { groups.push(NodeGroup::Head); }
-        if flag & (1 << 1) != 0 { groups.push(NodeGroup::ArmRight); }
-        if flag & (1 << 2) != 0 { groups.push(NodeGroup::ArmLeft); }
-        if flag & (1 << 3) != 0 { groups.push(NodeGroup::TorsoRight); }
-        if flag & (1 << 4) != 0 { groups.push(NodeGroup::TorsoLeft); }
-        if flag & (1 << 5) != 0 { groups.push(NodeGroup::TorsoFront); }
-        if flag & (1 << 6) != 0 { groups.push(NodeGroup::TorsoBack); }
-        if flag & (1 << 7) != 0 { groups.push(NodeGroup::LegRight); }
-        if flag & (1 << 8) != 0 { groups.push(NodeGroup::LegLeft); }
-        if flag & (1 << 9) != 0 { groups.push(NodeGroup::FootRight); }
-        if flag & (1 << 10) != 0 { groups.push(NodeGroup::FootLeft); }
+        if flag & (1 << 0) != 0 {
+            groups.push(NodeGroup::Head);
+        }
+        if flag & (1 << 1) != 0 {
+            groups.push(NodeGroup::ArmRight);
+        }
+        if flag & (1 << 2) != 0 {
+            groups.push(NodeGroup::ArmLeft);
+        }
+        if flag & (1 << 3) != 0 {
+            groups.push(NodeGroup::TorsoRight);
+        }
+        if flag & (1 << 4) != 0 {
+            groups.push(NodeGroup::TorsoLeft);
+        }
+        if flag & (1 << 5) != 0 {
+            groups.push(NodeGroup::TorsoFront);
+        }
+        if flag & (1 << 6) != 0 {
+            groups.push(NodeGroup::TorsoBack);
+        }
+        if flag & (1 << 7) != 0 {
+            groups.push(NodeGroup::LegRight);
+        }
+        if flag & (1 << 8) != 0 {
+            groups.push(NodeGroup::LegLeft);
+        }
+        if flag & (1 << 9) != 0 {
+            groups.push(NodeGroup::FootRight);
+        }
+        if flag & (1 << 10) != 0 {
+            groups.push(NodeGroup::FootLeft);
+        }
         groups
     }
 }
@@ -90,7 +112,7 @@ pub struct HapticMap {
 
 impl HapticMap {
     /// Creates empty HapticMap
-    pub fn new(falloff_distance: f32, merge_distance:f32) -> HapticMap {
+    pub fn new(falloff_distance: f32, merge_distance: f32) -> HapticMap {
         let gaussian_sigma = falloff_distance / (-2.0 * 0.05_f32.ln());
         return HapticMap {
             game_map: None,
@@ -131,7 +153,7 @@ impl HapticMap {
                 } else {
                     vec![0.0; device_map.len()]
                 };
-    
+
                 // Iterate over the device_map and update new_values accordingly.
                 for (index, device_node) in device_map.iter().enumerate() {
                     new_values[index] = interp_maps(
@@ -143,7 +165,7 @@ impl HapticMap {
                         self.merge_distance,
                     );
                 }
-    
+
                 // If the values have changed, update last_sent and return them.
                 if new_values != self.last_sent {
                     self.last_sent = new_values;
@@ -158,7 +180,6 @@ impl HapticMap {
             return Err(HapticMapError::GameMapNotSet);
         }
     }
-    
 
     /// Called when the game needs to update it's commanded intensity values.
     pub fn set_game_nodes(&mut self, intensity_values: &Vec<f32>) -> Result<(), HapticMapError> {
@@ -178,7 +199,6 @@ impl HapticMap {
         if let Some(_) = &self.game_map {
             self.game_intensity[index] = intensity;
             return Ok(());
-            
         } else {
             return Err(HapticMapError::GameMapNotSet);
         }

@@ -1,14 +1,14 @@
 use crate::osc::server::OscServer;
-use crate::VrcInfo;
 use crate::vrc::Parameters;
+use crate::VrcInfo;
 
 use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::{collections::HashMap, net::Ipv4Addr};
 
 use oyasumivr_oscquery;
-use oyasumivr_oscquery::{ OSCMethodAccessType, OSCMethod };
-use rosc::{ OscMessage, OscType };
+use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
+use rosc::{OscMessage, OscType};
 use serde;
 
 use regex::Regex;
@@ -33,7 +33,6 @@ pub fn get_vrc() -> VrcInfo {
     let raw_menu_for_callback = raw_menu.clone();
     let first_message_callback = first_message.clone();
     let on_receive = move |msg: OscMessage| {
-        
         let addr = remove_version(&msg.addr);
 
         if *first_message_callback.read().unwrap() == false {
@@ -44,25 +43,30 @@ pub fn get_vrc() -> VrcInfo {
             let mut params = raw_params_for_callback.write().unwrap();
             params.insert(msg.addr.clone(), msg.args.clone());
         }
-        
+
         if addr.starts_with(haptics_menu_prefix) {
             println!("in menu prefix: {}", addr);
             let mut menu = raw_menu_for_callback.write().unwrap();
 
-           //see if it needs to be put in the parameters
+            //see if it needs to be put in the parameters
             for (_, (param, value)) in menu.parameters.iter_mut() {
                 if param == &addr {
-                    match msg.args.first().expect("No value with menu parameter").to_owned() {
+                    match msg
+                        .args
+                        .first()
+                        .expect("No value with menu parameter")
+                        .to_owned()
+                    {
                         OscType::Float(msg_float) => {
                             *value = msg_float;
-                        },
+                        }
                         _ => {
                             unreachable!("Expected only OscType::Float in menu parameters");
                         }
                     }
                     break;
                 }
-            } 
+            }
         }
     };
 
@@ -131,7 +135,8 @@ impl OscQueryServer {
                     ad_type: OSCMethodAccessType::Write,
                     value_type: None,
                     value: None,
-                }).await; // /avatar/*, /avatar/parameters/*, etc.
+                })
+                .await; // /avatar/*, /avatar/parameters/*, etc.
                 oyasumivr_oscquery::server::advertise().await.unwrap();
             });
 

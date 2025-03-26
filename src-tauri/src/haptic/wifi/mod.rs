@@ -1,18 +1,18 @@
-pub mod discovery;
 pub mod config;
 mod connection_manager;
+pub mod discovery;
 
 // outside imports
-use std::time::{ SystemTime, Duration };
+use rosc::{encoder, OscMessage, OscPacket, OscType};
+use std::time::{Duration, SystemTime};
 use std::vec;
-use rosc::{OscType, OscPacket, encoder, OscMessage};
 
 // local imports
-use connection_manager::WifiConnManager;
+use crate::haptic::OutputFactors;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::HapticMap;
-use crate::haptic::OutputFactors;
 use crate::util::next_free_port;
+use connection_manager::WifiConnManager;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 /// The DeviceType that handles generic wifi haptic devices
@@ -29,7 +29,7 @@ pub struct WifiDevice {
     pub push_map: bool,
     // Last time a query, "GET", command was sent. used for debouncing
     pub last_queried: SystemTime,
-    // The Port We Send data to 
+    // The Port We Send data to
     pub send_port: u16,
     // Abstracts communication.
     connection_manager: WifiConnManager,
@@ -46,7 +46,7 @@ impl WifiDevice {
     pub fn new(mac: String, ip: String, send_port: u16, name: String) -> WifiDevice {
         let recv_port = next_free_port(1500).unwrap();
         let connection_manager = WifiConnManager::new(&recv_port, "/hrtbt".to_string());
-        
+
         return WifiDevice {
             mac: mac,
             ip: ip.clone(),
@@ -70,7 +70,6 @@ impl WifiDevice {
         _factors: &mut OutputFactors,
         map: &mut HapticMap,
     ) -> Option<Packet> {
-
         if !self.been_pinged {
             // first round through we ping
             self.been_pinged = true;
@@ -89,7 +88,7 @@ impl WifiDevice {
                 None => {
                     println!("Using config from Device: {:?}", conf.node_map);
                     map.set_device_map(conf.node_map.clone());
-                },
+                }
                 // TODO: if updated (not equal) update parent map as well.
                 _ => (),
             }
@@ -109,20 +108,22 @@ impl WifiDevice {
                         // TODO: Perform scaling before sending
                         packet = Some(self.compile_message(values.unwrap()));
                     }
-                },
-                Err(_) => {()} // Either haptic map or game map is not set
+                }
+                Err(_) => (), // Either haptic map or game map is not set
             }
             return packet;
-
-        } else { // If no mapping configuration found
+        } else {
+            // If no mapping configuration found
             // Gather the configuration
             let now = SystemTime::now();
-            let diff = now.duration_since(self.last_queried).expect("Error getting difference");
+            let diff = now
+                .duration_since(self.last_queried)
+                .expect("Error getting difference");
             if diff > Duration::from_millis(500) || self.last_queried == SystemTime::UNIX_EPOCH {
                 self.last_queried = now;
                 return Some(self.build_get_all());
             }
-            
+
             return None;
         }
     }
@@ -131,26 +132,28 @@ impl WifiDevice {
     fn build_set_map(&self, map: &Vec<HapticNode>) -> Packet {
         let base = "SET NODE_MAP ".to_string();
         // Convert each HapticNode into its 8-byte hex representation.
-        let hex_str: String = map.iter()
+        let hex_str: String = map
+            .iter()
             .map(|node| {
                 let bytes = node.to_bytes();
                 // For each byte, produce a two-digit hex string.
-                bytes.iter()
+                bytes
+                    .iter()
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>()
             })
             .collect();
-        
+
         let full = base + &hex_str;
 
         let message = rosc::OscMessage {
             addr: "/command".to_string(),
-            args: vec![OscType::String(full)]
+            args: vec![OscType::String(full)],
         };
         let packet = rosc::OscPacket::Message(message);
-            
+
         Packet {
-            packet: rosc::encoder::encode(&packet).unwrap()
+            packet: rosc::encoder::encode(&packet).unwrap(),
         }
     }
 
@@ -163,7 +166,7 @@ impl WifiDevice {
             args: vec![OscType::String(hex_message)],
         };
         let packet = rosc::OscPacket::Message(message);
-        return Packet{
+        return Packet {
             packet: rosc::encoder::encode(&packet).unwrap(),
         };
     }
@@ -204,7 +207,7 @@ impl WifiDevice {
 
 /// Manipulates the given flags according to the heartbeat timings.
 fn manage_hrtbt(
-    is_alive: &mut bool, 
+    is_alive: &mut bool,
     _been_pinged: &mut bool,
     connection_manager: &WifiConnManager,
 ) {

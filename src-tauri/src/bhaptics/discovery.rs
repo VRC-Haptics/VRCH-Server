@@ -1,10 +1,12 @@
 use crate::util::next_free_tcp_port;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, UdpSocket, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, UdpSocket};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+
+use log;
 
 use serde::Serialize;
 use serde_json;
@@ -60,7 +62,7 @@ impl Bhaptics {
         // Spawn the thread.
         let handle = thread::spawn(move || {
             let socket = UdpSocket::bind("0.0.0.0:0").expect("Could not bind UDP socket");
-            let target = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), UDP_PORT);
+            let target = SocketAddr::new(IpAddr::V4(Ipv4Addr::), UDP_PORT);
 
             // Loop until broadcasting is set to false.
             loop {
@@ -80,10 +82,10 @@ impl Bhaptics {
                 // Serialize the message to JSON.
                 let json_str = serde_json::to_string(&msg).expect("Failed to serialize message");
                 if let Err(e) = socket.send_to(json_str.as_bytes(), target) {
-                    eprintln!("Error sending UDP message: {}", e);
-                } else {
-                    println!("Sent message:{} to: {:?}", json_str, target);
-                }
+                    log::error!("Error sending UDP message: {}", e);
+                }// else {
+                    //log::info!("Sent message:{} to: {:?}", json_str, target);
+                //}
                 thread::sleep(Duration::from_secs(1));
             }
         });
@@ -98,17 +100,18 @@ impl Bhaptics {
         let game_stream = Arc::clone(&self.game_stream);
 
         let address = format!("{}:{}", Ipv4Addr::LOCALHOST, tcp_port);
-        let listener = TcpListener::bind(&address)
-            .expect("couldn't bind TCP listener");
-        println!("TCP listener bound on {}", address);
-
+        let listener = TcpListener::bind(&address).expect("couldn't bind TCP listener");
+        log::info!("TCP listener bound on {}", address);
 
         thread::spawn(move || {
             // Continue accepting connections as long as broadcasting is true.
-            while *broadcasting.lock().expect("Failed to lock broadcasting flag") {
+            while *broadcasting
+                .lock()
+                .expect("Failed to lock broadcasting flag")
+            {
                 match listener.accept() {
                     Ok((stream, addr)) => {
-                        println!("Accepted TCP connection from {}", addr);
+                        log::info!("Accepted TCP connection from {}", addr);
                         {
                             let mut gs = game_stream.lock().expect("Failed to lock game_stream");
                             *gs = Some(stream.try_clone().expect("Failed to clone TcpStream"));
@@ -120,28 +123,29 @@ impl Bhaptics {
                             match reader.read_line(&mut line) {
                                 Ok(0) => {
                                     // Connection closed.
-                                    println!("TCP connection from {} closed.", addr);
+                                    log::info!("TCP connection from {} closed.", addr);
                                     let mut gs =
                                         game_stream.lock().expect("Failed to lock game_stream");
                                     *gs = None;
                                     break;
                                 }
                                 Ok(_) => {
-                                    println!("Received TCP message: {}", line.trim_end());
+                                    log::info!("Received TCP message: {}", line.trim_end());
                                     if let Ok(auth_msg) =
                                         serde_json::from_str::<AuthenticationMessage>(&line)
                                     {
-                                        println!("AuthenticationMessage received: appID:\"{}\" apiKey:\"{}\"",
+                                        log::info!("AuthenticationMessage received: appID:\"{}\" apiKey:\"{}\"",
                                             auth_msg.applicationId, auth_msg.sdkApiKey);
                                         // Stop UDP broadcasting.
-                                        let mut flag =
-                                            broadcasting.lock().expect("Failed to lock broadcasting flag");
+                                        let mut flag = broadcasting
+                                            .lock()
+                                            .expect("Failed to lock broadcasting flag");
                                         *flag = false;
                                         break;
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("Error reading from TCP stream: {}", e);
+                                    log::error!("Error reading from TCP stream: {}", e);
                                     let mut gs =
                                         game_stream.lock().expect("Failed to lock game_stream");
                                     *gs = None;
@@ -151,17 +155,17 @@ impl Bhaptics {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error accepting connection: {}", e);
+                        log::error!("Error accepting connection: {}", e);
                         thread::sleep(Duration::from_millis(100));
                     }
                 }
             }
-            println!("TCP listener thread terminating.");
+            log::info!("TCP listener thread terminating.");
         });
     }
 
     pub fn do_something(&self) {
-        println!("Doing something");
+        log::info!("Doing something");
     }
 }
 

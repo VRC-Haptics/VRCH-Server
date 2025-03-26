@@ -3,6 +3,7 @@ import * as tauriPath from "@tauri-apps/api/path";
 import * as fs from "@tauri-apps/plugin-fs";
 import * as os from "@tauri-apps/plugin-os";
 import tauriConfJson from "../../src-tauri/tauri.conf.json";
+import { attachConsole } from "@tauri-apps/plugin-log";
 
 declare global {
   interface Window {
@@ -56,6 +57,10 @@ export function TauriProvider({ children }: { children: ReactNode }) {
       };
       callTauriAPIs().catch(console.error);
     }
+  }, []);
+
+  useEffect(() => {
+    attachConsole().catch((err) => console.error("Failed to attach console:", err));
   }, []);
 
   return (

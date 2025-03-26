@@ -2,7 +2,7 @@ use crate::mapping::NodeGroup;
 
 /// Struct defining all needed properties for a haptic node.
 /// Used for mapping from one haptic model to another.
-/// Units are in Meters: Z is vertical, X is aligned with the Left Arm, Y is towards the front.
+/// Units are in Meters: Y is vertical, X is aligned with the Right Arm, Z is towards the front.
 /// Standard location is zeroed at the reference models feet, directly below the viewpoint.
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct HapticNode {
@@ -15,7 +15,6 @@ pub struct HapticNode {
     /// The NodeGroups this node should influence or take influence from
     pub groups: Vec<NodeGroup>,
 }
-
 
 impl HapticNode {
     /// Returns Euclidean distance in meters between this and the other HapticNode.

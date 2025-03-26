@@ -1,11 +1,11 @@
-use std::{collections::HashMap, net::Ipv4Addr };
-use std::sync::{ Arc, Mutex, RwLock };
-use serde::{ Deserialize, Serialize };
-use rosc::{ OscMessage, OscType };
+use rosc::{OscMessage, OscType};
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
+use std::{collections::HashMap, net::Ipv4Addr};
 
-use crate::osc::server::OscServer;
 use crate::haptic::wifi::config::WifiConfig;
+use crate::osc::server::OscServer;
 
 /// handles the wifi device's connection. Sending, recieving, killing etc.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -25,15 +25,16 @@ pub struct WifiConnManager {
 impl WifiConnManager {
     pub fn new(recv_port: &u16, hrtbt_addr: String) -> WifiConnManager {
         let start_time = SystemTime::now();
-        let last_hrtbt: Arc<Mutex<SystemTime>>= Arc::new(Mutex::new(start_time));
-        let recieved_params: Arc<RwLock<HashMap<String, (Vec<OscType>, SystemTime)>>> = Arc::new(RwLock::new(HashMap::new()));
+        let last_hrtbt: Arc<Mutex<SystemTime>> = Arc::new(Mutex::new(start_time));
+        let recieved_params: Arc<RwLock<HashMap<String, (Vec<OscType>, SystemTime)>>> =
+            Arc::new(RwLock::new(HashMap::new()));
         let last_command: Arc<RwLock<Option<WifiConfig>>> = Arc::new(RwLock::new(None));
 
         let recieve_copy = recieved_params.clone();
         let last_hrtbt_cpy = last_hrtbt.clone();
         let hrtbt_addr_cpy = hrtbt_addr.clone();
         let last_command_cpy = last_command.clone();
-        
+
         // The closure that gets called anytime an osc message is recieved.
         let on_receive = move |msg: OscMessage| {
             let mut recieve_mut = recieve_copy.write().unwrap();
@@ -53,10 +54,13 @@ impl WifiConnManager {
                             println!("Set device config: {:?}", command);
                             let mut cmd_lock = last_command_cpy.write().unwrap();
                             *cmd_lock = Some(command);
-                        },
+                        }
                         Err(e) => {
-                            eprintln!("Failed to parse WifiCommand JSON: {}, \n\t\tPacket: {}", e, cmd_str);
-                        },
+                            eprintln!(
+                                "Failed to parse WifiCommand JSON: {}, \n\t\tPacket: {}",
+                                e, cmd_str
+                            );
+                        }
                     }
                 }
             }
@@ -68,8 +72,8 @@ impl WifiConnManager {
             recv_port: recv_port.to_owned(),
             last_hrtbt: last_hrtbt,
             hrtbt_address: hrtbt_addr,
-            server:Some(server),
-            config:last_command,
+            server: Some(server),
+            config: last_command,
         }
     }
 }

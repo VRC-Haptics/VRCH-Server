@@ -12,9 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "vrch-gui",
+        "title": "Haptics",
         "width": 1000,
-        "height": 600
+        "height": 600,
+        "devtools": true
       }
     ],
     "security": {
@@ -31,6 +32,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["sidecars/vrc-sidecar.exe"]
+    "resources": [
+      "sidecars/vrc-sidecar.exe", 
+      "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
+      "sidecars/elevated-register.exe"
+    ]
   }
 }

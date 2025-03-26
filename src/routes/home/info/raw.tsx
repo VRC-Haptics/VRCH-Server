@@ -5,10 +5,24 @@ interface RawDeviceInfoProps {
 }
 
 // Helper function to format SystemTime-like objects
-function formatSystemTime(systemTime: { secs_since_epoch: number; nanos_since_epoch: number }): string {
+function formatSystemTime(
+  time: string | { secs_since_epoch: number; nanos_since_epoch: number }
+) {
+  let systemTime: { secs_since_epoch: number; nanos_since_epoch: number };
+
+  if (typeof time === 'string') {
+    systemTime = {
+      secs_since_epoch: parseInt(time, 10),
+      nanos_since_epoch: 0,
+    };
+  } else {
+    systemTime = time;
+  }
+
   const ms = systemTime.secs_since_epoch * 1000;
   return new Date(ms).toLocaleString();
 }
+
 
 export default function RawDeviceInfo({ device }: RawDeviceInfoProps) {
   return (
