@@ -43,4 +43,7 @@ tauri-plugin-log = "2"
 log = "0.4.27"
 runas = "1.2.0"
 windows = "0.61.1"
+rustls = "0.23.25"
+native-tls = "0.2.14"
+async-tungstenite = {version = "0.29.1", features = ["tokio-native-tls", "tokio-runtime"]}
 

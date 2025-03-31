@@ -35,7 +35,8 @@
     "resources": [
       "sidecars/vrc-sidecar.exe", 
       "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
-      "sidecars/elevated-register.exe"
+      "sidecars/elevated-register.exe",
+      "security/bhaptics.pfx"
     ]
   }
 }

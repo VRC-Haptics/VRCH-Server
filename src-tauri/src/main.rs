@@ -11,7 +11,7 @@ pub mod util;
 mod vrc;
 
 // local modules
-use bhaptics::discovery::Bhaptics;
+use bhaptics::game::BhapticsGame;
 use haptic::wifi::discovery::start_wifi_listener;
 use haptic::{Device, DeviceType};
 use mapping::haptic_node::HapticNode;
@@ -275,22 +275,11 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 }
 
 fn main() {
-    // Get the path of the running executable.
-    match std::env::current_exe() {
-        Ok(exe_path) => {
-        // Extract the parent directory.
-        if let Some(parent) = exe_path.parent() {
-            println!("Parent folder: {}", parent.display());
-        } else {
-            eprintln!("Failed to determine the parent folder.");
-        }
-        }
-        Err(e) => eprintln!("Failed to get current exe: {}", e),
-    }
+    std::env::set_var("RUST_LOG", "tungstenite=warn");
 
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
-    let baptics: Arc<Mutex<Bhaptics>> = Arc::new(Mutex::new(Bhaptics::new()));
+    let baptics = BhapticsGame::new();
                                                                         
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
@@ -309,6 +298,8 @@ fn main() {
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Webview,
                 ))
+                // tungestenite logs and it is annoying
+                .filter(|metadata| !metadata.target().starts_with("tungstenite"))
                 .max_file_size(50_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
                 .build(),
@@ -339,6 +330,8 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
+        // purely to have the baptics variable live long enough
+        // I don't really like it but idk right now
     let lock = baptics.lock().unwrap();
     lock.do_something();
 }
