@@ -299,7 +299,7 @@ fn main() {
                     tauri_plugin_log::TargetKind::Webview,
                 ))
                 // tungestenite logs and it is annoying
-                .filter(|metadata| !metadata.target().starts_with("tungstenite"))
+                .filter(|metadata| !metadata.target().starts_with("rustls"))
                 .max_file_size(50_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
                 .build(),

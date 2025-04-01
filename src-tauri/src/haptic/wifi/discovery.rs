@@ -18,8 +18,8 @@ pub fn start_wifi_listener(
         let socket = UdpSocket::bind("0.0.0.0:8888").unwrap();
         let multicast_addr = Ipv4Addr::new(239, 0, 0, 1);
         multicast_all_interfaces(&socket, &multicast_addr).ok();
-        println!(
-            "Listening for multicast messages on {}:8888...",
+        log::trace!(
+            "Listening for Devices on {}:8888",
             multicast_addr
         );
 
@@ -45,7 +45,7 @@ pub fn start_wifi_listener(
 
                         // Check if device already exists
                         if !lock.iter().any(|d| d.id == mac) {
-                            println!("New device found: {} at {}", name, ip);
+                            log::trace!("New device found: {} at {}", name, ip);
 
                             let new_device =
                                 WifiDevice::new(mac.clone(), ip.clone(), port, name.clone());
@@ -70,10 +70,10 @@ pub fn start_wifi_listener(
                                     //_ => panic!("Unexpected device type with same ID as new wifi device"),
                                 }
                             }
-                            println!("Multicast for {}, which already exists", name);
+                            log::debug!("Multicast for {}, which already exists", name);
                         }
                     } else {
-                        println!("Invalid JSON received: {}", received);
+                        log::error!("Invalid JSON received: {}", received);
                     }
                 }
                 Err(e) => {
@@ -93,10 +93,10 @@ fn multicast_all_interfaces(socket: &UdpSocket, multicast_addr: &Ipv4Addr) -> io
         // Check for IPv4 addresses.
         if let if_addrs::IfAddr::V4(v4_addr) = &iface.addr {
             if !iface.is_loopback() {
-                println!("Joining multicast group on interface: {}", v4_addr.ip);
+                log::trace!("Listening on: {}", v4_addr.ip);
                 // Attempt to join multicast group on this interface.
                 if let Err(e) = socket.join_multicast_v4(multicast_addr, &v4_addr.ip) {
-                    eprintln!(
+                    log::error!(
                         "Failed to join multicast on interface {}: {}",
                         v4_addr.ip, e
                     );

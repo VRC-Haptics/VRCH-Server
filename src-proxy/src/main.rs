@@ -25,17 +25,14 @@ fn main() {
 
         println!("PROGRAM EXITED");
         println!("STDERR: {:?}", _status.stderr);
-        pause_before_exit();
 
         // if it already is running
     } else {
         println!("vrch-gui.exe is already running. Attaching to its lifetime...");
         track_process_and_exit("vrch-gui.exe", &mut system);
-        pause_before_exit();
     }
 
     println!("vrch-gui.exe has exited. Proxy shutting down.");
-    pause_before_exit();
 }
 
 fn pause_before_exit() {

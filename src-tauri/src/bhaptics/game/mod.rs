@@ -2,18 +2,39 @@ mod player_messages;
 /// A mess of serialization crap that sorta works to deserialize the weirdly formatted AuthenticationInit Message
 mod auth_message;
 
-use auth_message::AuthInitMessage;
-
-use std::fs::File;
-use std::io::Read;
-use std::net::TcpListener;
-use std::sync::Arc;
-use std::thread;
-
-use native_tls::{Identity, TlsAcceptor};
-use rustls::lock::Mutex;
+use auth_message::handle_auth_init;
+use tokio::sync::mpsc;
 use serde;
-use async_tungstenite::;
+
+use std::{
+    thread,
+    fs::File,
+    io::{self, BufReader},
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
+
+
+use futures_util::{SinkExt, StreamExt};
+use rustls_pemfile::{certs, pkcs8_private_keys};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use tokio::net::TcpListener;
+use tokio_rustls::{rustls, TlsAcceptor};
+use tokio_websockets::Message;
+
+const PATH_TO_CERT: &str = "security/localhost.crt";
+const PATH_TO_KEY: &str = "security/localhost.key";
+
+fn load_certs(path: &str) -> io::Result<Vec<CertificateDer<'static>>> {
+    certs(&mut BufReader::new(File::open(path)?)).collect()
+}
+
+fn load_key(path: &str) -> io::Result<PrivateKeyDer<'static>> {
+    pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
+        .next()
+        .unwrap()
+        .map(Into::into)
+}
 
 /// Holds information for the bhaptics game server.
 pub struct BhapticsGame {
@@ -37,84 +58,119 @@ pub struct ApiInfo {
 }
 
 impl BhapticsGame {
-    /// Create an instance of BhapticsGame. 
-    /// Instantiates the Websocket server and prepares to recieve connections
-    pub fn new() -> Arc<Mutex<BhapticsGame>> {
-        let game = BhapticsGame {
+    /// Creates a new BhapticsGame instance and starts the WebSocket server on a separate thread.
+    ///
+    /// This factory function spawns a thread with its own Tokio runtime to listen for connections.
+    pub fn new() -> Arc<Mutex<Self>> {
+        let game = Arc::new(Mutex::new(BhapticsGame { 
             game_connected: false,
             api_info: None,
             name: None,
             sdk_api_version: None,
-            recv_msgs: Vec::new(),
-        };
-        let shared_game = Arc::new(Mutex::new(game));
+            ws_sender: None,
+        }));
+        let game_clone = game.clone();
 
-        // setup the game conneciton server.
-        let game_clone = Arc::clone(&shared_game);
+
         thread::spawn(move || {
-             // Create a new Tokio runtime in this thread.
-             let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-             rt.block_on(async move {
-            // Setup TLS
-            let mut file =
-                File::open("./security/bhaptics.pfx").expect("unable to get security identity");
-            let mut identity = vec![];
-            file.read_to_end(&mut identity).unwrap();
-            let identity = Identity::from_pkcs12(&identity, "bhaptics").unwrap();
-            let tls_acceptor = TlsAcceptor::builder(identity)
-                .build()
-                .expect("Failed to build TLS acceptor.");
-            let tls_acceptor = Arc::new(tls_acceptor);
+            // Create a new Tokio runtime in this thread.
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+            rt.block_on(async move {
+                //TLS setup
+                let addr = SocketAddr::from(([127, 0, 0, 1], 15882));
+                let certs = load_certs(PATH_TO_CERT).expect("couldn't load cert");
+                let key = load_key(PATH_TO_KEY).expect("couldn't load key");
 
-            let server =
-                TcpListener::bind("127.0.0.1:15882").expect("unable to bind to bhaptics port");
-            log::info!("Started bHaptics Server");
+                let config = rustls::ServerConfig::builder()
+                    .with_no_client_auth()
+                    .with_single_cert(certs, key)
+                    .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))
+                .expect("Failed Creating server");
 
-            // Accept incoming connections.
-            for stream in server.incoming() {
-                let game_thread = Arc::clone(&game_clone);
-                let stream = stream.expect("unable to unwrap the stream");
-                let tls_acceptor_thread = Arc::clone(&tls_acceptor);
+                let acceptor = TlsAcceptor::from(Arc::new(config));
+                let listener = TcpListener::bind(&addr).await.expect("Couldn't bind tcp listener");
+                log::info!("bHaptics server started on {}", addr);
 
-                thread::spawn(move || {
-                    let tls_stream = tls_acceptor_thread
-                        .accept(stream)
-                        .expect("Failed to accept TLS connection.");
+                // Main connection manager
+                loop {
+                    let (stream, _) = listener.accept().await.expect("failed creating stream");
+                    let acceptor = acceptor.clone();
+                    let game_server = game_clone.clone();
 
-                    // Upgrade the TLS stream to a WebSocket connection.
-                    let mut websocket =
-                        tungstenite::accept(tls_stream).expect("Failed to upgrade to WebSocket.");
+                    let fut = async move {
+                        // On connection former
+                        tokio::spawn(async move {
+                            let stream = acceptor.accept(stream).await.expect("failed accept stream");
 
-                    // Read messages from the WebSocket.
-                    loop {
-                        match websocket.read() {
-                            Ok(msg) => {
-                                if msg.is_ping() || msg.is_pong() {
-                                    continue;
-                                } else if msg.is_text() {
-                                    log::trace!("Received text message");
-                                    // Pass the message along with the shared game instance.
-                                    msg_received(msg, Arc::clone(&game_thread));
-                                } else {
-                                    log::error!("Received non-text message: {:?}", msg.into_data());
+                            // Accept the WebSocket connection.
+                            let (_request, ws_stream) = tokio_websockets::ServerBuilder::new()
+                                .accept(stream)
+                                .await
+                                .expect("TLS handshake failed");
+
+                            log::info!("New WebSocket connection established");
+
+                            // Split the WebSocket into sender and receiver halves.
+                            let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+                            let (tx, mut rx) = mpsc::unbounded_channel();
+
+                            // Store the sender in the shared game state.
+                            {
+                                let mut game_lock = game_server.lock().unwrap();
+                                game_lock.ws_sender = Some(tx);
+                            }
+
+                            // Spawn a task to forward outgoing messages from the channel to the WebSocket.
+                            tokio::spawn(async move {
+                                while let Some(msg) = rx.recv().await {
+                                    if ws_sender.send(msg).await.is_err() {
+                                        log::error!("Failed to send message to WebSocket");
+                                        break;
+                                    }
                                 }
+                            });
 
-                                // Mark game as connected.
-                                let mut game_lock =
-                                    game_thread.lock().expect("couldn't lock game for update");
-                                game_lock.game_connected = true;
+                            while let Some(Ok(msg)) = ws_receiver.next().await {
+                                if msg.is_text() {
+                                    let game_clone = Arc::clone(&game_server);
+                                    msg_received(msg, game_clone);
+                                } else if msg.is_ping() || msg.is_pong() {
+                                    continue;
+                                } else {
+                                    log::warn!("Received non-text message");
+                                }
                             }
-                            Err(e) => {
-                                log::error!("Error reading message: {}", e);
-                                break;
-                            }
+                        });
+
+                        Ok(()) as Result<(), tokio_websockets::Error>
+                    };
+                
+
+                    tokio::spawn(async move {
+                        if let Err(err) = fut.await {
+                            eprintln!("{:?}", err);
                         }
-                    }
-                });
-            }
+                    });
+                }
+            });
         });
 
-        shared_game
+        game
+    }
+
+    /// Sends a text message over the established WebSocket connection.
+    ///
+    /// If no connection is available, a warning is logged.
+    pub fn send(&self, msg: Vec<SendMessage>) {
+        if let Some(ref sender) = self.ws_sender {
+            let data = serde_json::to_string(&msg)
+                .expect("couldn't create json for sending");
+            if let Err(e) = sender.send(Message::text(data)) {
+                log::error!("Failed to send message: {}", e);
+            }
+        } else {
+            log::warn!("No WebSocket connection available.");
+        }
     }
 
     pub fn do_something(&self) {
@@ -125,7 +181,7 @@ impl BhapticsGame {
 /// Handles decoding message strings into their respective structs.
 fn msg_received(msg: Message, game: Arc<Mutex<BhapticsGame>>) {
     // Convert the message into a String.
-    let raw_text = msg.into_text()
+    let raw_text = msg.as_text()
         .expect("Failed to convert message to text");
     let decoded: RecievedMessage = serde_json::from_str(&raw_text)
         .expect("couldn't decode incoming packet");
@@ -134,7 +190,28 @@ fn msg_received(msg: Message, game: Arc<Mutex<BhapticsGame>>) {
     match decoded {
         RecievedMessage::SdkRequestAuthInit(contents) => 
             handle_auth_init(&contents, game),
+        RecievedMessage::SdkPlay(event) => 
+            handle_sdk_play(&event, &game),
+        RecievedMessage::SdkStopAll => 
+            log::error!("SdkStopAll not impelemented"),
     }
+}
+
+
+fn handle_sdk_play(input: &str, game: &Arc<Mutex<BhapticsGame>>) {
+    let content: SdkPlayMessage = serde_json::from_str(input)
+        .expect("Couldn't decode play request");
+    log::debug!("Play Event: {:?}", content);
+}
+
+fn create_init_response() -> Vec<SendMessage> {
+    let messages: Vec<SendMessage> = vec![
+        SendMessage::ServerReady,
+        SendMessage::ServerEventNameList(vec!["event_names".to_string()]),
+        SendMessage::ServerEventList(vec![]),
+    ];
+
+    return messages;
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -143,53 +220,39 @@ fn msg_received(msg: Message, game: Arc<Mutex<BhapticsGame>>) {
 enum RecievedMessage {
     /// The first message sent from the game
     SdkRequestAuthInit(String),
+    /// The message that triggers the start of a haptic event
+    SdkPlay(String),
+    /// Clears all active events
+    SdkStopAll,
 }
-
-/// Handler for SdkRequestAuthInit messages.
-fn handle_auth_init(contents: &str, game: Arc<Mutex<BhapticsGame>>) {
-    log::info!("Recieved Auth Init message.");
-    
-    let new = contents.replace(r"\\", "");
-
-    //Trim weird extra escape characters
-    let init_msg = AuthInitMessage::from_message_str(&new);
-    match init_msg {
-        Ok(msg) => {          
-            let new_info = ApiInfo {
-                application_id: msg.authentication.application_id,
-                api_key: msg.authentication.sdk_api_key,
-                creator_id: msg.haptic.message.creator,
-                workspace_id: msg.haptic.message.workspace_id,
-            };
-
-            let mut game_lock = game.lock()
-                .expect("could not lock BhapticsGame");
-            game_lock.api_info = Some(new_info);
-
-            game_lock.name = Some(msg.haptic.message.name);
-            game_lock.sdk_api_version = Some(msg.haptic.message.version);
-
-            log::info!("Need to handle saving this info maybe?");
-        },
-        Err(err) => {
-            log::error!("Unable to parse authorization message: {}", err);
-        }
-    }
-}
-
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "Type", content = "message")]
-enum SentMessage {
+pub enum SendMessage {
     ServerReady,
     ServerEventNameList(Vec<String>),
-    ServerEventList(Vec<HapticEvent>)
+    ServerEventList(Vec<ServerEvent>)
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct HapticEvent {
+pub struct ServerEvent {
     #[serde(rename = "eventName")]
     event_name: String,
     #[serde(rename = "eventTime")]
     event_time: u32,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SdkPlayMessage {
+    #[serde(rename = "eventName")]
+    event_name: String,
+    #[serde(rename = "requestId")]
+    request_id: u32,
+    position: u32,
+    intensity: f32,
+    duration: f32,
+    #[serde(rename = "offsetAngleX")]
+    offset_angle_x: f32,
+    #[serde(rename = "offsetY")]
+    offset_y: f32,
 }

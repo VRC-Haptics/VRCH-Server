@@ -1,5 +1,8 @@
 use crate::util::deserialization::skip_outer_quotes;
 
+use std::sync::{Arc, Mutex};
+use crate::bhaptics::game::{BhapticsGame, ApiInfo, create_init_response};
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// Collects alot of weird classes to handle serialization and deserialization of the AuthInit Message
 pub struct AuthInitMessage {
@@ -13,6 +16,42 @@ impl AuthInitMessage {
     pub fn from_message_str(raw: &str) -> Result<AuthInitMessage, Box<serde_json::Error>> {
         let res: AuthInitMessage = serde_json::from_str(raw)?;
         return Ok(res);
+    }
+}
+
+/// Handler for SdkRequestAuthInit messages.
+pub fn handle_auth_init(contents: &str, game: Arc<Mutex<BhapticsGame>>) {
+    log::info!("Recieved Auth Init message.");
+    
+    // get rid of double escaped quotes
+    let new = contents.replace(r"\\", "");
+
+    //Trim weird extra escape characters
+    let init_msg = AuthInitMessage::from_message_str(&new);
+    match init_msg {
+        Ok(msg) => {          
+            let new_info = ApiInfo {
+                application_id: msg.authentication.application_id,
+                api_key: msg.authentication.sdk_api_key,
+                creator_id: msg.haptic.message.creator,
+                workspace_id: msg.haptic.message.workspace_id,
+            };
+
+            let mut game_lock = game.lock()
+                .expect("could not lock BhapticsGame");
+            game_lock.api_info = Some(new_info);
+
+            game_lock.name = Some(msg.haptic.message.name);
+            game_lock.sdk_api_version = Some(msg.haptic.message.version);
+
+            log::info!("Need to handle saving this info maybe?");
+
+            // send the OK message
+            game_lock.send(create_init_response());
+        },
+        Err(err) => {
+            log::error!("Unable to parse authorization message: {}", err);
+        }
     }
 }
 
