@@ -6,8 +6,6 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use wifi::WifiDevice;
 
-use crate::mapping::HapticMap;
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceType {
@@ -26,8 +24,6 @@ pub struct Device {
     pub is_alive: bool,
     /// Factors that are used in the modulation of devices
     pub factors: OutputFactors,
-    /// Contains the mapping parameters for this device
-    pub map: HapticMap,
     /// Holds the varying fields/methods that need to be used for each type of device.
     pub device_type: DeviceType,
 }
@@ -53,7 +49,6 @@ impl Device {
                 sens_mult: 1.0,
                 user_sense: 1.0,
             },
-            map: HapticMap::new(0.3, 0.01),
             device_type: DeviceType::Wifi(wifi_device),
         };
 

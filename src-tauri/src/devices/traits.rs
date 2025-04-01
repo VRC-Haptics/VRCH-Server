@@ -1,4 +1,7 @@
-use crate::haptic::{Device, DeviceType, HapticMap, OutputFactors};
+use crate::devices::{
+    DeviceType,
+    OutputFactors
+};
 
 pub enum MenuType {
     Float(f32),
@@ -9,7 +12,7 @@ pub enum MenuType {
 /// Called on every server frame (~100hz)
 /// Should handle sending, recieving, killing, etc.
 trait Tick {
-    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors, map: &mut HapticMap);
+    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors);
 }
 
 /// Called slightly before shutdown or when deleting a device.
@@ -19,10 +22,10 @@ trait Stop {
 
 // Delegate the Tick trait implementation to the inner types.
 impl Tick for DeviceType {
-    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors, map: &mut HapticMap) {
+    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors) {
         match self {
             DeviceType::Wifi(dev) => {
-                dev.tick(is_alive, factors, map);
+                dev.tick(is_alive, factors);
             }
             _ => println!("unknown device type"),
         }

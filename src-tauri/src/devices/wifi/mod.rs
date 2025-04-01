@@ -8,9 +8,8 @@ use std::time::{Duration, SystemTime};
 use std::vec;
 
 // local imports
-use crate::haptic::OutputFactors;
+use crate::devices::OutputFactors;
 use crate::mapping::haptic_node::HapticNode;
-use crate::mapping::HapticMap;
 use crate::util::next_free_port;
 use connection_manager::WifiConnManager;
 
@@ -68,7 +67,6 @@ impl WifiDevice {
         &mut self,
         is_alive: &mut bool,
         _factors: &mut OutputFactors,
-        map: &mut HapticMap,
     ) -> Option<Packet> {
         if !self.been_pinged {
             // first round through we ping

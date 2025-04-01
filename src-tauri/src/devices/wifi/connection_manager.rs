@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
 use std::{collections::HashMap, net::Ipv4Addr};
 
-use crate::haptic::wifi::config::WifiConfig;
+use crate::devices::wifi::config::WifiConfig;
 use crate::osc::server::OscServer;
 
 /// handles the wifi device's connection. Sending, recieving, killing etc.

@@ -5,7 +5,7 @@ use std::net::{Ipv4Addr, UdpSocket};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
-use crate::haptic::{Device, DeviceType, WifiDevice};
+use crate::devices::{Device, DeviceType, WifiDevice};
 
 pub fn start_wifi_listener(
     app_handle: AppHandle,

@@ -3,7 +3,6 @@ mod player_messages;
 mod auth_message;
 
 use auth_message::handle_auth_init;
-use tokio::sync::mpsc;
 use serde;
 
 use std::{
@@ -14,10 +13,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-
 use futures_util::{SinkExt, StreamExt};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use tokio::sync::mpsc;
 use tokio::net::TcpListener;
 use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_websockets::Message;
@@ -196,7 +195,6 @@ fn msg_received(msg: Message, game: Arc<Mutex<BhapticsGame>>) {
             log::error!("SdkStopAll not impelemented"),
     }
 }
-
 
 fn handle_sdk_play(input: &str, game: &Arc<Mutex<BhapticsGame>>) {
     let content: SdkPlayMessage = serde_json::from_str(input)
