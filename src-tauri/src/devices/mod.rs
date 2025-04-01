@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use wifi::WifiDevice;
 
+use crate::mapping::interp::{GaussianState, InterpAlgo};
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceType {
@@ -35,11 +37,15 @@ pub struct OutputFactors {
     pub sens_mult: f32,
     /// sensitivity set by user
     pub user_sense: f32,
+    /// Interpolation algorithm
+    pub interp_algo: InterpAlgo,
 }
 
 impl Device {
-    /// Consumes wifi_device and creates a generic Device
+    /// Consumes wifi_device and creates a generic Device (with the wifiDevice as a child)
     pub fn from_wifi(wifi_device: WifiDevice, app_handle: &AppHandle) -> Device {
+        let init_interp = GaussianState::new(0.02, 0.1, 0.1);
+        
         let mut new_device = Device {
             id: wifi_device.mac.clone(),
             name: wifi_device.name.clone(),
@@ -48,6 +54,7 @@ impl Device {
             factors: OutputFactors {
                 sens_mult: 1.0,
                 user_sense: 1.0,
+                interp_algo: InterpAlgo::Gaussian(init_interp)
             },
             device_type: DeviceType::Wifi(wifi_device),
         };

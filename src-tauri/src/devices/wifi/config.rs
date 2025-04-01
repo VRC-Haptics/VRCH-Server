@@ -10,7 +10,7 @@ pub struct WifiConfig {
     pub wifi_password: String,
     pub mdns_name: String,
     #[serde(deserialize_with = "deserialize_from_str")]
-    pub node_map: Vec<HapticNode>, // Adjust type if necessary.
+    pub node_map: Vec<HapticNode>,
     pub i2c_scl: u32,
     pub i2c_sda: u32,
     pub i2c_speed: u32,

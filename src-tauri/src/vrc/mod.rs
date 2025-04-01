@@ -1,4 +1,5 @@
 pub mod discovery;
+pub mod parsing;
 
 use crate::osc::server::OscServer;
 use discovery::OscQueryServer;

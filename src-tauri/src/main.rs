@@ -14,7 +14,10 @@ mod vrc;
 use bhaptics::game::BhapticsGame;
 use devices::wifi::discovery::start_wifi_listener;
 use devices::{Device, DeviceType};
-use mapping::haptic_node::HapticNode;
+use mapping::{
+    haptic_node::HapticNode,
+    global_map::GlobalMap,
+};
 use vrc::{discovery::get_vrc, VrcInfo};
 
 //standard imports
@@ -102,19 +105,16 @@ async fn upload_device_map(
         serde_json::from_str(&config_json).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
     let mut devices = devices_mutex.lock().unwrap();
-    if let Some(device) = devices.iter_mut().find(|d| d.id == id) {
-        device.map.set_device_map(upload.device_map);
-
+    if let Some(device) = devices.iter_mut().find(|d| d.id == id) {       
         //propogate changes if necessary
         match &mut device.device_type {
             DeviceType::Wifi(wifi) => {
-                wifi.push_map = true;
+                return wifi.set_node_list(upload.device_map);
             }
         }
     } else {
         return Err(format!("No Device with id: {}", id));
     }
-    Ok(())
 }
 
 #[tauri::command]
@@ -198,7 +198,7 @@ async fn bhaptics_launch_default() {
     log::info!("Finished bhaptics_launch_default.");
 }
 
-fn tick_devices(device_list: Arc<Mutex<Vec<Device>>>, app: &tauri::AppHandle) {
+fn tick_devices(device_list: Arc<Mutex<Vec<Device>>>, input_list: Arc<Mutex<GlobalMap>>, app: &tauri::AppHandle) {
     log::info!("starting tick");
     io::stdout().flush().unwrap();
     let app_handle = app.clone();
@@ -230,6 +230,7 @@ fn tick_devices(device_list: Arc<Mutex<Vec<Device>>>, app: &tauri::AppHandle) {
                 // Remove dead devices
                 device_list_guard.retain(|device| device.is_alive);
 
+                let inputs_guard = input_list.lock().expect("couldn't find inputs guard");
                 for device in device_list_guard.iter_mut() {
                     // handle device specific tick functions
                     match &mut device.device_type {
@@ -238,7 +239,7 @@ fn tick_devices(device_list: Arc<Mutex<Vec<Device>>>, app: &tauri::AppHandle) {
                             if let Some(packet) = wifi_device.tick(
                                 &mut device.is_alive,
                                 &mut device.factors,
-                                &mut device.map,
+                                &inputs_guard,
                             ) {
                                 let addr = format!("{}:{}", wifi_device.ip, wifi_device.send_port);
                                 // TODO: Actually error handle
@@ -274,9 +275,14 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
     }
 }
 
+use tauri_plugin_log::{Target, TargetKind};
+
 fn main() {
+    let input_list: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
     let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
+    log::info!("Working");
+    println!("Working");
     let baptics = BhapticsGame::new();
                                                                         
     tauri::Builder::default()
@@ -288,16 +294,12 @@ fn main() {
         .plugin(tauri_plugin_os::init())
         .plugin(
             tauri_plugin_log::Builder::new()
-                .target(tauri_plugin_log::Target::new(
-                    tauri_plugin_log::TargetKind::LogDir {
-                        file_name: Some("logs".to_string()),
-                    },
-                ))
-                .target(tauri_plugin_log::Target::new(
-                    tauri_plugin_log::TargetKind::Webview,
-                ))
-                // tungestenite logs and it is annoying
-                .filter(|metadata| !metadata.target().starts_with("rustls"))
+                .target(Target::new(TargetKind::Webview))
+                .filter(|metadata| 
+                    !metadata.target().starts_with("mio") && 
+                    !metadata.target().starts_with("mdns_sd") &&
+                    !metadata.target().starts_with("async_std")
+                )
                 .max_file_size(200_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
                 .build(),
@@ -306,7 +308,7 @@ fn main() {
         .manage(vrc_info.clone())
         .setup(move |app| {
             let app_handle = app.handle();
-            tick_devices(device_list.clone(), app_handle);
+            tick_devices(device_list.clone(), input_list.clone(), app_handle);
             start_wifi_listener(app_handle.clone(), app.state());
             throw_vrc_notif(app_handle, vrc_info.clone());
             Ok(())

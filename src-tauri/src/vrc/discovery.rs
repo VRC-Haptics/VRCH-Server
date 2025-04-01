@@ -2,9 +2,22 @@ use crate::osc::server::OscServer;
 use crate::vrc::Parameters;
 use crate::VrcInfo;
 
-use std::sync::{mpsc, Arc, RwLock};
-use std::thread;
-use std::{collections::HashMap, net::Ipv4Addr};
+use super::parsing::{parse_incoming, OscInfo};
+
+use std::net::IpAddr;
+use std::sync::{
+    Mutex,
+    mpsc, 
+    Arc, 
+    RwLock,
+};
+use std::{
+    collections::HashMap, 
+    net::Ipv4Addr,
+    thread,
+    time::Duration,
+};
+
 
 use oyasumivr_oscquery;
 use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
@@ -12,6 +25,11 @@ use rosc::{OscMessage, OscType};
 use serde;
 
 use regex::Regex;
+use futures_util::{pin_mut, stream::StreamExt};
+use mdns::{Error, Record, RecordKind};
+
+/// default http port is 8060
+/// default server name is "OSCQueryService"
 
 fn remove_version(path: &str) -> String {
     // This regex matches "VF" followed by exactly two digits.
@@ -21,6 +39,9 @@ fn remove_version(path: &str) -> String {
 }
 
 pub fn get_vrc() -> VrcInfo {
+    let all_parameters: Arc<Mutex<HashMap<String, OscInfo>>> = Arc::new(Mutex::new(HashMap::new()));
+    start_filling_all_parameters(all_parameters.clone());
+
     let raw_parameters = Arc::new(RwLock::new(HashMap::new()));
     let raw_menu = Arc::new(RwLock::new(Parameters::new()));
     let first_message = Arc::new(RwLock::new(false));
@@ -69,7 +90,6 @@ pub fn get_vrc() -> VrcInfo {
             }
         }
     };
-
     //create server before starting anything
     let recieving_port = 9001;
     let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
@@ -78,7 +98,7 @@ pub fn get_vrc() -> VrcInfo {
     let mut osc_server = OscQueryServer::new(recieving_port);
     if port_used != recieving_port {
         osc_server.start();
-        println!("Not using VRC dedicated ports, expect slower operations.");
+        log::warn!("Not using VRC dedicated ports, expect slower operations.");
     }
 
     return VrcInfo {
@@ -92,6 +112,80 @@ pub fn get_vrc() -> VrcInfo {
         menu_parameters: raw_menu,
         raw_parameters: raw_parameters,
     };
+}
+
+fn start_filling_all_parameters(params: Arc<Mutex<HashMap<String, OscInfo>>>) {
+    thread::spawn(move || {
+        // Create a new Tokio runtime in this thread.
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+        rt.block_on(async move {
+            let service_type = "_oscjson._tcp.local.";
+            let stream = mdns::discover::interface(service_type, Duration::from_secs(3), Ipv4Addr::LOCALHOST)
+                .expect("couldn't start discovery")
+                .listen();
+            pin_mut!(stream);
+            println!("hit stream");
+
+            while let Some(Ok(response)) = stream.next().await {
+                let records = response.records();
+        
+                for record in records {
+                    let r_type = &record.kind;
+                    match r_type {
+                        RecordKind::SRV { priority, weight, port, ref target } => {
+                            println!("SRV Record - Priority: {}, Weight: {}, Port: {}, Target: {}", priority, weight, port, target);
+                            handle_service_resolved(&target, *port, &params);
+                        },
+                        r => println!("Other Record: {:?}", r),
+                    }
+                }
+            }
+        });
+    });
+}
+
+fn handle_service_resolved(full_name: &str, port: u16, params: &Arc<Mutex<HashMap<String, OscInfo>>>) {
+    println!("Resolved service: {}", full_name);
+    if full_name.contains("VRChat-Client-") {
+        run_vrc_http_polling(port, params.clone());
+    }
+}
+
+/// polls the 
+fn run_vrc_http_polling(port: u16, params: Arc<Mutex<HashMap<String, OscInfo>>>) {
+    let url = format!("http://127.0.0.1:{}/", port);
+    println!("Started polling: {}", port);
+    
+    loop {
+        // Make the HTTP request (using the blocking client for simplicity)
+        match reqwest::blocking::get(&url) {
+            Ok(response) => {
+                if let Ok(text) = response.text() {
+                    // Attempt to parse the non-standard formatted response.
+                    let node_info = parse_incoming(&text);
+                    // Handling this way so that we can do something when values change later
+                    let mut param_lock = params.lock().expect("Unable to get param lock");
+                    for node in node_info {
+                        match param_lock.get(&node.full_path) {
+                            Some(old_node) => {
+                                if old_node != &node {
+                                    param_lock.insert(node.full_path.clone(), node);
+                                }
+                            }
+                            None => {
+                                param_lock.insert(node.full_path.clone(), node);
+                            }
+                        };
+                    }
+                } else {
+                    eprintln!("Failed to read response text");
+                }
+            }
+            Err(err) => eprintln!("HTTP request failed: {}", err),
+        }
+        // Wait for a regular interval before the next query.
+        thread::sleep(Duration::from_secs(2));
+    }
 }
 
 #[derive(serde::Serialize, Debug, Clone)]

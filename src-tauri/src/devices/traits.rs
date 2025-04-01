@@ -1,7 +1,7 @@
-use crate::devices::{
+use crate::{devices::{
     DeviceType,
     OutputFactors
-};
+}, mapping::global_map::GlobalMap};
 
 pub enum MenuType {
     Float(f32),
@@ -12,7 +12,7 @@ pub enum MenuType {
 /// Called on every server frame (~100hz)
 /// Should handle sending, recieving, killing, etc.
 trait Tick {
-    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors);
+    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors, inputs: &GlobalMap);
 }
 
 /// Called slightly before shutdown or when deleting a device.
@@ -22,10 +22,10 @@ trait Stop {
 
 // Delegate the Tick trait implementation to the inner types.
 impl Tick for DeviceType {
-    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors) {
+    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors, inputs: &GlobalMap) {
         match self {
             DeviceType::Wifi(dev) => {
-                dev.tick(is_alive, factors);
+                dev.tick(is_alive, factors, inputs);
             }
             _ => println!("unknown device type"),
         }

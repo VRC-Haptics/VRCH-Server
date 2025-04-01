@@ -1,5 +1,5 @@
 use super::{
-    input_node::InputNode, interp::{InterpAlgo, Interpolate}, HapticNode
+    input_node::InputNode, interp::InterpAlgo, interp::Interpolate, HapticNode
 };
 
 use std::{
@@ -79,8 +79,8 @@ impl GlobalMap {
     /// 
     /// `respect_enable`: toggles whether to ignore the global_enable parameter
     /// 
-    pub fn get_intensity_from_haptic(&self, node: HapticNode, algo: InterpAlgo, respect_enable: bool) -> f32 {
-        if respect_enable && !self.global_enable {
+    pub fn get_intensity_from_haptic(&self, node: &HapticNode, algo: &InterpAlgo, respect_enable: &bool) -> f32 {
+        if *respect_enable && !self.global_enable {
             return 0.0;
         }
         algo.interp(node, &self.input_nodes.values().cloned().collect())

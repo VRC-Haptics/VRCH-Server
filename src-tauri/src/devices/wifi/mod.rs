@@ -9,6 +9,7 @@ use std::vec;
 
 // local imports
 use crate::devices::OutputFactors;
+use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
 use crate::util::next_free_port;
 use connection_manager::WifiConnManager;
@@ -66,7 +67,8 @@ impl WifiDevice {
     pub fn tick(
         &mut self,
         is_alive: &mut bool,
-        _factors: &mut OutputFactors,
+        factors: &mut OutputFactors,
+        inputs: &GlobalMap,
     ) -> Option<Packet> {
         if !self.been_pinged {
             // first round through we ping
@@ -79,37 +81,31 @@ impl WifiDevice {
         // keep track of heartbeat timings and whatnot
         manage_hrtbt(is_alive, &mut self.been_pinged, &self.connection_manager);
 
-        // If we have no config we can't do much
+        // check if we filled out the wifiConfig yet
         if let Some(conf) = self.connection_manager.config.read().unwrap().as_ref() {
-            // update the parent if needed.
-            match map.device_map {
-                None => {
-                    println!("Using config from Device: {:?}", conf.node_map);
-                    map.set_device_map(conf.node_map.clone());
-                }
-                // TODO: if updated (not equal) update parent map as well.
-                _ => (),
-            }
 
             //push config to device if necessary
             if self.push_map {
                 self.push_map = false;
-                return Some(self.build_set_map(&map.device_map.clone().unwrap()));
-            }
-
-            // Gather values
-            let mut packet: Option<Packet> = None;
-            let response = map.get_device_nodes();
-            match response {
-                Ok(values) => {
-                    if values.is_some() {
-                        // TODO: Perform scaling before sending
-                        packet = Some(self.compile_message(values.unwrap()));
+                let conn_lock = self.connection_manager.config.read().unwrap();
+                match conn_lock.as_ref() {
+                    Some(config) => {
+                        return Some(self.build_set_map(&config.node_map));
+                    },
+                    // Possiblity to get caught in loop if we try to set without recieving the config.
+                    None => {
+                        return None;
                     }
                 }
-                Err(_) => (), // Either haptic map or game map is not set
             }
-            return packet;
+
+            // Collect haptic values
+            let mut intensities = vec![];
+            for node in conf.node_map.iter() {
+                intensities.push(inputs.get_intensity_from_haptic(&node, &factors.interp_algo, &true));
+            }
+            intensities.reverse(); //undo reversing from push
+            return Some(self.compile_message(&intensities));
         } else {
             // If no mapping configuration found
             // Gather the configuration
@@ -200,6 +196,18 @@ impl WifiDevice {
         }))
         .unwrap();
         Packet { packet: msg_buf }
+    }
+
+    /// Sets the wifi connection manager's node map and flags it for transmission.
+    pub fn set_node_list(&mut self, list: Vec<HapticNode>) -> Result<(), String> {
+        let mut lock = self.connection_manager.config.write().unwrap();
+        if let Some(mut wifi_con) = lock.take() {
+            wifi_con.node_map = list;
+            self.push_map;
+            return Ok(());
+        } else {
+            return Err("no_map".to_string());
+        }
     }
 }
 
