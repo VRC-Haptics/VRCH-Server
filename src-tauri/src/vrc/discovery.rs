@@ -4,18 +4,20 @@ use crate::VrcInfo;
 
 use super::parsing::{parse_incoming, OscInfo};
 
-use std::net::IpAddr;
+use std::collections::HashMap;
+use std::net::Ipv4Addr;
+use std::thread;
+use std::time::Duration;
+use std::io::{BufReader, BufRead};
 use std::sync::{
     Mutex,
     mpsc, 
     Arc, 
     RwLock,
 };
-use std::{
-    collections::HashMap, 
-    net::Ipv4Addr,
-    thread,
-    time::Duration,
+use std::process::{
+    Command, 
+    Stdio
 };
 
 
@@ -23,16 +25,10 @@ use oyasumivr_oscquery;
 use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
 use rosc::{OscMessage, OscType};
 use serde;
-
 use regex::Regex;
-use futures_util::{pin_mut, stream::StreamExt};
-use mdns::{Error, Record, RecordKind};
 
-/// default http port is 8060
-/// default server name is "OSCQueryService"
-
+/// Removes the VRC Fury naming from the parameters
 fn remove_version(path: &str) -> String {
-    // This regex matches "VF" followed by exactly two digits.
     let re = Regex::new(r"VF\d{2}").unwrap();
     // Replace all matches with an empty string.
     re.replace_all(path, "").to_string()
@@ -116,39 +112,45 @@ pub fn get_vrc() -> VrcInfo {
 
 fn start_filling_all_parameters(params: Arc<Mutex<HashMap<String, OscInfo>>>) {
     thread::spawn(move || {
-        // Create a new Tokio runtime in this thread.
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-        rt.block_on(async move {
-            let service_type = "_oscjson._tcp.local.";
-            let stream = mdns::discover::interface(service_type, Duration::from_secs(3), Ipv4Addr::LOCALHOST)
-                .expect("couldn't start discovery")
-                .listen();
-            pin_mut!(stream);
-            println!("hit stream");
+        // Launch the sidecar process.
+        let mut child = Command::new("./sidecars/listen-for-vrc.exe")
+            // Do not attach a terminal to the sidecar.
+            .stdin(Stdio::null())
+            // Capture its stdout so we can read the FOUND messages.
+            .stdout(Stdio::piped())
+            // Optionally inherit stderr to see error messages.
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("Failed to launch sidecar");
 
-            while let Some(Ok(response)) = stream.next().await {
-                let records = response.records();
-        
-                for record in records {
-                    let r_type = &record.kind;
-                    match r_type {
-                        RecordKind::SRV { priority, weight, port, ref target } => {
-                            println!("SRV Record - Priority: {}, Weight: {}, Port: {}, Target: {}", priority, weight, port, target);
-                            handle_service_resolved(&target, *port, &params);
-                        },
-                        r => println!("Other Record: {:?}", r),
+        let stdout = child.stdout.take().expect("Failed to capture stdout");
+        let reader = BufReader::new(stdout);
+
+        // Monitor the sidecar output line by line.
+        for line in reader.lines() {
+            match line {
+                Ok(msg) => {
+                    if let Some(port_str) = msg.strip_prefix("FOUND:") {
+                        // Try parsing the port as a u16.
+                        if let Ok(port) = port_str.trim().parse::<u16>() {
+                            println!("Received FOUND message with port: {}", port);
+                            // Call the sub-function with the extracted port.
+                            run_vrc_http_polling(port, Arc::clone(&params));
+                            // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
+                        } else {
+                            eprintln!("Error: Could not parse port from message: {}", msg);
+                        }
+                    } else {
+                        println!("Received non-matching message: {}", msg);
                     }
                 }
+                Err(e) => {
+                    eprintln!("Error reading sidecar output: {}", e);
+                    break;
+                }
             }
-        });
+        }
     });
-}
-
-fn handle_service_resolved(full_name: &str, port: u16, params: &Arc<Mutex<HashMap<String, OscInfo>>>) {
-    println!("Resolved service: {}", full_name);
-    if full_name.contains("VRChat-Client-") {
-        run_vrc_http_polling(port, params.clone());
-    }
 }
 
 /// polls the 
@@ -169,10 +171,12 @@ fn run_vrc_http_polling(port: u16, params: Arc<Mutex<HashMap<String, OscInfo>>>)
                         match param_lock.get(&node.full_path) {
                             Some(old_node) => {
                                 if old_node != &node {
+                                    log::trace!("Inserting:{:?}", node);
                                     param_lock.insert(node.full_path.clone(), node);
                                 }
                             }
                             None => {
+                                log::trace!("Inserting:{:?}", node);
                                 param_lock.insert(node.full_path.clone(), node);
                             }
                         };
@@ -181,7 +185,14 @@ fn run_vrc_http_polling(port: u16, params: Arc<Mutex<HashMap<String, OscInfo>>>)
                     eprintln!("Failed to read response text");
                 }
             }
-            Err(err) => eprintln!("HTTP request failed: {}", err),
+            Err(err) => {
+                if err.is_connect() {
+                    log::error!("connection to VRC HTTP failed");
+                    return
+                } else {
+                    eprintln!("HTTP request failed: {}", err);
+                }
+            }
         }
         // Wait for a regular interval before the next query.
         thread::sleep(Duration::from_secs(2));

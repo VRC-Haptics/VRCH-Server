@@ -2,6 +2,7 @@ use std::vec;
 use std::collections::HashMap;
 
 use rosc::OscType;
+use serde_json::Value;
 
 /// convenience function for parsing returned HTTP OSCQuery messages
 pub fn parse_incoming(input: &str) -> Vec<OscInfo> {
@@ -74,6 +75,16 @@ pub enum OscAccessLevel {
     Full,       // 3 – value may be both retrieved and set
 }
 
+impl OscAccessLevel {
+    /// if this access level represents a readable state
+    fn is_readable(&self) -> bool {
+        match *self {
+            OscAccessLevel::Full | OscAccessLevel::OnlyRead => true,
+            _ => false,
+        }
+    }
+}
+
 // Conversion from the optional u8 (from the JSON) into our enum.
 // If ACCESS is missing (None) then per protocol we assume that if VALUE is supported, it’s readable,
 impl From<u8> for OscAccessLevel {
@@ -103,40 +114,25 @@ impl OscInfo {
             access = OscAccessLevel::from(acc);
         }
 
-        // If both tags and contents exist
+        // create OSCType
         let mut types: Option<Vec<OscType>> = Option::None;
         if let Some(type_tags) = &node.osc_type {
             if let Some(contents) = &node.value {
                 let mut things = vec![];
                 // Iterate over each tag for the types
                 for (i, tag) in type_tags.chars().enumerate() {
-                    let finished = match tag {
-                        's' => {OscType::String(
-                                contents[i].as_str()
-                                    .expect("Couldn't coerce string type")
-                                    .to_string()
-                            )
-                        },
-                        'i' => {OscType::Int(
-                            contents[i].as_i64()
-                                .expect("Couldn't coerce integer type") 
-                                as i32
-                            )
-                        },
-                        'f' => {OscType::Float(
-                            contents[i].as_f64()
-                                .expect("Couldn't coerce integer type") 
-                                as f32
-                            )
-                        },
-                        tag => {
-                            log::error!("Unsupported OSC Type tag: {}", tag);
-                            OscType::Nil
-                        }
-                    };
+                    // if more type tags then contents
+                    if contents.len() <= i {
+                        break;
+                    } 
+                    // if we don't have read access
+                    if !access.is_readable() {
+                        things.push(OscType::Nil);
+                        break;
+                    }                        
 
-                    things.push(finished);
-                }
+                    things.push(match_tag(tag, &contents[i]));
+                }   
                 things.reverse();
                 types = Some(things);
             }
@@ -147,6 +143,48 @@ impl OscInfo {
             access: access, 
             value: types, 
             description: node.description.clone(),
+        }
+    }
+}
+
+fn match_tag(tag: char, content: &Value) -> OscType {
+    match tag {
+        's'|'S' => {
+            if let Some(s) = content.as_str() {
+                OscType::String(s.to_string())
+            } else {
+                log::error!("Couldn't coerce string: {:?}", content);
+                OscType::Nil
+            }
+        },
+        'i' => {
+            if let Some(num) = content.as_i64() {
+                OscType::Int(num as i32)
+            } else {
+                log::error!("Couldn't coerce integer: {:?}", content);
+                OscType::Nil
+            }
+        },
+        'f' => {
+            if let Some(num) = content.as_f64()  {
+                OscType::Float(num as f32)
+            } else {
+                log::error!("Couldn't coerce float: {:?}", content);
+                OscType::Nil
+            }
+        },
+        'T' => OscType::Bool(true),
+        'F' => OscType::Bool(false),
+        'I' => OscType::Inf,
+        'N' => OscType::Nil,
+        't' => {
+            log::error!("time tag types are unsupported");
+            OscType::Nil
+        },
+        tag => {
+            log::error!("Unsupported OSC Type tag: {}", tag);
+            log::error!("Contents: {:?}", content);
+            OscType::Nil
         }
     }
 }

@@ -297,8 +297,7 @@ fn main() {
                 .target(Target::new(TargetKind::Webview))
                 .filter(|metadata| 
                     !metadata.target().starts_with("mio") && 
-                    !metadata.target().starts_with("mdns_sd") &&
-                    !metadata.target().starts_with("async_std")
+                    !metadata.target().starts_with("reqwest")
                 )
                 .max_file_size(200_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
