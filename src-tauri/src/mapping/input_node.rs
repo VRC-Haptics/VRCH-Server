@@ -1,10 +1,11 @@
 use super::haptic_node::HapticNode;
+use super::Id;
 
-#[derive(Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 /// All information needed to compute an OuputNode of any given location
 pub struct InputNode {
     /// id Unique to this InputNode
-    id: String,
+    id: Id,
     /// Contains the standard location and NodeGroup tags for calculating outputs
     pub haptic_node: HapticNode,
     /// The feedback strength at this location
@@ -23,7 +24,7 @@ impl InputNode {
     /// tags: Use these to find groups of InputNodes
     /// 
     /// **NOTE:** Initializes intensity to 0.0, set the intensity using class functions
-    pub fn new(node: HapticNode, tags: Vec<String>, id: String) -> InputNode {
+    pub fn new(node: HapticNode, tags: Vec<String>, id: Id) -> InputNode {
         return InputNode {
             id: id,
             haptic_node: node,
@@ -43,7 +44,7 @@ impl InputNode {
     }
 
     /// Gets our unique ID
-    pub fn get_id(&self) -> &str {
+    pub fn get_id(&self) -> &Id {
         &self.id
     }
 }

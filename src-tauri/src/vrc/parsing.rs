@@ -1,8 +1,17 @@
+use super::OscPath;
+
 use std::vec;
 use std::collections::HashMap;
-
+use regex::Regex;
 use rosc::OscType;
 use serde_json::Value;
+
+/// Removes the VRC Fury naming from the parameters
+pub fn remove_version(path: &str) -> String {
+    let re = Regex::new(r"VF\d{2}").unwrap();
+    // Replace all matches with an empty string.
+    re.replace_all(path, "").to_string()
+}
 
 /// convenience function for parsing returned HTTP OSCQuery messages
 pub fn parse_incoming(input: &str) -> Vec<OscInfo> {
@@ -67,7 +76,7 @@ impl OscQueryNode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub enum OscAccessLevel {
     Refused,    // 0 – no value associated
     OnlyRead,   // 1 – value may only be retrieved
@@ -99,9 +108,9 @@ impl From<u8> for OscAccessLevel {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct OscInfo {
-    pub full_path: String,
+    pub full_path: OscPath,
     pub access: OscAccessLevel,
     pub value: Option<Vec<OscType>>,
     pub description: Option<String>,
@@ -139,7 +148,7 @@ impl OscInfo {
         }
 
         OscInfo { 
-            full_path: node.full_path.clone(), 
+            full_path: OscPath(node.full_path.clone()), 
             access: access, 
             value: types, 
             description: node.description.clone(),
@@ -152,6 +161,8 @@ fn match_tag(tag: char, content: &Value) -> OscType {
         's'|'S' => {
             if let Some(s) = content.as_str() {
                 OscType::String(s.to_string())
+            } else if let Some(obj) = content.as_object() {
+                handle_obj(obj)
             } else {
                 log::error!("Couldn't coerce string: {:?}", content);
                 OscType::Nil
@@ -160,6 +171,8 @@ fn match_tag(tag: char, content: &Value) -> OscType {
         'i' => {
             if let Some(num) = content.as_i64() {
                 OscType::Int(num as i32)
+            } else if let Some(obj) = content.as_object() {
+                handle_obj(obj)
             } else {
                 log::error!("Couldn't coerce integer: {:?}", content);
                 OscType::Nil
@@ -168,6 +181,8 @@ fn match_tag(tag: char, content: &Value) -> OscType {
         'f' => {
             if let Some(num) = content.as_f64()  {
                 OscType::Float(num as f32)
+            } else if let Some(obj) = content.as_object() {
+                handle_obj(obj)
             } else {
                 log::error!("Couldn't coerce float: {:?}", content);
                 OscType::Nil
@@ -186,6 +201,15 @@ fn match_tag(tag: char, content: &Value) -> OscType {
             log::error!("Contents: {:?}", content);
             OscType::Nil
         }
+    }
+}
+
+fn handle_obj(obj: &serde_json::Map<String, Value>) -> OscType {
+    if obj.is_empty() { // if empty object we can safely skip it
+        OscType::Nil
+    } else {
+        log::error!("Found object that was not empty");
+        OscType::Nil
     }
 }
 

@@ -1,42 +1,65 @@
+use super::Id;
 use super::{
-    input_node::InputNode, interp::InterpAlgo, interp::Interpolate, HapticNode
+    input_node::InputNode, interp::{InterpAlgo, Interpolate}, HapticNode
 };
 
 use std::{
-    collections::HashMap, 
+    sync::Arc,
     fmt
 };
+use dashmap::DashMap;
 
 /// Provides implementations for interpolating input haptic intensities to device nodes
 pub struct GlobalMap {
-    input_nodes: HashMap<String, InputNode>,
+    input_nodes: Arc<DashMap<Id, InputNode>>,
     global_offset: f32,
     global_enable: bool,
+    refresh_callbacks: Vec<Box<dyn Fn(&DashMap<Id, InputNode>) + Send + Sync + 'static>>,
 }
 
 impl GlobalMap {
     pub fn new() -> GlobalMap {
         return GlobalMap {
-            input_nodes: HashMap::new(),
+            input_nodes: Arc::new(DashMap::new()),
             global_offset: 1.0,
             global_enable: true,
+            refresh_callbacks: vec![]
+        }
+    }
+
+    /// registers a function to be called on a refresh event
+    pub fn register_refresh<F>(&mut self, fun: F)
+    where
+        F: Fn(&DashMap<Id, InputNode>) + Send + Sync + 'static,
+    {
+        self.refresh_callbacks.push(Box::new(fun));
+
+        return;
+    }
+
+    /// called immediately before each device tick.
+    /// It invites each of the game integrations to insert their values into the global map
+    pub fn refresh_inputs(&mut self) {
+        for callback in &self.refresh_callbacks {
+            let clone = Arc::clone(&self.input_nodes);
+            callback(&clone);
         }
     }
 
     /// checks for duplicates and registers input node for writing to
-    pub fn add_input_node(&mut self, new_node: HapticNode, tags: Vec<String>, id: String) -> Result<(), DuplicateNodeIDError> {
-        if let Some(existing) = self.input_nodes.get(&id) {
+    pub fn add_input_node(&self, new_node: HapticNode, tags: Vec<String>, id: String) -> Result<(), DuplicateNodeIDError> {
+        if let Some(existing) = self.input_nodes.get(&Id(id.clone())) {
             return Err(DuplicateNodeIDError{existing:existing.clone()});
         }
 
-        self.input_nodes.insert(id.clone(), InputNode::new(new_node, tags, id));
+        self.input_nodes.insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id)));
 
         Ok(())
     }
 
     /// Removes the input node from being used in haptic interpolation
     pub fn pop_input_node(&mut self, id: String) -> Result<InputNode, DoesNotExistError> {
-        if let Some(node) = self.input_nodes.remove(&id) {
+        if let Some((_, node)) = self.input_nodes.remove(&Id(id.clone())) {
             return Ok(node);
         }
 
@@ -47,7 +70,7 @@ impl GlobalMap {
     /// 
     /// Returns old value
     pub fn set_intensity(&mut self, id: String, new: f32) -> Result<f32, DoesNotExistError> {
-        if let Some(node) = self.input_nodes.get_mut(&id) {
+        if let Some(mut node) = self.input_nodes.get_mut(&Id(id.clone())) {
             let old = node.get_intensity();
             node.set_intensity(new);
             return Ok(old);
@@ -64,7 +87,7 @@ impl GlobalMap {
             return Ok(0.0);        
         }
 
-        if let Some(node) = self.input_nodes.get(&id) {
+        if let Some(node) = self.input_nodes.get(&Id(id.clone())) {
             return Ok(node.get_intensity() * self.global_offset);
         }
 
@@ -83,7 +106,11 @@ impl GlobalMap {
         if *respect_enable && !self.global_enable {
             return 0.0;
         }
-        algo.interp(node, &self.input_nodes.values().cloned().collect())
+        let local  = Arc::clone(&self.input_nodes);
+        let locals  = <DashMap<Id, InputNode> as Clone>::clone(&local).into_read_only();
+        let values = locals.values();
+        let input_list = values.collect::<Vec<&InputNode>>();
+        algo.interp(node, input_list)
     }
 }
 

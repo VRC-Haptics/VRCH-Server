@@ -27,19 +27,19 @@ serde_json = "1"
 tauri-plugin-os = "2.2.0"
 tauri-plugin-fs = "2.2.0"
 tauri-plugin-shell = "2.2.0"
+tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
+tauri-plugin-log = "2"
 
 # project stuff
 oyasumivr_oscquery = { git = "https://github.com/Raphiiko/oyasumivr_oscquery.git" }
 tokio = {version = "1.42.1", features = ["rt-multi-thread"] }
 rosc = { git = "https://github.com/virtuallyaverage/rosc-serde.git" }
-tauri-plugin-store = "2"
 regex = "1.11.1"
-tauri-plugin-dialog = "2"
 uuid = "1.14.0"
 if-addrs = "0.13.3"
 btleplug = "0.11.7"
 dunce = "1.0.5"
-tauri-plugin-log = "2"
 log = "0.4.27"
 runas = "1.2.0"
 windows = "0.61.1"
@@ -50,3 +50,4 @@ rustls-pemfile = "2.2.0"
 rustls-pki-types = "1.11.0"
 futures = "0.3.31"
 reqwest = {version = "0.12.15", features = ["blocking", "json"] }
+dashmap = {version = "6.1.0", features = ["serde"] }

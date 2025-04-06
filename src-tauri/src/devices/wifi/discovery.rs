@@ -7,6 +7,8 @@ use tauri::{AppHandle, Emitter};
 
 use crate::devices::{Device, DeviceType, WifiDevice};
 
+
+/// Listen for wifi based device advertisements
 pub fn start_wifi_listener(
     app_handle: AppHandle,
     devices_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,

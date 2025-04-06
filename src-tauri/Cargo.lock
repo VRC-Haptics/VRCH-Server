@@ -976,6 +976,7 @@ dependencies = [
  "lock_api",
  "once_cell",
  "parking_lot_core",
+ "serde",
 ]
 
 [[package]]
@@ -5472,6 +5473,7 @@ name = "vrch-gui"
 version = "0.0.1"
 dependencies = [
  "btleplug",
+ "dashmap 6.1.0",
  "dunce",
  "futures",
  "futures-util",

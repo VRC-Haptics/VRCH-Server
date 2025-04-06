@@ -4,7 +4,7 @@ use super::{
 };
 
 pub trait Interpolate {
-    fn interp(&self, node: &HapticNode, in_nodes: &Vec<InputNode>) -> f32;
+    fn interp(&self, node: &HapticNode, in_nodes: Vec<&InputNode>) -> f32;
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -18,7 +18,10 @@ pub enum InterpAlgo {
 }
 
 impl Interpolate for InterpAlgo {
-    fn interp(&self, node: &HapticNode, in_nodes: &Vec<InputNode>) -> f32 {
+    /// node: the haptic node (output position) that will be used to determine the feedback value
+    /// 
+    /// in_nodes: The haptic Nodes that will be used to calculate the output value
+    fn interp(&self, node: &HapticNode, in_nodes: Vec<&InputNode>) -> f32 {
         match self {
             InterpAlgo::Gaussian(state) => state.interp(node, in_nodes),
             // add other algo's here
@@ -60,7 +63,7 @@ impl GaussianState {
 }
 
 impl Interpolate for GaussianState {
-    fn interp(&self, node: &HapticNode, in_nodes: &Vec<InputNode>) -> f32 {
+    fn interp(&self, node: &HapticNode, in_nodes: Vec<&InputNode>) -> f32 {
         let mut numerator = 0.0;
         let mut denominator = 0.0;
 

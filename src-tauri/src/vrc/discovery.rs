@@ -1,116 +1,20 @@
-use crate::osc::server::OscServer;
-use crate::vrc::Parameters;
 use crate::VrcInfo;
-
 use super::parsing::{parse_incoming, OscInfo};
+use super::OscPath;
 
-use std::collections::HashMap;
-use std::net::Ipv4Addr;
 use std::thread;
 use std::time::Duration;
 use std::io::{BufReader, BufRead};
-use std::sync::{
-    Mutex,
-    mpsc, 
-    Arc, 
-    RwLock,
-};
-use std::process::{
-    Command, 
-    Stdio
-};
-
+use std::sync::{Mutex, mpsc, Arc};
+use std::process::{Command, Stdio};
 
 use oyasumivr_oscquery;
 use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
-use rosc::{OscMessage, OscType};
 use serde;
-use regex::Regex;
+use dashmap::DashMap;
 
-/// Removes the VRC Fury naming from the parameters
-fn remove_version(path: &str) -> String {
-    let re = Regex::new(r"VF\d{2}").unwrap();
-    // Replace all matches with an empty string.
-    re.replace_all(path, "").to_string()
-}
-
-pub fn get_vrc() -> VrcInfo {
-    let all_parameters: Arc<Mutex<HashMap<String, OscInfo>>> = Arc::new(Mutex::new(HashMap::new()));
-    start_filling_all_parameters(all_parameters.clone());
-
-    let raw_parameters = Arc::new(RwLock::new(HashMap::new()));
-    let raw_menu = Arc::new(RwLock::new(Parameters::new()));
-    let first_message = Arc::new(RwLock::new(false));
-
-    let haptics_prefix = "/avatar/parameters/h";
-    let haptics_menu_prefix = "/avatar/parameters/h_param";
-    let haptics_prefix_clone = haptics_prefix.to_string();
-
-    let raw_params_for_callback = raw_parameters.clone();
-    let raw_menu_for_callback = raw_menu.clone();
-    let first_message_callback = first_message.clone();
-    let on_receive = move |msg: OscMessage| {
-        let addr = remove_version(&msg.addr);
-
-        if *first_message_callback.read().unwrap() == false {
-            *first_message_callback.write().unwrap() = true;
-        }
-
-        if addr.starts_with(haptics_prefix) {
-            let mut params = raw_params_for_callback.write().unwrap();
-            params.insert(msg.addr.clone(), msg.args.clone());
-        }
-
-        if addr.starts_with(haptics_menu_prefix) {
-            println!("in menu prefix: {}", addr);
-            let mut menu = raw_menu_for_callback.write().unwrap();
-
-            //see if it needs to be put in the parameters
-            for (_, (param, value)) in menu.parameters.iter_mut() {
-                if param == &addr {
-                    match msg
-                        .args
-                        .first()
-                        .expect("No value with menu parameter")
-                        .to_owned()
-                    {
-                        OscType::Float(msg_float) => {
-                            *value = msg_float;
-                        }
-                        _ => {
-                            unreachable!("Expected only OscType::Float in menu parameters");
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-    };
-    //create server before starting anything
-    let recieving_port = 9001;
-    let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
-    let port_used = vrc_server.start();
-
-    let mut osc_server = OscQueryServer::new(recieving_port);
-    if port_used != recieving_port {
-        osc_server.start();
-        log::warn!("Not using VRC dedicated ports, expect slower operations.");
-    }
-
-    return VrcInfo {
-        vrc_connected: false,
-        osc_server: Some(vrc_server),
-        query_server: Some(osc_server),
-        in_port: Some(port_used),
-        out_port: None,
-        avatar: None,
-        haptics_prefix: haptics_prefix_clone,
-        menu_parameters: raw_menu,
-        raw_parameters: raw_parameters,
-    };
-}
-
-fn start_filling_all_parameters(params: Arc<Mutex<HashMap<String, OscInfo>>>) {
+pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>){
+    let vrc_clone = Arc::clone(&vrc);
     thread::spawn(move || {
         // Launch the sidecar process.
         let mut child = Command::new("./sidecars/listen-for-vrc.exe")
@@ -133,19 +37,24 @@ fn start_filling_all_parameters(params: Arc<Mutex<HashMap<String, OscInfo>>>) {
                     if let Some(port_str) = msg.strip_prefix("FOUND:") {
                         // Try parsing the port as a u16.
                         if let Ok(port) = port_str.trim().parse::<u16>() {
-                            println!("Received FOUND message with port: {}", port);
+                            log::debug!("Received FOUND message with port: {}", port);
+                            let mut vrc = vrc_clone.lock().expect("couldn't lock vrc");
+                            let params = {
+                                vrc.vrc_connected = true;
+                                &vrc.available_parameters
+                            };
                             // Call the sub-function with the extracted port.
-                            run_vrc_http_polling(port, Arc::clone(&params));
+                            run_vrc_http_polling(port, params);
                             // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
                         } else {
-                            eprintln!("Error: Could not parse port from message: {}", msg);
+                            log::error!("Error: Could not parse port from message: {}", msg);
                         }
                     } else {
-                        println!("Received non-matching message: {}", msg);
+                        log::error!("Received non-matching message: {}", msg);
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error reading sidecar output: {}", e);
+                    log::error!("Error reading sidecar output: {}", e);
                     break;
                 }
             }
@@ -154,10 +63,11 @@ fn start_filling_all_parameters(params: Arc<Mutex<HashMap<String, OscInfo>>>) {
 }
 
 /// polls the 
-fn run_vrc_http_polling(port: u16, params: Arc<Mutex<HashMap<String, OscInfo>>>) {
+fn run_vrc_http_polling(port: u16, params: &DashMap<OscPath, OscInfo>) {
     let url = format!("http://127.0.0.1:{}/", port);
-    println!("Started polling: {}", port);
-    
+    log::debug!("Started polling: {}", port);
+
+    let mut first = true;
     loop {
         // Make the HTTP request (using the blocking client for simplicity)
         match reqwest::blocking::get(&url) {
@@ -166,23 +76,23 @@ fn run_vrc_http_polling(port: u16, params: Arc<Mutex<HashMap<String, OscInfo>>>)
                     // Attempt to parse the non-standard formatted response.
                     let node_info = parse_incoming(&text);
                     // Handling this way so that we can do something when values change later
-                    let mut param_lock = params.lock().expect("Unable to get param lock");
                     for node in node_info {
-                        match param_lock.get(&node.full_path) {
-                            Some(old_node) => {
-                                if old_node != &node {
-                                    log::trace!("Inserting:{:?}", node);
-                                    param_lock.insert(node.full_path.clone(), node);
+                        match params.get(&node.full_path) {
+                            // path is being updated
+                            Some(old_node) => { 
+                                if *old_node != node {
+                                    params.insert(node.full_path.clone(), node);
                                 }
                             }
+                            // path is new (should only happen on starup)
                             None => {
-                                log::trace!("Inserting:{:?}", node);
-                                param_lock.insert(node.full_path.clone(), node);
+                                if !first { log::trace!("Inserting:{:?}", node) };
+                                params.insert(node.full_path.clone(), node);
                             }
                         };
                     }
                 } else {
-                    eprintln!("Failed to read response text");
+                    log::error!("Failed to read response text");
                 }
             }
             Err(err) => {
@@ -190,16 +100,17 @@ fn run_vrc_http_polling(port: u16, params: Arc<Mutex<HashMap<String, OscInfo>>>)
                     log::error!("connection to VRC HTTP failed");
                     return
                 } else {
-                    eprintln!("HTTP request failed: {}", err);
+                    log::error!("HTTP request failed: {}", err);
                 }
             }
         }
         // Wait for a regular interval before the next query.
         thread::sleep(Duration::from_secs(2));
+        first = false;
     }
 }
 
-#[derive(serde::Serialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct OscQueryServer {
     recv_port: u16,
     #[serde(skip)]
@@ -220,11 +131,11 @@ impl OscQueryServer {
         self.stop_sender = Some(tx);
 
         thread::spawn(move || {
-            println!("Spawned VRC Advertising on port:{}", in_port);
+            log::debug!("Spawned VRC Advertising on port:{}", in_port);
             let tk_rt = tokio::runtime::Runtime::new().unwrap();
             tk_rt.block_on(async {
                 // Initialize the OSCQuery server
-                println!("In port: {}", in_port);
+                log::debug!("In port: {}", in_port);
                 let (host, port) = oyasumivr_oscquery::server::init(
                     "VRC Haptics", // The name of your application (Shows in VRChat's UI)
                     in_port,
@@ -233,7 +144,7 @@ impl OscQueryServer {
                 .await
                 .unwrap();
                 let addr = format!("{}:{}", host, port);
-                println!("OscQuery on: {}", addr);
+                log::debug!("OscQuery on: {}", addr);
                 oyasumivr_oscquery::server::add_osc_method(OSCMethod {
                     description: Some("Haptics Specific Parameters".to_string()),
                     address: "/avatar/parameters/h".to_string(),

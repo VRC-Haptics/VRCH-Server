@@ -10,6 +10,13 @@ pub fn create_global_map() -> GlobalMap {
     GlobalMap::new()
 }
 
+/// The types of modifiers that the global map supports for modifying input
+#[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug)]
+pub enum GlobalModifier {
+    /// Percentage to apply to all haptics (1 = no change)
+    Intensity(f32),
+}
+
 /// Descriptors for location groups.
 /// Allows for segmented Interpolation
 #[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug)]
@@ -26,6 +33,11 @@ pub enum NodeGroup {
     FootRight,
     FootLeft,
 }
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+/// Id unique to the node it references.
+/// if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
+pub struct Id(pub String);
 
 impl NodeGroup {
     /// Given a string containing at least 2 raw bytes, interpret the first two bytes as
