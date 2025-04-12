@@ -1,5 +1,5 @@
 use super::parsing::{parse_incoming, OscInfo};
-use super::{Avatar, OscPath, PREFAB_PREFIX};
+use super::{Avatar, OscPath, PREFAB_PREFIX, GameMap};
 use crate::vrc::config::load_vrc_config;
 use crate::vrc::AVATAR_ID_PATH;
 use crate::VrcInfo;
@@ -66,143 +66,212 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>) {
     });
 }
 
-/// polls the
+/// Fetches the HTTP response text from the given URL using a blocking reqwest client.
+///
+/// # Arguments
+///
+/// * `url` - The URL to fetch.
+fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
+    reqwest::blocking::get(url)?.text()
+}
+
+/// Parses the given text to extract OSC nodes and updates the provided parameters map.
+///
+/// # Arguments
+///
+/// * `text` - The HTTP response text to parse.
+/// * `params` - The DashMap containing OSC parameter information.
+/// * `is_first` - Indicator used to adjust logging on the first iteration.
+fn update_params_from_text(
+    text: &str,
+    params: &DashMap<OscPath, OscInfo>,
+    is_first: bool,
+) {
+    let node_info = parse_incoming(text);
+    for node in node_info {
+        match params.get(&node.full_path) {
+            // If the path exists and the data has changed, update it.
+            Some(old_node) => {
+                if *old_node != node { // Replace with appropriate comparison.
+                    params.insert(node.full_path.clone(), node);
+                }
+            }
+            // New path: log (unless it's the first iteration) and insert.
+            None => {
+                if !is_first {
+                    log::trace!("Inserting: {:?}", node);
+                }
+                params.insert(node.full_path.clone(), node);
+            }
+        }
+    }
+}
+
+/// Checks for an already active avatar and updates it if its ID does not match the OSC parameter.
+///
+/// # Arguments
+///
+/// * `params` - The OSC parameters.
+/// * `avatar` - The shared avatar configuration.
+fn update_existing_avatar(
+    params: &DashMap<OscPath, OscInfo>,
+    avatar: &Arc<RwLock<Option<Avatar>>>,
+) {
+    let avi_read = avatar.read().expect("unable to get read lock");
+    if let Some(existing_avi) = &*avi_read {
+        if let Some(new_contents) = params.get(&OscPath(AVATAR_ID_PATH.to_string())) {
+            if let Some(new_values) = &new_contents.value {
+                // Unwrap the new id from the OSC data.
+                let new_id = new_values.first().unwrap().clone().string().unwrap();
+                if existing_avi.id != new_id {
+                    log::info!("Avatar ID changed: {} -> {}", existing_avi.id, new_id);
+                    // Update logic can be added here if needed.
+                }
+            }
+        }
+    }
+}
+
+/// Loads configuration files from disk (using OSC parameters for prefab info) and merges them.
+///
+/// # Arguments
+///
+/// * `params` - The OSC parameters containing prefab information.
+///
+/// # Returns
+///
+/// * `Some(GameMap)` if configurations were successfully loaded and merged.
+/// * `None` if no configs were found or loaded.
+fn load_and_merge_configs(
+    params: &DashMap<OscPath, OscInfo>,
+) -> Option<GameMap> {
+    let mut configs = vec![];
+    if let Some(prefabs) = get_prefab_info(params) {
+        for prefab in prefabs {
+            match load_vrc_config(
+                prefab.0,
+                prefab.1,
+                prefab.2,
+                vec!["./map_configs".into()],
+            ) {
+                Ok(map) => configs.push(map),
+                Err(err) => match err.kind() {
+                    ErrorKind::NotFound => {
+                        log::error!("Unable to load config: not found");
+                    }
+                    other => {
+                        log::error!("Error loading config: {:?}", other);
+                    }
+                },
+            }
+        }
+    }
+    if let Some((first_config, rest)) = configs.split_first_mut() {
+        for conf in rest {
+            first_config.nodes.append(&mut conf.nodes);
+            first_config.meta.map_author += &format!("+{}", conf.meta.map_author);
+            first_config.meta.map_name += &format!("+{}", conf.meta.map_name);
+        }
+        Some(first_config.to_owned())
+    } else {
+        log::info!("No loaded configs for this avatar.");
+        None
+    }
+}
+
+/// Extracts the avatar ID from the OSC parameters.
+///
+/// # Arguments
+///
+/// * `params` - The DashMap containing OSC parameter data.
+///
+/// # Returns
+///
+/// * `Some(String)` containing the avatar ID if found.
+/// * `None` if the avatar ID parameter is missing.
+fn extract_avatar_id(
+    params: &DashMap<OscPath, OscInfo>,
+) -> Option<String> {
+    params.get(&OscPath(AVATAR_ID_PATH.to_string()))
+        .and_then(|id_info| {
+            id_info.value.as_ref()
+                .and_then(|vals| vals.first())
+                .map(|osc_val| osc_val.clone().string().unwrap())
+        })
+}
+
+/// Initializes the avatar configuration if none is currently active, by loading and merging configs.
+///
+/// # Arguments
+///
+/// * `params` - The OSC parameters.
+/// * `avatar` - The shared avatar configuration to update.
+fn initialize_avatar(
+    params: &DashMap<OscPath, OscInfo>,
+    avatar: &Arc<RwLock<Option<Avatar>>>,
+) {
+    let mut avi_write = avatar.write().expect("unable to get write lock");
+    if avi_write.is_none() {
+        if let Some(config) = load_and_merge_configs(params) {
+            if let Some(id) = extract_avatar_id(params) {
+                let new_avi = Avatar {
+                    id,
+                    prefab_name: Some(config.meta.map_name.clone()),
+                    conf: Some(config),
+                    // Initialize other fields as needed.
+                };
+                *avi_write = Some(new_avi);
+                log::info!("Initialized new avatar.");
+            } else {
+                log::error!("Failed to extract avatar ID from parameters.");
+            }
+        }
+    }
+}
+
+/// ---------------------------------------------------------------------
+/// Main Polling Loop
+/// ---------------------------------------------------------------------
+
+/// Continuously polls the VRC HTTP endpoint for OSC parameters and updates both
+/// the parameter map and the avatar configuration accordingly.
+///
+/// # Arguments
+///
+/// * `port` - The port on which the VRC HTTP server is running.
+/// * `params` - A reference to the DashMap holding OSC parameter data.
+/// * `avatar` - A shared, thread-safe reference to the current avatar configuration.
 fn run_vrc_http_polling(
     port: u16,
     params: &DashMap<OscPath, OscInfo>,
     avatar: Arc<RwLock<Option<Avatar>>>,
 ) {
     let url = format!("http://127.0.0.1:{}/", port);
-    log::debug!("Started polling: {}", port);
+    log::debug!("Started polling on port: {}", port);
 
     let mut first = true;
     loop {
-        // Make the HTTP request (using the blocking client for simplicity)
-        match reqwest::blocking::get(&url) {
-            Ok(response) => {
-                if let Ok(text) = response.text() {
-                    // Attempt to parse the non-standard formatted response.
-                    let node_info = parse_incoming(&text);
-                    // Handling this way so that we can do something when values change later
-                    for node in node_info {
-                        match params.get(&node.full_path) {
-                            // path is being updated
-                            Some(old_node) => {
-                                if *old_node != node {
-                                    params.insert(node.full_path.clone(), node);
-                                }
-                            }
-                            // path is new (should only happen on starup)
-                            None => {
-                                if !first {
-                                    log::trace!("Inserting:{:?}", node)
-                                };
-                                params.insert(node.full_path.clone(), node);
-                            }
-                        };
-                    }
+        match fetch_http_response(&url) {
+            Ok(text) => {
+                // Update OSC parameters based on the incoming HTTP response.
+                update_params_from_text(&text, params, first);
 
-                    // Avi is the struct that provides OSC -> Location mapping
-                    // params lists the advertised availaible parameters.
-                    // check if we need to update the configuration.
-                    // if we had an avatar already recorded.
-                    {
-                        let avi_read = avatar.read().expect("unable to get read lock");
-                        if let Some(existing_avi) = &*avi_read {
-                            // There is an active avatar.
-                            if let Some(new_contents) =
-                                params.get(&OscPath(AVATAR_ID_PATH.to_string()))
-                            {
-                                if let Some(new_values) = &new_contents.value {
-                                    // Unwrap the new id from the OSC data.
-                                    let new_id = new_values
-                                        .first().unwrap()
-                                        .clone()
-                                        .string().unwrap();
-                                    if existing_avi.id != new_id {
-                                        // re-enter new data as needed.
-                                    }
-                                }
-                            }
-                            // Drop `avi_read` automatically here.
-                        }
-                    }
+                // Check for updates if an avatar is already active.
+                update_existing_avatar(params, &avatar);
 
-                    // If no avatar is set, update it.
-                    {
-                        // Acquire a write lock for modifying the avatar.
-                        let mut avi_write =
-                            avatar.write().expect("unable to get write lock");
-                        // Check if the avatar is still None.
-                        if avi_write.is_none() {
-                            // Load configs from file.
-                            let mut configs = vec![];
-                            if let Some(prefabs) = get_prefab_info(params) {
-                                for prefab in prefabs {
-                                    match load_vrc_config(
-                                        prefab.0,
-                                        prefab.1,
-                                        prefab.2,
-                                        vec!["./map_configs".into()]
-                                    ) {
-                                        Ok(map) => configs.push(map),
-                                        Err(err) => {
-                                            match err.kind() {
-                                                std::io::ErrorKind::NotFound => {
-                                                    log::error!("Unable to load config");
-                                                },
-                                                other => {
-                                                    log::error!("Error of kind: {}", other);
-                                                },
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Merge configs if any are loaded.
-                            if let Some((first_config, rest)) = configs.split_first_mut() {
-                                for conf in rest {
-                                    first_config.nodes.append(&mut conf.nodes);
-                                    first_config.meta.map_author += &format!("+{}", conf.meta.map_author);
-                                    first_config.meta.map_name += &format!("+{}", conf.meta.map_name);
-                                }
-
-                                // Retrieve the avatar id from params.
-                                let id_info = params.get(&OscPath(AVATAR_ID_PATH.to_string()))
-                                    .expect("couldn't find avatar id");
-                                let id = id_info.value.as_ref().unwrap().first()
-                                    .unwrap().clone().string().unwrap();
-
-                                // Create a new Avatar.
-                                let new_avi = Avatar {
-                                    id,
-                                    prefab_name: Some(first_config.meta.map_name.clone()),
-                                    conf: Some(first_config.to_owned()),
-                                    // Initialize other Avatar fields as needed.
-                                };
-
-                                // Update the avatar.
-                                *avi_write = Some(new_avi);
-                            } else {
-                                log::info!("No loaded configs for this avatar.");
-                            }
-                        }
-                    }
-                } else {
-                    log::error!("Failed to read response text");
-                }
+                // Initialize the avatar if it hasn't been set yet.
+                initialize_avatar(params, &avatar);
             }
             Err(err) => {
                 if err.is_connect() {
-                    log::error!("connection to VRC HTTP failed");
+                    log::error!("Connection to VRC HTTP failed");
                     return;
                 } else {
                     log::error!("HTTP request failed: {}", err);
                 }
             }
         }
-        // Wait for a regular interval before the next query.
+        // Sleep before the next polling iteration.
         thread::sleep(Duration::from_secs(2));
         first = false;
     }
