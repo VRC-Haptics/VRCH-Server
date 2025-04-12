@@ -84,7 +84,7 @@ pub fn start_wifi_listener(
                 }
                 Err(e) => {
                     if e.kind() != std::io::ErrorKind::WouldBlock {
-                        println!("Timed out");
+                        log::info!("Timed out");
                     } else {
                         log::error!("Recieved error: {}", e);
                     }

@@ -59,10 +59,6 @@ impl WifiDevice {
         };
     }
 
-    pub fn stop(&self) {
-        println!("DO stop stuff now")
-    }
-
     /// Called in regular intervals. Optionally returns a packet to be sent to the device.
     pub fn tick(
         &mut self,
@@ -74,7 +70,7 @@ impl WifiDevice {
             // first round through we ping
             self.been_pinged = true;
             let packet = self.build_ping();
-            println!("Packet: {:?}", packet);
+            //log::trace!("Packet: {:?}", packet);
             return Some(self.build_ping());
         }
 
@@ -180,7 +176,7 @@ impl WifiDevice {
     }
 
     pub fn build_ping(&self) -> Packet {
-        println!("Setting port: {}", self.connection_manager.recv_port);
+        log::info!("Setting port: {}", self.connection_manager.recv_port);
         let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
             addr: "/ping".to_string(),
             args: vec![OscType::Int(self.connection_manager.recv_port.into())],
@@ -209,6 +205,10 @@ impl WifiDevice {
             return Err("no_map".to_string());
         }
     }
+
+    pub fn stop(&self) {
+        log::info!("DO stop stuff now")
+    }
 }
 
 /// Manipulates the given flags according to the heartbeat timings.
@@ -224,7 +224,7 @@ fn manage_hrtbt(
         Ok(duration) => duration,
         Err(e) => {
             // Handle negative duration
-            eprintln!("Duration issue, assuming alive: {:?}", e);
+            log::error!("Duration issue, assuming alive: {:?}", e);
             Duration::from_secs(0)
         }
     };
@@ -233,7 +233,7 @@ fn manage_hrtbt(
     if diff > ttl && is_alive.to_owned() {
         *is_alive = false;
         *_been_pinged = false;
-        println!("Set to false");
+        log::trace!("Set to false");
     } else if diff <= ttl && !is_alive.to_owned() {
         *is_alive = true;
     }

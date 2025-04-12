@@ -69,11 +69,14 @@ fn get_device_store_field<T: serde::de::DeserializeOwned>(
         .store("known_devices.json")
         .expect("couldn't access known_devices.json");
 
-    let device_data = store.get(mac).unwrap();
-    let map = device_data.as_object()?;
+    if let Some(device_data) = store.get(mac) {
+        let map = device_data.as_object()?;
 
-    map.get(field)
-        .and_then(|value| serde_json::from_value(value.clone()).ok())
+        map.get(field)
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+    } else {
+        None
+    }  
 }
 
 fn tick_devices(

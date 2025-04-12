@@ -39,7 +39,7 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>) {
                     if let Some(port_str) = msg.strip_prefix("FOUND:") {
                         // Try parsing the port as a u16.
                         if let Ok(port) = port_str.trim().parse::<u16>() {
-                            log::debug!("Received FOUND message with port: {}", port);
+                            log::debug!("Sidecar found vrc with port: {}", port);
                             let mut vrc = vrc_clone.lock().expect("couldn't lock vrc");
                             let params = {
                                 vrc.vrc_connected = true;
@@ -85,22 +85,21 @@ fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
 fn update_params_from_text(
     text: &str,
     params: &DashMap<OscPath, OscInfo>,
-    is_first: bool,
 ) {
     let node_info = parse_incoming(text);
     for node in node_info {
         match params.get(&node.full_path) {
             // If the path exists and the data has changed, update it.
             Some(old_node) => {
-                if *old_node != node { // Replace with appropriate comparison.
+                // Do the comparison and store the result.
+                let should_update = *old_node != node;
+                // Explicitly drop the guard before calling insert.
+                drop(old_node);
+                if should_update {
                     params.insert(node.full_path.clone(), node);
                 }
             }
-            // New path: log (unless it's the first iteration) and insert.
             None => {
-                if !is_first {
-                    log::trace!("Inserting: {:?}", node);
-                }
                 params.insert(node.full_path.clone(), node);
             }
         }
@@ -117,18 +116,54 @@ fn update_existing_avatar(
     params: &DashMap<OscPath, OscInfo>,
     avatar: &Arc<RwLock<Option<Avatar>>>,
 ) {
-    let avi_read = avatar.read().expect("unable to get read lock");
-    if let Some(existing_avi) = &*avi_read {
-        if let Some(new_contents) = params.get(&OscPath(AVATAR_ID_PATH.to_string())) {
-            if let Some(new_values) = &new_contents.value {
-                // Unwrap the new id from the OSC data.
-                let new_id = new_values.first().unwrap().clone().string().unwrap();
-                if existing_avi.id != new_id {
-                    log::info!("Avatar ID changed: {} -> {}", existing_avi.id, new_id);
-                    // Update logic can be added here if needed.
+    // First, retrieve the current avatar ID (if any) using a read lock.
+    let current_id = {
+        let avi_read = avatar.read().expect("unable to get read lock");
+        avi_read.as_ref().map(|avi| avi.id.clone())
+    };
+
+    // Extract the new avatar ID from the OSC parameters.
+    if let Some(new_contents) = params.get(&OscPath(AVATAR_ID_PATH.to_string())) {
+        if let Some(new_values) = &new_contents.value {
+            // Unwrap the new id from the OSC data.
+            let new_id = new_values.first().unwrap().clone().string().unwrap();
+            
+            // Compare the new id with the current avatar's id.
+            if current_id.as_deref() != Some(&new_id) {
+                log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
+            
+                // Attempt to load the new configuration using OSC parameters.
+                if let Some(new_config) = load_and_merge_configs(params) {
+                    let mut avi_write = avatar.write().expect("unable to get write lock");
+                    if let Some(avi_mut) = avi_write.as_mut() {
+                        avi_mut.id = new_id;
+                        avi_mut.conf = Some(new_config.clone());
+                        avi_mut.prefab_name = Some(new_config.meta.map_name.clone());
+                    } else {
+                        let new_avi = Avatar{
+                            id: new_id,
+                            conf: Some(new_config.clone()),
+                            prefab_name: Some(new_config.meta.map_name.clone())
+                        };
+                        *avi_write = Some(new_avi);
+                    };
+                    log::info!("Updated avatar with new configuration.");
+                } else {
+                    // we don't have enough information to do haptics.
+                    // put shell avatar together.
+                    let mut avi_write = avatar.write().expect("unable to get write lock");
+                    let new_avi = Avatar{
+                        id: new_id,
+                        conf: None,
+                        prefab_name: None,
+                    };
+                    *avi_write = Some(new_avi);
+                    log::error!("Unable to load haptics for this avatar.");
                 }
             }
         }
+    } else {
+        log::error!("Unable to find ID parameter: {:?}", params);
     }
 }
 
@@ -147,6 +182,7 @@ fn load_and_merge_configs(
 ) -> Option<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
+        log::trace!("Found prefabs: {:?}", prefabs);
         for prefab in prefabs {
             match load_vrc_config(
                 prefab.0,
@@ -174,58 +210,7 @@ fn load_and_merge_configs(
         }
         Some(first_config.to_owned())
     } else {
-        log::info!("No loaded configs for this avatar.");
         None
-    }
-}
-
-/// Extracts the avatar ID from the OSC parameters.
-///
-/// # Arguments
-///
-/// * `params` - The DashMap containing OSC parameter data.
-///
-/// # Returns
-///
-/// * `Some(String)` containing the avatar ID if found.
-/// * `None` if the avatar ID parameter is missing.
-fn extract_avatar_id(
-    params: &DashMap<OscPath, OscInfo>,
-) -> Option<String> {
-    params.get(&OscPath(AVATAR_ID_PATH.to_string()))
-        .and_then(|id_info| {
-            id_info.value.as_ref()
-                .and_then(|vals| vals.first())
-                .map(|osc_val| osc_val.clone().string().unwrap())
-        })
-}
-
-/// Initializes the avatar configuration if none is currently active, by loading and merging configs.
-///
-/// # Arguments
-///
-/// * `params` - The OSC parameters.
-/// * `avatar` - The shared avatar configuration to update.
-fn initialize_avatar(
-    params: &DashMap<OscPath, OscInfo>,
-    avatar: &Arc<RwLock<Option<Avatar>>>,
-) {
-    let mut avi_write = avatar.write().expect("unable to get write lock");
-    if avi_write.is_none() {
-        if let Some(config) = load_and_merge_configs(params) {
-            if let Some(id) = extract_avatar_id(params) {
-                let new_avi = Avatar {
-                    id,
-                    prefab_name: Some(config.meta.map_name.clone()),
-                    conf: Some(config),
-                    // Initialize other fields as needed.
-                };
-                *avi_write = Some(new_avi);
-                log::info!("Initialized new avatar.");
-            } else {
-                log::error!("Failed to extract avatar ID from parameters.");
-            }
-        }
     }
 }
 
@@ -247,20 +232,19 @@ fn run_vrc_http_polling(
     avatar: Arc<RwLock<Option<Avatar>>>,
 ) {
     let url = format!("http://127.0.0.1:{}/", port);
-    log::debug!("Started polling on port: {}", port);
+    log::debug!("Started polling HTTP.");
 
-    let mut first = true;
     loop {
         match fetch_http_response(&url) {
             Ok(text) => {
                 // Update OSC parameters based on the incoming HTTP response.
-                update_params_from_text(&text, params, first);
+                update_params_from_text(&text, params);
 
                 // Check for updates if an avatar is already active.
                 update_existing_avatar(params, &avatar);
 
                 // Initialize the avatar if it hasn't been set yet.
-                initialize_avatar(params, &avatar);
+                //initialize_avatar(params, &avatar);
             }
             Err(err) => {
                 if err.is_connect() {
@@ -273,7 +257,6 @@ fn run_vrc_http_polling(
         }
         // Sleep before the next polling iteration.
         thread::sleep(Duration::from_secs(2));
-        first = false;
     }
 }
 

@@ -51,12 +51,12 @@ impl WifiConnManager {
                 if let Some(OscType::String(cmd_str)) = msg.args.get(0) {
                     match serde_json::from_str::<WifiConfig>(cmd_str) {
                         Ok(command) => {
-                            println!("Set device config: {:?}", command);
+                            //log::trace!("Set device config: {:?}", command);
                             let mut cmd_lock = last_command_cpy.write().unwrap();
                             *cmd_lock = Some(command);
                         }
                         Err(e) => {
-                            eprintln!(
+                            log::error!(
                                 "Failed to parse WifiCommand JSON: {}, \n\t\tPacket: {}",
                                 e, cmd_str
                             );

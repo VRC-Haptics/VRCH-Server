@@ -27,7 +27,7 @@ impl Tick for DeviceType {
             DeviceType::Wifi(dev) => {
                 dev.tick(is_alive, factors, inputs);
             }
-            _ => println!("unknown device type"),
+            _ => log::error!("unknown device type"),
         }
     }
 }
