@@ -1,0 +1,22 @@
+{
+    "nodes": [
+        {
+            "nodeData": {
+                "x": 0.1,
+                "y": 0.1,
+                "z": 0.1,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/h/Head_0",
+            "radius": 0.03750000149011612,
+            "targetBone": "Head"
+        }
+    ],
+    "meta": {
+        "map_name": "Headset-8x",
+        "map_version": 1,
+        "map_author": "Average"
+    }
+}

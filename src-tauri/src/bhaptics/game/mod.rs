@@ -128,9 +128,13 @@ async fn run_server(
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
 
     let acceptor = TlsAcceptor::from(Arc::new(config));
-    let listener = TcpListener::bind(&addr)
-        .await
-        .expect("Couldn't bind TCP listener");
+    let listener = match TcpListener::bind(&addr).await {
+        Ok(list) => list,
+        Err(e) => {
+            log::error!("Error connecting to bhaptics dedicated port: {}", e);
+            return Err(e);
+        }
+    };
     log::info!("bHaptics server started on {}", addr);
 
     loop {

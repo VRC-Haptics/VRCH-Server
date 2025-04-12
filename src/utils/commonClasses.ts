@@ -1,9 +1,21 @@
 let Titles = "text-2xl font-bold padding-5 text-center";
 
+export interface GaussianState {
+  sigma: number;
+  cutoff: number;
+  merge: number;
+}
+
+export type InterpAlgo = {
+  variant: "Gaussian";
+  value: GaussianState;
+}
+
 // Represents the factors that modulate device output.
 export interface OutputFactors {
   sens_mult: number;
   user_sense: number;
+  interp_algo: InterpAlgo;
 }
 
 // The possible node groups (as string literals) corresponding to the Rust enum.
@@ -64,7 +76,6 @@ export interface Device {
   num_motors: number;
   is_alive: boolean;
   factors: OutputFactors;
-  map: HapticMap;
   device_type: DeviceType;
 }
 
@@ -77,15 +88,14 @@ export const defaultDevice: Device = {
   factors: {
     sens_mult: 1.0,
     user_sense: 1.0,
-  },
-  map: {
-    game_map: null,
-    device_map: null,
-    game_intensity: [],
-    last_sent: [],
-    falloff_distance: 0,
-    merge_distance: 0,
-    sigma: 0,
+    interp_algo: {
+      variant: "Gaussian",
+      value: {
+        sigma: 0.0,
+        cutoff: 0.0,
+        merge: 0.0,
+      }
+    }
   },
   device_type: {
     variant: "Wifi",

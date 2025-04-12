@@ -47,54 +47,10 @@ export default function RawDeviceInfo({ device }: RawDeviceInfoProps) {
 
           <h2>Haptic Map</h2>
           <div className="ml-4">
-            <p><strong>Falloff Distance:</strong> {device.map.falloff_distance}</p>
-            <p><strong>Sigma:</strong> {device.map.sigma}</p>
+            <p><strong>Interpolation Algorithm:</strong> {device.factors.interp_algo.variant}</p>
             <p>
-              <strong>Game Intensity:</strong> {device.map.game_intensity.join(", ")}
+              <strong>Game Intensity:</strong> {device.factors.user_sense}
             </p>
-            <p>
-              <strong>Last Sent:</strong> {device.map.last_sent.join(", ")}
-            </p>
-          </div>
-
-          <div className="ml-4">
-            <h3>Game Map Nodes</h3>
-            <div className="ml-4">
-              {device.map.game_map && device.map.game_map.length > 0 ? (
-                device.map.game_map.map((node, index) => (
-                  <div key={`game-map-node-${index}`} className="mb-2">
-                    <p>
-                      <strong>Node {index + 1}:</strong> (x: {node.x}, y: {node.y}, z: {node.z})
-                    </p>
-                    <p>
-                      <strong>Groups:</strong> {node.groups.join(", ")}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p>No game map nodes available</p>
-              )}
-            </div>
-          </div>
-
-          <div className="ml-4">
-            <h3>Device Map Nodes</h3>
-            <div className="ml-4">
-              {device.map.device_map && device.map.device_map.length > 0 ? (
-                device.map.device_map.map((node, index) => (
-                  <div key={`device-map-node-${index}`} className="mb-2">
-                    <p>
-                      <strong>Node {index + 1}:</strong> (x: {node.x}, y: {node.y}, z: {node.z})
-                    </p>
-                    <p>
-                      <strong>Groups:</strong> {node.groups.join(", ")}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p>No device map nodes available</p>
-              )}
-            </div>
           </div>
 
           <h2>Device Type</h2>

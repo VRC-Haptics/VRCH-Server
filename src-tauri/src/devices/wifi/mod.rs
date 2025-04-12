@@ -69,8 +69,6 @@ impl WifiDevice {
         if !self.been_pinged {
             // first round through we ping
             self.been_pinged = true;
-            let packet = self.build_ping();
-            //log::trace!("Packet: {:?}", packet);
             return Some(self.build_ping());
         }
 
@@ -86,7 +84,8 @@ impl WifiDevice {
                 let conn_lock = self.connection_manager.config.read().unwrap();
                 match conn_lock.as_ref() {
                     Some(config) => {
-                        return Some(self.build_set_map(&config.node_map));
+                        let set_map = self.build_set_map(&config.node_map);
+                        return Some(set_map);
                     },
                     // Possiblity to get caught in loop if we try to set without recieving the config.
                     None => {
@@ -121,6 +120,7 @@ impl WifiDevice {
     /// Sends updated message
     fn build_set_map(&self, map: &Vec<HapticNode>) -> Packet {
         let base = "SET NODE_MAP ".to_string();
+
         // Convert each HapticNode into its 8-byte hex representation.
         let hex_str: String = map
             .iter()
@@ -133,7 +133,6 @@ impl WifiDevice {
                     .collect::<String>()
             })
             .collect();
-
         let full = base + &hex_str;
 
         let message = rosc::OscMessage {
@@ -141,7 +140,6 @@ impl WifiDevice {
             args: vec![OscType::String(full)],
         };
         let packet = rosc::OscPacket::Message(message);
-
         Packet {
             packet: rosc::encoder::encode(&packet).unwrap(),
         }
@@ -197,9 +195,9 @@ impl WifiDevice {
     /// Sets the wifi connection manager's node map and flags it for transmission.
     pub fn set_node_list(&mut self, list: Vec<HapticNode>) -> Result<(), String> {
         let mut lock = self.connection_manager.config.write().unwrap();
-        if let Some(mut wifi_con) = lock.take() {
+        if let Some(wifi_con) = lock.as_mut() {
             wifi_con.node_map = list;
-            self.push_map;
+            self.push_map = true;
             return Ok(());
         } else {
             return Err("no_map".to_string());

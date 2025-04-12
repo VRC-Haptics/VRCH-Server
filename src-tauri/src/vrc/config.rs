@@ -64,9 +64,11 @@ pub struct GameMap {
 /// Contains more information than the default HapticNode to help with locating 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct ConfNode {
+    #[serde(rename = "nodeData")]
     pub node_data: HapticNode,
     pub address: String,
     pub radius: f32,
+    #[serde(rename = "targetBone")]
     pub target_bone: TargetBone,
 }
 

@@ -8,9 +8,12 @@ use serde_json::Value;
 
 /// Removes the VRC Fury naming from the parameters
 pub fn remove_version(path: &str) -> String {
-    let re = Regex::new(r"VF\d{2}").unwrap();
-    // Replace all matches with an empty string.
-    re.replace_all(path, "").to_string()
+    let re = Regex::new(r"VF\d{2}_").unwrap();
+    // We capture the leading slash.
+    //let re = Regex::new(r"(/)VF\d{2}_").unwrap();
+
+    // Replace all matches with the captured slash "$1" to avoid producing a double slash.
+    re.replace_all(path, "$1").to_string()
 }
 
 /// convenience function for parsing returned HTTP OSCQuery messages

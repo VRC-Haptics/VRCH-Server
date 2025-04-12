@@ -1,6 +1,6 @@
 pub mod discovery;
 pub mod parsing;
-mod config;
+pub mod config;
 
 // crate dependencies
 use crate::osc::server::OscServer;
@@ -20,6 +20,7 @@ use std::{
 };
 
 // "/avatar/parameters/haptic/prefabs/<author>/<name>/<version>"
+// "/avatar/parameters/haptic/prefabs/Average/test-00/1"
 // I think having trailing "/" references the contents of the path, not all the children paths.
 pub const AVATAR_PREFIX: &str = "/avatar/parameters";
 pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";

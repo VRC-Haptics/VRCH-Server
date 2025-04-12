@@ -57,7 +57,7 @@ impl WifiConnManager {
                         }
                         Err(e) => {
                             log::error!(
-                                "Failed to parse WifiCommand JSON: {}, \n\t\tPacket: {}",
+                                "Failed to parse (needs to be fixed but idk)WifiCommand JSON: {}. Packet: {}",
                                 e, cmd_str
                             );
                         }

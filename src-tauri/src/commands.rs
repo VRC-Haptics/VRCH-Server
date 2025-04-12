@@ -1,7 +1,7 @@
 // local modules
 use crate::devices::{Device, DeviceType};
-use crate::vrc::{VrcInfo, OscPath};
 use crate::mapping::haptic_node::HapticNode;
+use crate::vrc::{VrcInfo, OscPath, config::GameMap};
 use crate::set_device_store_field;
 //standard imports
 use rosc::OscType;
@@ -20,33 +20,38 @@ pub fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
     vrc_info.clone()
 }
 
-#[derive(serde::Deserialize, Debug)]
-struct DeviceMapUpload {
-    device_map: Vec<HapticNode>,
-}
-
 #[tauri::command]
-pub async  fn upload_device_map(
+pub async fn upload_device_map(
     id: String,
     config_json: String,
     devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
 ) -> Result<(), String> {
     log::info!("commanded to upload");
-    let upload: DeviceMapUpload =
+    
+    // Deserialize the JSON string into a GameMap struct.
+    let upload: GameMap =
         serde_json::from_str(&config_json).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-
+    
+    // Extract a plain list of HapticNode from the config while preserving the indices.
+    let haptic_nodes: Vec<HapticNode> = upload
+        .nodes
+        .into_iter()
+        .map(|node| node.node_data)
+        .collect();
+    
     let mut devices = devices_mutex.lock().unwrap();
     if let Some(device) = devices.iter_mut().find(|d| d.id == id) {       
-        //propogate changes if necessary
+        // Propagate changes if necessary.
         match &mut device.device_type {
             DeviceType::Wifi(wifi) => {
-                return wifi.set_node_list(upload.device_map);
+                return wifi.set_node_list(haptic_nodes);
             }
         }
     } else {
         return Err(format!("No Device with id: {}", id));
     }
 }
+
 
 #[tauri::command]
 pub async  fn update_device_multiplier(

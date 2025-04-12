@@ -1,4 +1,4 @@
-use super::parsing::{parse_incoming, OscInfo};
+use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, OscPath, PREFAB_PREFIX, GameMap};
 use crate::vrc::config::load_vrc_config;
 use crate::vrc::AVATAR_ID_PATH;
@@ -81,14 +81,14 @@ fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
 ///
 /// * `text` - The HTTP response text to parse.
 /// * `params` - The DashMap containing OSC parameter information.
-/// * `is_first` - Indicator used to adjust logging on the first iteration.
 fn update_params_from_text(
     text: &str,
     params: &DashMap<OscPath, OscInfo>,
 ) {
     let node_info = parse_incoming(text);
     for node in node_info {
-        match params.get(&node.full_path) {
+        let path = remove_version(&node.full_path.0);
+        match params.get(&OscPath(path.clone())) {
             // If the path exists and the data has changed, update it.
             Some(old_node) => {
                 // Do the comparison and store the result.
@@ -96,11 +96,11 @@ fn update_params_from_text(
                 // Explicitly drop the guard before calling insert.
                 drop(old_node);
                 if should_update {
-                    params.insert(node.full_path.clone(), node);
+                    params.insert(OscPath(path), node);
                 }
             }
             None => {
-                params.insert(node.full_path.clone(), node);
+                params.insert(OscPath(path), node);
             }
         }
     }
@@ -163,7 +163,8 @@ fn update_existing_avatar(
             }
         }
     } else {
-        log::error!("Unable to find ID parameter: {:?}", params);
+        log::error!("Unable to find ID parameter");
+        log::info!("PARAMS: \n{:?}", params);
     }
 }
 
@@ -182,13 +183,12 @@ fn load_and_merge_configs(
 ) -> Option<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
-        log::trace!("Found prefabs: {:?}", prefabs);
         for prefab in prefabs {
             match load_vrc_config(
                 prefab.0,
                 prefab.1,
                 prefab.2,
-                vec!["./map_configs".into()],
+                vec!["./map_configs/".into()],
             ) {
                 Ok(map) => configs.push(map),
                 Err(err) => match err.kind() {
@@ -201,6 +201,8 @@ fn load_and_merge_configs(
                 },
             }
         }
+    } else {
+        log::trace!("No prefab info");
     }
     if let Some((first_config, rest)) = configs.split_first_mut() {
         for conf in rest {
@@ -271,25 +273,27 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
 
         // Check if the key starts with the expected prefix.
         if let Some(rest) = key_str.strip_prefix(PREFAB_PREFIX) {
-            // Expected remainder is "<name>/<author>/<version>".
+            // Expected remainder is "<name>/<author>" with version as the value
             let parts: Vec<&str> = rest.split('/').collect();
 
             if parts.len() == 3 {
-                if let Ok(version) = parts[2].parse::<u32>() {
-                    let name = parts[1].to_string();
-                    let author = parts[0].to_string();
+                let name = parts[1].to_string();
+                let author = parts[0].to_string();
 
-                    // Build tuple with order: (author, name, version)
-                    results.push((author, name, version));
-                } else {
-                    log::error!(
-                        "Unable to parse version into unsigned integer: {}",
-                        parts[2]
-                    );
-                }
-            } else {
-                log::warn!("Malformed Haptics Prefab info: {}", key_str);
-            }
+                // sometimes I hate this language
+                let info = entry.value();
+                if let Some(values) = &info.value {
+                    if values.len() != 0 {
+                        let first = values.first().unwrap().clone();
+                        if let Some(int_val) = first.int(){
+                            let version = int_val as u32;
+                            log::info!("Avatar has prefab: {:?}", (&author, &name, &version));
+                            // Build tuple with order: (author, name, version)
+                            results.push((author, name, version));
+                        }
+                    }
+                } 
+            }// could be malformed, but probably just partial path.
         }
     }
 

@@ -43,20 +43,30 @@ fn set_device_store_field<T: serde::Serialize>(
         .expect("couldn't access known_devices.json");
 
     // Try to retrieve the existing device data.
-    let mut device_data = store.get(mac).unwrap();
+    if let Some(mut device_data) = store.get(mac) {
+        // Ensure we have a JSON object.
+        if !device_data.is_object() {
+            device_data = json!({});
+        }
 
-    // Ensure we have a JSON object.
-    if !device_data.is_object() {
-        device_data = json!({});
-    }
+        // Insert or update the field.
+        if let Some(map) = device_data.as_object_mut() {
+            map.insert(field.to_string(), serde_json::to_value(value).unwrap());
+        }
 
-    // Insert or update the field.
-    if let Some(map) = device_data.as_object_mut() {
+        // Write back the updated device data.
+        store.set(mac, device_data);  
+    } else {
+        // create new device data instance.
+        let mut device_data = json!({});
+
+        // Insert the field.
+        let map = device_data.as_object_mut().unwrap();
         map.insert(field.to_string(), serde_json::to_value(value).unwrap());
-    }
 
-    // Write back the updated device data.
-    store.set(mac, device_data);
+        // Write back the updated device data.
+        store.set(mac, device_data);  
+    };
 }
 
 /// Helper to get persistant store values
