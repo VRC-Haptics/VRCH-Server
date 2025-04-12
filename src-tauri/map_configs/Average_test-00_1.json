@@ -17,6 +17,9 @@
     "meta": {
         "map_name": "Headset-8x",
         "map_version": 1,
-        "map_author": "Average"
+        "map_author": "Average",
+        "menu": {
+            "intensity": "/avatar/parameters/haptic/prefabs/Average/Headset-8x/intensity"
+        }
     }
 }

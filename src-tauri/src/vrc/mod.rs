@@ -6,7 +6,7 @@ pub mod config;
 use crate::osc::server::OscServer;
 use crate::GlobalMap;
 use crate::vrc::parsing::OscInfo;
-use crate::mapping::{input_node::InputNode, Id};
+use crate::mapping::{input_node::InputNode, Id, global_map::StandardMenu};
 // module dependencies
 use parsing::remove_version;
 use config::GameMap;
@@ -22,8 +22,8 @@ use std::{
 // "/avatar/parameters/haptic/prefabs/<author>/<name>/<version>"
 // "/avatar/parameters/haptic/prefabs/Average/test-00/1"
 // I think having trailing "/" references the contents of the path, not all the children paths.
-pub const AVATAR_PREFIX: &str = "/avatar/parameters";
 pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";
+pub const GLOBALS_PREFIX: &str = "/avatar/parameters/haptic/global/";
 pub const AVATAR_ID_PATH: &str = "/avatar/change";
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -107,7 +107,7 @@ impl VrcInfo {
         // the callback called when each device tick starts
         let avi_refresh = Arc::clone(&avi);
         let params_refresh = Arc::clone(&vrc_lock.parameter_cache);
-        let on_refresh = move |inputs: &DashMap<Id, InputNode>| {          
+        let on_refresh = move |inputs: &DashMap<Id, InputNode>, menu: &Mutex<StandardMenu> | {          
             // If we have an avi in use, and haptics are on the avatar we can use haptics
             let avi_option = avi_refresh.read().expect("Unable to lock avi");
             if let Some(avi_read) = &*avi_option {
@@ -134,7 +134,21 @@ impl VrcInfo {
                             inputs.insert(Id(node.address.clone()), in_node);
                         }
                     }
-                }
+                    // upate menu items if we have something to dupate them with
+                    let mut menu_l = menu.lock().expect("couldn't lock the menu");
+                    if let Some(intensity) = params_refresh.get(&OscPath(GLOBALS_PREFIX.to_owned() + "intensity") ) {
+                        let intensity = intensity.value().clone();
+                        let intensity = intensity.float().unwrap();
+                        if intensity > 0.001 {
+                            menu_l.intensity = intensity;
+                            menu_l.enable = true;
+                        } else {
+                            menu_l.intensity = intensity;
+                            menu_l.enable = false;
+                        }
+                    }
+                
+                }   
             }
         };
 
@@ -144,6 +158,11 @@ impl VrcInfo {
         let mut lock = global_map.lock().expect("couldn't get lock");
         lock.register_refresh(on_refresh);
         return vrc;
+    }
+
+    /// Purges the parameter cache.
+    pub fn purge_cache(&self) {
+        self.parameter_cache.clear();
     }
 }
 

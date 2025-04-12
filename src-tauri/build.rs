@@ -9,10 +9,12 @@ macro_rules! p {
 }
 
 fn main() {
+    let output_folder = "./sidecars";
+
+    p!("Building proxy sidecar");
+
     println!("cargo:rerun-if-changed=../src-proxy/Cargo.toml");
     println!("cargo:rerun-if-changed=../src-proxy/src/");
-
-    // Builds the proxy sidecar
     let status = Command::new("cargo")
         .args(&[
             "build",
@@ -26,7 +28,7 @@ fn main() {
         panic!("Sidecar build failed!");
     }
 
-    p!("Bhaptics Proxy built");
+    p!("Building elevated sidecar");
 
     println!("cargo:rerun-if-changed=../src-elevated-register/Cargo.toml");
     println!("cargo:rerun-if-changed=../src-elevated-register/src/");
@@ -43,7 +45,29 @@ fn main() {
         panic!("Sidecar build failed!");
     }
 
-    p!("elevated sidecar built");
+    p!("Building C# VRC sidecar");
+
+    println!("cargo:rerun-if-changed=../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj");
+    println!("cargo:rerun-if-changed=../src-vrc-oscquery/listen-for-vrc/Program.cs");
+    let status = Command::new("dotnet")
+        .args([
+            "publish",
+            "../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj",
+            "-c",
+            "Release",// Configuration: Release mode
+            "--self-contained",
+            "true",                // Publish as self-contained.
+            "-p:PublishSingleFile=true",
+            "-p:PublishTrimmed=true", // Optional: trims unused code, reducing the binary size.
+            "-o",
+            output_folder,       // Output directory for the published files
+        ])
+        .status()
+        .expect("Failed to execute dotnet publish.");
+    if !status.success() {
+        panic!("Sidecar build failed!");
+    }
+
 
     // Copy Sidecar to sidecars directory of main app
     let source = Path::new("../src-proxy/target/release/BhapticsPlayer.exe");

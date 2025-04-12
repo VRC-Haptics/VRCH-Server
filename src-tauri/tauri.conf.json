@@ -37,8 +37,11 @@
       "sidecars/vrc-sidecar.exe", 
       "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
       "sidecars/elevated-register.exe",
-      "security/bhaptics.pfx",
       "sidecars/listen-for-vrc.exe",
+      "security/localhost.crt",
+      "security/localhost.key",
+      "security/README.md",
+      "security/selfsigned_cert.sh",
       "map_configs/**/*"
     ]
   }

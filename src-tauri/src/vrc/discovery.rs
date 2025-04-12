@@ -48,7 +48,7 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>) {
                             let avatar = { Arc::clone(&vrc.avatar) };
                             drop(vrc);
                             // Call the sub-function with the extracted port.
-                            run_vrc_http_polling(port, params, avatar);
+                            run_vrc_http_polling(port, params, avatar, Arc::clone(&vrc_clone));
                             // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
                         } else {
                             log::error!("Error: Could not parse port from message: {}", msg);
@@ -115,6 +115,7 @@ fn update_params_from_text(
 fn update_existing_avatar(
     params: &DashMap<OscPath, OscInfo>,
     avatar: &Arc<RwLock<Option<Avatar>>>,
+    vrc: &Mutex<VrcInfo>,
 ) {
     // First, retrieve the current avatar ID (if any) using a read lock.
     let current_id = {
@@ -131,7 +132,9 @@ fn update_existing_avatar(
             // Compare the new id with the current avatar's id.
             if current_id.as_deref() != Some(&new_id) {
                 log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
-            
+                let lock = vrc.lock().expect("couldn't lock vrc");
+                lock.purge_cache();
+                drop(lock);
                 // Attempt to load the new configuration using OSC parameters.
                 if let Some(new_config) = load_and_merge_configs(params) {
                     let mut avi_write = avatar.write().expect("unable to get write lock");
@@ -232,6 +235,7 @@ fn run_vrc_http_polling(
     port: u16,
     params: &DashMap<OscPath, OscInfo>,
     avatar: Arc<RwLock<Option<Avatar>>>,
+    vrc: Arc<Mutex<VrcInfo>>,
 ) {
     let url = format!("http://127.0.0.1:{}/", port);
     log::debug!("Started polling HTTP.");
@@ -243,7 +247,7 @@ fn run_vrc_http_polling(
                 update_params_from_text(&text, params);
 
                 // Check for updates if an avatar is already active.
-                update_existing_avatar(params, &avatar);
+                update_existing_avatar(params, &avatar, &vrc);
 
                 // Initialize the avatar if it hasn't been set yet.
                 //initialize_avatar(params, &avatar);

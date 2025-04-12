@@ -4,6 +4,8 @@ namespace ServiceFinder
 {
     class Program
     {
+        static int currentPort = 0;
+        
         /// <summary>
         /// Blocks until an MDNS service of type "_oscjson._tcp.local." is found
         /// whose display name starts with "VRChat-Client-". Returns the advertised port.
@@ -32,8 +34,13 @@ namespace ServiceFinder
             while (true)
             {
                 // Call the blocking function. It will only return when the service is found.
-                int port = BlockUntilFound();
-                Console.WriteLine($"FOUND:{port}");
+                int newPort = BlockUntilFound();
+                if (newPort != currentPort)
+                {
+                    currentPort = newPort;
+                    Console.WriteLine($"FOUND:{currentPort}");
+                }
+                
             }
         }
     }

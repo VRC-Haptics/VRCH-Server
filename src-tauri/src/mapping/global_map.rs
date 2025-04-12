@@ -1,40 +1,45 @@
 use super::Id;
 use super::{
-    input_node::InputNode, interp::{InterpAlgo, Interpolate}, HapticNode
+    input_node::InputNode,
+    interp::{InterpAlgo, Interpolate},
+    HapticNode,
 };
 
-use std::{
-    sync::Arc,
-    fmt
-};
 use dashmap::DashMap;
+use std::sync::Mutex;
+use std::{fmt, sync::Arc};
+
+/// The common factors that will be used across all devices to modify output.
+pub struct StandardMenu {
+    pub intensity: f32,
+    pub enable: bool,
+}
 
 /// Provides implementations for interpolating input haptic intensities to device nodes
 pub struct GlobalMap {
     input_nodes: Arc<DashMap<Id, InputNode>>,
-    global_offset: f32,
-    global_enable: bool,
-    refresh_callbacks: Vec<Box<dyn Fn(&DashMap<Id, InputNode>) + Send + Sync + 'static>>,
+    standard_menu: Arc<Mutex<StandardMenu>>,
+    refresh_callbacks: Vec<Box<dyn Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static>>,
 }
 
 impl GlobalMap {
     pub fn new() -> GlobalMap {
         return GlobalMap {
             input_nodes: Arc::new(DashMap::new()),
-            global_offset: 1.0,
-            global_enable: true,
-            refresh_callbacks: vec![]
-        }
+            standard_menu: Arc::new(Mutex::new(StandardMenu {
+                intensity: 1.0,
+                enable: true,
+            })),
+            refresh_callbacks: vec![],
+        };
     }
 
     /// registers a function to be called on a refresh event
     pub fn register_refresh<F>(&mut self, fun: F)
     where
-        F: Fn(&DashMap<Id, InputNode>) + Send + Sync + 'static,
-    {
+        F: Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static,
+    {        
         self.refresh_callbacks.push(Box::new(fun));
-
-        return;
     }
 
     /// called immediately before each device tick.
@@ -42,17 +47,26 @@ impl GlobalMap {
     pub fn refresh_inputs(&mut self) {
         for callback in &self.refresh_callbacks {
             let clone = Arc::clone(&self.input_nodes);
-            callback(&clone);
+            let menu = Arc::clone(&self.standard_menu);
+            callback(&clone, &menu);
         }
     }
 
     /// checks for duplicates and registers input node for writing to
-    pub fn add_input_node(&self, new_node: HapticNode, tags: Vec<String>, id: String) -> Result<(), DuplicateNodeIDError> {
+    pub fn add_input_node(
+        &self,
+        new_node: HapticNode,
+        tags: Vec<String>,
+        id: String,
+    ) -> Result<(), DuplicateNodeIDError> {
         if let Some(existing) = self.input_nodes.get(&Id(id.clone())) {
-            return Err(DuplicateNodeIDError{existing:existing.clone()});
+            return Err(DuplicateNodeIDError {
+                existing: existing.clone(),
+            });
         }
 
-        self.input_nodes.insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id)));
+        self.input_nodes
+            .insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id)));
 
         Ok(())
     }
@@ -63,11 +77,11 @@ impl GlobalMap {
             return Ok(node);
         }
 
-        Err(DoesNotExistError{id: id})
+        Err(DoesNotExistError { id: id })
     }
 
     /// Sets a nodes intensity by id
-    /// 
+    ///
     /// Returns old value
     pub fn set_intensity(&mut self, id: String, new: f32) -> Result<f32, DoesNotExistError> {
         if let Some(mut node) = self.input_nodes.get_mut(&Id(id.clone())) {
@@ -76,38 +90,49 @@ impl GlobalMap {
             return Ok(old);
         }
 
-        Err(DoesNotExistError{id: id})
+        Err(DoesNotExistError { id: id })
     }
 
     /// Returns the InputNodes Intensity by ID
-    /// 
+    ///
     /// `respect_enable`: toggles whether to ignore the global_enable parameter
-    pub fn get_intensity(&mut self, id: String, respect_enable: bool) -> Result<f32, DoesNotExistError> {
-        if !self.global_enable && respect_enable {
-            return Ok(0.0);        
+    pub fn get_intensity(
+        &mut self,
+        id: String,
+        respect_enable: bool,
+    ) -> Result<f32, DoesNotExistError> {
+        let menu_lock = self.standard_menu.lock().expect("unable to get lock");
+        if !menu_lock.enable && respect_enable {
+            return Ok(0.0);
         }
 
         if let Some(node) = self.input_nodes.get(&Id(id.clone())) {
-            return Ok(node.get_intensity() * self.global_offset);
+            return Ok(node.get_intensity() * menu_lock.intensity);
         }
 
-        Err(DoesNotExistError{id: id})
+        Err(DoesNotExistError { id: id })
     }
 
     /// Returns the interpolated value for a given HapticNode
-    /// 
+    ///
     /// `node`: the input HapticNode
-    /// 
+    ///
     /// `algo`: the algorithm state that will be used to create the returned value
-    /// 
+    ///
     /// `respect_enable`: toggles whether to ignore the global_enable parameter
-    /// 
-    pub fn get_intensity_from_haptic(&self, node: &HapticNode, algo: &InterpAlgo, respect_enable: &bool) -> f32 {
-        if *respect_enable && !self.global_enable {
+    ///
+    pub fn get_intensity_from_haptic(
+        &self,
+        node: &HapticNode,
+        algo: &InterpAlgo,
+        respect_enable: &bool,
+    ) -> f32 {
+        let menu_lock = self.standard_menu.lock().expect("unable to get lock");
+        if *respect_enable && !menu_lock.enable {
             return 0.0;
         }
-        let local  = Arc::clone(&self.input_nodes);
-        let locals  = <DashMap<Id, InputNode> as Clone>::clone(&local).into_read_only();
+        let local = Arc::clone(&self.input_nodes);
+        let locals = <DashMap<Id, InputNode> as Clone>::clone(&local).into_read_only();
         let values = locals.values();
         let input_list = values.collect::<Vec<&InputNode>>();
         algo.interp(node, input_list)
@@ -118,12 +143,12 @@ impl GlobalMap {
 
 #[derive(Debug, Clone)]
 pub struct DoesNotExistError {
-    id: String
+    id: String,
 }
 
 impl fmt::Display for DoesNotExistError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"No registered node with id: {:?}", self.id)
+        write!(f, "No registered node with id: {:?}", self.id)
     }
 }
 

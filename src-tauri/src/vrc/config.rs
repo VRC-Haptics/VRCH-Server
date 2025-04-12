@@ -5,6 +5,8 @@ use std::io;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+use super::OscPath;
+
 /// Searches for a file named "<author>_<name>_<version>.json" within the provided
 /// directories (and their subdirectories) and returns the first instance found.
 ///
@@ -99,4 +101,10 @@ pub struct ConfMetadata {
     pub map_name: String,
     pub map_version: u32,
     pub map_author: String,
+    pub menu: StandardMenuParameters,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+pub struct StandardMenuParameters {
+    pub intensity: OscPath,
 }
