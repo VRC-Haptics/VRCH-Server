@@ -5,7 +5,7 @@ use crate::vrc::AVATAR_ID_PATH;
 use crate::VrcInfo;
 
 use std::io::{BufRead, BufReader, ErrorKind};
-use std::process::{Command, Stdio};
+use std::process::{Command, Stdio, id};
 use std::sync::{mpsc, Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -20,6 +20,7 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>) {
     thread::spawn(move || {
         // Launch the sidecar process.
         let mut child = Command::new("./sidecars/listen-for-vrc.exe")
+            .arg(format!("--pid={}", id()))
             // Do not attach a terminal to the sidecar.
             .stdin(Stdio::null())
             // Capture its stdout so we can read the FOUND messages.

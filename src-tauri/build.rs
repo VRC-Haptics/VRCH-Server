@@ -49,22 +49,26 @@ fn main() {
 
     println!("cargo:rerun-if-changed=../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj");
     println!("cargo:rerun-if-changed=../src-vrc-oscquery/listen-for-vrc/Program.cs");
-    let status = Command::new("dotnet")
-        .args([
+    let output = Command::new("dotnet")
+        .args(&[
             "publish",
             "../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj",
             "-c",
-            "Release",// Configuration: Release mode
-            "--self-contained",
-            "true",                // Publish as self-contained.
+            "Release",              // Configuration: Release mode
+            "--self-contained=true",
             "-p:PublishSingleFile=true",
             "-p:PublishTrimmed=true", // Optional: trims unused code, reducing the binary size.
             "-o",
-            output_folder,       // Output directory for the published files
+            output_folder,          // Output directory for the published files
         ])
-        .status()
+        .output()  // Capture the output rather than just the status.
         .expect("Failed to execute dotnet publish.");
-    if !status.success() {
+
+    if !output.status.success() {
+        // Convert stdout from bytes to a string and print.
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        p!("dotnet publish failed with output:\n{} ERR:{}", stdout, stderr);
         panic!("Sidecar build failed!");
     }
 

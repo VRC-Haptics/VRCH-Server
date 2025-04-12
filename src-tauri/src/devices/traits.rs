@@ -3,12 +3,6 @@ use crate::{devices::{
     OutputFactors
 }, mapping::global_map::GlobalMap};
 
-pub enum MenuType {
-    Float(f32),
-    Int(i32),
-    String(String),
-}
-
 /// Called on every server frame (~100hz)
 /// Should handle sending, recieving, killing, etc.
 trait Tick {
