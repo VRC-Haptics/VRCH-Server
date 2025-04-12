@@ -139,8 +139,12 @@ fn tick_devices(
     });
 }
 
-fn close_app(_: &Window) {
-    log::info!("TODO: Properly shut down")
+fn close_app(window: &Window) {
+    log::info!("Cleaning up and Shutting Down.");
+    let bhaptics = window.state::<Arc<Mutex<BhapticsGame>>>();
+    let bh_lock = bhaptics.lock().expect("unable to lock bhaptics");
+    bh_lock.shutdown();
+    log::trace!("Shutdown bhaptics server");
     //cleanup vrc TODO:
 }
 

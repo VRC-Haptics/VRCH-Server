@@ -2,7 +2,7 @@ use if_addrs::get_if_addrs;
 use serde_json::Value;
 use std::io;
 use std::net::{Ipv4Addr, UdpSocket};
-use std::sync::{Arc, Mutex};
+use std::sync::{ atomic::AtomicBool, atomic::Ordering, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 use crate::devices::{Device, DeviceType, WifiDevice};
@@ -12,8 +12,12 @@ use crate::devices::{Device, DeviceType, WifiDevice};
 pub fn start_wifi_listener(
     app_handle: AppHandle,
     devices_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-) {
+) -> Arc<AtomicBool> {
+    // Create a cancellation flag.
+    let cancelled = Arc::new(AtomicBool::new(false));
+    // Lock our device list.
     let devices = devices_state.inner().clone();
+    let cancelled_clone = cancelled.clone();
 
     std::thread::spawn(move || {
         // Bind to all interfaces on port 8888 and register for multicast.
@@ -29,7 +33,7 @@ pub fn start_wifi_listener(
         let mut buf = [0u8; 1024];
 
         // Main loop: receive and process incoming packets.
-        loop {
+        while !cancelled_clone.load(Ordering::Relaxed) {
             match socket.recv_from(&mut buf) {
                 Ok((size, _)) => {
                     let received = String::from_utf8_lossy(&buf[..size]);
@@ -60,9 +64,9 @@ pub fn start_wifi_listener(
                                 full_device.factors.sens_mult = old_offset;
                             }
 
-                            app_handle
-                                .emit("device-added", full_device.clone())
-                                .unwrap();
+                            if let Err(e) = app_handle.emit("device-added", full_device.clone()) {
+                                log::error!("Failed to emit device-added: {:?}", e);
+                            }
                             lock.push(full_device);
                         } else {
                             // If the device already exists, probably needs a reset
@@ -81,11 +85,16 @@ pub fn start_wifi_listener(
                 Err(e) => {
                     if e.kind() != std::io::ErrorKind::WouldBlock {
                         println!("Timed out");
+                    } else {
+                        log::error!("Recieved error: {}", e);
                     }
                 }
             }
         }
+        log::info!("WiFi listener terminated due to cancellation.");
     });
+    // Return the cancellation handle so the caller can stop the listener.
+    cancelled
 }
 
 /// Joins the socket to the multicast group on all eligible IPv4 interfaces.

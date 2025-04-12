@@ -16,8 +16,14 @@ use dashmap::DashMap;
 // std imports
 use std::{
     net::Ipv4Addr,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
+
+// "/avatar/parameters/haptic/prefabs/<author>/<name>/<version>"
+// I think having trailing "/" references the contents of the path, not all the children paths.
+pub const AVATAR_PREFIX: &str = "/avatar/parameters";
+pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";
+pub const AVATAR_ID_PATH: &str = "/avatar/change";
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct VrcInfo {
@@ -28,7 +34,7 @@ pub struct VrcInfo {
     /// port we are sending data over
     pub out_port: Option<u16>,
     /// Holds data from http server about the given avatar
-    pub avatar: Arc<Option<Avatar>>,
+    pub avatar: Arc<RwLock<Option<Avatar>>>,
     /// Parameters VRC advertises as available, is empty if not resolved yet
     /// 
     /// NOTE: The values actual values contained in this struct are out of date by ~2S.
@@ -48,7 +54,7 @@ pub struct VrcInfo {
 
 impl VrcInfo {
     pub fn new(global_map: Arc<Mutex<GlobalMap>>) -> Arc<Mutex<VrcInfo>> {
-        let avi:Arc<Option<Avatar>> = Arc::new(None);
+        let avi:Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
         
         // Instantiate
         let vrc = VrcInfo {
@@ -67,7 +73,7 @@ impl VrcInfo {
         start_filling_available_parameters(Arc::clone(&vrc));
 
         // create clone for closure
-        let vrc_lock = vrc.lock().expect("couldn't get lock");
+        let mut vrc_lock = vrc.lock().expect("couldn't get lock");
         let cached_parameters_rcve = Arc::clone(&vrc_lock.parameter_cache);
         // Our closure that gets called whenever an OSC message is recieved
         let on_receive = move |msg: OscMessage| {
@@ -78,7 +84,8 @@ impl VrcInfo {
             if let Some(arg) = msg.args.first() {
                 cached_parameters_rcve.insert(OscPath(addr), arg.to_owned());
             } else {
-                log::error!("empty message recieved: {:?}", msg);
+                log::warn!("empty message recieved: {:?}", msg);
+                cached_parameters_rcve.insert(OscPath(addr), OscType::Nil);
             }
         };
 
@@ -86,6 +93,7 @@ impl VrcInfo {
         let recieving_port = 9001;
         let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
         let port_used = vrc_server.start();
+        vrc_lock.in_port = Some(port_used);
 
         // if the server wasn't able to capture the port start advertising the port it was bound to.
         let mut osc_server = None;
@@ -100,18 +108,21 @@ impl VrcInfo {
         let params_refresh = Arc::clone(&vrc_lock.parameter_cache);
         let on_refresh = move |inputs: &DashMap<Id, InputNode>| {          
             // If we have an avi in use, and haptics are on the avatar we can use haptics
-            if let Some(avi) = avi_refresh.as_ref() {
-                if let Some(conf) = &avi.parameters {
+            let avi_option = avi_refresh.read().expect("Unable to lock avi");
+            if let Some(avi_read) = &*avi_option {
+                if let Some(conf) = &avi_read.conf {
                     // for each node in our config, see if we have recieved a value.
                     for node in &conf.nodes {
                         if let Some(value) = params_refresh.get(&OscPath(node.address.clone())) {
-                            // insert the value into our input
+                            //create node basic's
                             let position = &node.node_data;
                             let mut in_node = InputNode::new(
                                 position.to_owned(), 
                                 vec![node.target_bone.to_str().to_string()],
                                 Id(node.address.clone())
                             );
+                            
+                            // insert the value into our hashmap
                             if let Some(intensity) = value.clone().float() {
                                 in_node.set_intensity(intensity);
                             } else {
@@ -139,12 +150,10 @@ impl VrcInfo {
 pub struct Avatar {
     /// The avatar reffered to by the VRC api
     id: String,
-    /// User-facing name of the avatar
-    name: String,
     /// the name of the prefab referenced by the parameter on the avatar
     prefab_name: Option<String>,
     /// All information mapping OSC Parameters to their needed formats
-    parameters: Option<GameMap>,
+    conf: Option<GameMap>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]

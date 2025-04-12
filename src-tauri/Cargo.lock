@@ -5499,8 +5499,10 @@ dependencies = [
  "tauri-plugin-store",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tokio-websockets",
  "uuid",
+ "walkdir",
  "windows 0.61.1",
 ]
 

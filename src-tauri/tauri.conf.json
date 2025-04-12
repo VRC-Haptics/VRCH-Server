@@ -38,7 +38,8 @@
       "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
       "sidecars/elevated-register.exe",
       "security/bhaptics.pfx",
-      "sidecars/listen-for-vrc.exe"
+      "sidecars/listen-for-vrc.exe",
+      "map_configs/**/*"
     ]
   }
 }

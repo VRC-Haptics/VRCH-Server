@@ -35,12 +35,6 @@ fn main() {
     println!("vrch-gui.exe has exited. Proxy shutting down.");
 }
 
-fn pause_before_exit() {
-    println!("Press Enter to exit...");
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).expect("Failed to read line");
-}
-
 fn track_process_and_exit(process_name: &str, system: &mut System) {
     // Refresh the list of processes.
     system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
@@ -72,7 +66,6 @@ fn track_process_and_exit(process_name: &str, system: &mut System) {
 
         if !process_found {
             println!("Process '{}' has closed. Exiting host process.", process_name);
-            pause_before_exit();
         }
 
         // Sleep for a fixed duration before checking again.
