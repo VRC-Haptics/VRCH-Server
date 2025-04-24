@@ -1,12 +1,74 @@
 // local modules
 use crate::devices::{Device, DeviceType};
+use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
+use crate::mapping::NodeGroup;
 use crate::vrc::{VrcInfo, OscPath, config::GameMap};
 use crate::set_device_store_field;
 //standard imports
 use rosc::OscType;
 use runas::Command;
 use std::sync::{Arc, Mutex};
+use tokio::time::Duration;
+
+/// Swaps the haptic node indices on the given device id
+#[tauri::command]
+pub fn swap_conf_nodes(
+    device_id: String,
+    index_1: u32,
+    index_2: u32,
+    device_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>
+) -> Result<(), String> {
+    let mut device_lock = device_state.lock().expect("Couldn't lock device list");
+
+    log::trace!("Into command");
+    for dev in device_lock.iter_mut() {
+        if dev.id == device_id {
+            if let DeviceType::Wifi(wifi_cfg) = &mut dev.device_type {
+                wifi_cfg.swap_nodes(index_1 as usize, index_2 as usize)?;
+                let _ = wifi_cfg;
+            }
+            drop(device_lock);
+            log::trace!("Finished Command");
+            return Ok(());
+        }
+    }
+
+    Err(format!("No device with id to swap nodes: {:?}", device_id))
+}
+
+/// Plays the specified point for the duration in seconds at the power percentage of intensity.
+#[tauri::command]
+pub fn play_point(
+    feedback_location: (f32, f32, f32), // xyz location to insert point
+    power: f32, // the power percentage to play 1 = no change
+    duration: f32, // When should this point be removed.
+    global_map_state: tauri::State<'_, Arc<Mutex<GlobalMap>>>
+) -> Result<(), ()> {
+    use strum::IntoEnumIterator;
+    let all_bones: Vec<NodeGroup> = NodeGroup::iter().collect();
+    let temp_node = HapticNode {
+        x: feedback_location.0,
+        y: feedback_location.1,
+        z: feedback_location.2,
+        groups: all_bones
+    };
+
+    let mut global_map = global_map_state.lock().expect("couldn't lock global map");
+    let node_name = "Manual Play Node".to_string();
+    if let Ok(_) = global_map.add_input_node(temp_node, vec!["Testing".to_string()], node_name.to_string()) {
+        let _ = global_map.set_intensity(&node_name, power);
+    }
+    
+    drop(global_map); // explicitly yeild our lock.
+
+    std::thread::sleep(Duration::from_secs_f32(duration));
+
+    let mut global_map = global_map_state.lock().expect("couldn't lock global map");
+    let _ = global_map.pop_input_node(node_name);
+
+    return Ok(())
+}
 
 #[tauri::command]
 pub fn get_device_list(state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Vec<Device> {

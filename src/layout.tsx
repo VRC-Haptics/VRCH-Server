@@ -11,7 +11,7 @@ export default function Layout() {
   const linkClass = "hover:text-primary w-10 h-10 hover:bg-base-300 rounded-md flex items-center justify-center";
 
   return (
-    <div className="flex flex-col min-w-screen min-h-screen overflow-hidden">
+    <div className="absolute inset-0 flex flex-col overflow-hidden">
       <div id="settingsBar" className="bg-base-200 flex flex-row w-full p-3 gap-3 items-center">
 
         <Link title="Home" className={linkClass} to="/">
@@ -43,7 +43,7 @@ export default function Layout() {
         </Link>
         
       </div>
-      <div id="windowContainer" className="flex flex-1 m-4">
+      <div id="windowContainer" className="flex flex-col flex-1 overflow-hidden">
         <Outlet />
       </div>
     </div>

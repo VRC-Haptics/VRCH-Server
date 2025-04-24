@@ -15,7 +15,7 @@ export default function ConnectedDevices({
   return (
     <div
       id="ConnectedDevicesContainer"
-      className="flex flex-col min-w-fit bg-base-200 rounded-md p-2 space-y-2"
+      className="flex-shrink-0 flex-col min-w-0 bg-base-200 rounded-md p-2 space-y-2"
     >
       <div
         className="font-bold bg-base-300 rounded-md px-2 py-1 h-min"

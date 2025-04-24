@@ -49,6 +49,14 @@ impl WifiConnManager {
             //if response to server command
             if msg.addr == "/command" {
                 if let Some(OscType::String(cmd_str)) = msg.args.get(0) {
+                    // if confirmation that we reset something invalidate config
+                    if cmd_str.contains(" set to ") {
+                        log::trace!("Recieved set to command: {:?}", cmd_str);
+                        let mut conf = last_command_cpy.write().expect("Couldn't get write");
+                        *conf = None;
+                        log::trace!("Set to None");
+                    }
+                    
                     match serde_json::from_str::<WifiConfig>(cmd_str) {
                         Ok(command) => {
                             //log::trace!("Set device config: {:?}", command);

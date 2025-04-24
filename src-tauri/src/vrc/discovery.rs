@@ -138,6 +138,7 @@ fn update_existing_avatar(
                 drop(lock);
                 // Attempt to load the new configuration using OSC parameters.
                 if let Some(new_config) = load_and_merge_configs(params) {
+                    //log::trace!("new config: {:?}", new_config.nodes.len());
                     let mut avi_write = avatar.write().expect("unable to get write lock");
                     if let Some(avi_mut) = avi_write.as_mut() {
                         avi_mut.id = new_id;
@@ -268,7 +269,7 @@ fn run_vrc_http_polling(
 }
 
 /// Searches the DashMap for haptic prefabs. Paths must follow the pattern:
-/// `/avatar/parameters/haptic/prefabs/<author>/<name>/<version>`
+/// `/avatar/parameters/haptic/prefabs/<author>/<name>/v<version>`
 /// and returns an Option containing a vector of tuples (author, name, version).
 pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, String, u32)>> {
     let mut results = Vec::new();
@@ -285,19 +286,15 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
                 let name = parts[1].to_string();
                 let author = parts[0].to_string();
 
+                let num_str = parts[2]
+                    .strip_prefix('v').expect("no v in version entry.");
+
+                // parse the remainder as an i32
+                let version = num_str.parse::<u32>().expect(&format!("Could not parse verison number: {:?}", key_str));
+
                 // sometimes I hate this language
-                let info = entry.value();
-                if let Some(values) = &info.value {
-                    if values.len() != 0 {
-                        let first = values.first().unwrap().clone();
-                        if let Some(int_val) = first.int(){
-                            let version = int_val as u32;
-                            log::info!("Avatar has prefab: {:?}", (&author, &name, &version));
-                            // Build tuple with order: (author, name, version)
-                            results.push((author, name, version));
-                        }
-                    }
-                } 
+                log::info!("Avatar has prefab: {:?}", (&author, &name, &version));
+                results.push((author, name, version));
             }// could be malformed, but probably just partial path.
         }
     }

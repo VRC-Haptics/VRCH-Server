@@ -231,6 +231,8 @@ fn main() {
             commands::update_device_multiplier,
             bhaptics_launch_default,
             bhaptics_launch_vrch,
+            commands::play_point,
+            commands::swap_conf_nodes,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {

@@ -19,7 +19,7 @@ pub enum GlobalModifier {
 
 /// Descriptors for location groups.
 /// Allows for segmented Interpolation
-#[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter)]
 pub enum NodeGroup {
     Head,
     ArmRight,

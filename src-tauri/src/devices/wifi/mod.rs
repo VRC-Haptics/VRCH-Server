@@ -76,30 +76,18 @@ impl WifiDevice {
         manage_hrtbt(is_alive, &mut self.been_pinged, &self.connection_manager);
 
         // check if we filled out the wifiConfig yet
-        if let Some(conf) = self.connection_manager.config.read().unwrap().as_ref() {
+        if let Some(conf) = self.connection_manager.config.write().unwrap().as_ref() {
 
             //push config to device if necessary
             if self.push_map {
                 self.push_map = false;
-                let conn_lock = self.connection_manager.config.read().unwrap();
-                match conn_lock.as_ref() {
-                    Some(config) => {
-                        let set_map = self.build_set_map(&config.node_map);
-                        return Some(set_map);
-                    },
-                    // Possiblity to get caught in loop if we try to set without recieving the config.
-                    None => {
-                        return None;
-                    }
-                }
+                let set_map = self.build_set_map(&conf.node_map);
+                return Some(set_map);
             }
 
-            // Collect haptic values
-            let mut intensities = vec![];
-            for node in conf.node_map.iter() {
-                intensities.push(inputs.get_intensity_from_haptic(&node, &factors.interp_algo, &true));
-            }
-            intensities.reverse(); //undo reversing from push
+            // Collect haptic values and scale to output.
+            let mut intensities = inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
+            intensities.iter_mut().for_each(|x| *x *= factors.sens_mult);
             return Some(self.compile_message(&intensities));
         } else {
             // If no mapping configuration found
@@ -197,6 +185,20 @@ impl WifiDevice {
         let mut lock = self.connection_manager.config.write().unwrap();
         if let Some(wifi_con) = lock.as_mut() {
             wifi_con.node_map = list;
+            self.push_map = true;
+            return Ok(());
+        } else {
+            return Err("no_map".to_string());
+        }
+    }
+
+    /// Swaps the configured nodes at indices
+    pub fn swap_nodes(&mut self, i1: usize, i2: usize) -> Result<(), String> {
+        let mut lock = self.connection_manager.config.write().unwrap();
+        if let Some(wifi_con) = lock.as_mut() {
+            let first = wifi_con.node_map[i1].clone();
+            wifi_con.node_map[i1] = wifi_con.node_map[i2].clone();
+            wifi_con.node_map[i2] = first;
             self.push_map = true;
             return Ok(());
         } else {

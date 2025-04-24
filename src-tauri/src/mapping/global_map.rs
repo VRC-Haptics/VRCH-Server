@@ -83,14 +83,14 @@ impl GlobalMap {
     /// Sets a nodes intensity by id
     ///
     /// Returns old value
-    pub fn set_intensity(&mut self, id: String, new: f32) -> Result<f32, DoesNotExistError> {
-        if let Some(mut node) = self.input_nodes.get_mut(&Id(id.clone())) {
+    pub fn set_intensity(&mut self, id: &str, new: f32) -> Result<f32, DoesNotExistError> {
+        if let Some(mut node) = self.input_nodes.get_mut(&Id(id.to_string())) {
             let old = node.get_intensity();
             node.set_intensity(new);
             return Ok(old);
         }
 
-        Err(DoesNotExistError { id: id })
+        Err(DoesNotExistError { id: id.to_string() })
     }
 
     /// Returns the InputNodes Intensity by ID
@@ -113,9 +113,9 @@ impl GlobalMap {
         Err(DoesNotExistError { id: id })
     }
 
-    /// Returns the interpolated value for a given HapticNode
+    /// Returns the interpolated value for a given HapticNode list
     ///
-    /// `node`: the input HapticNode
+    /// `node`: the input HapticNode list
     ///
     /// `algo`: the algorithm state that will be used to create the returned value
     ///
@@ -123,19 +123,19 @@ impl GlobalMap {
     ///
     pub fn get_intensity_from_haptic(
         &self,
-        node: &HapticNode,
+        node_list: &Vec<HapticNode>,
         algo: &InterpAlgo,
         respect_enable: &bool,
-    ) -> f32 {
+    ) -> Vec<f32> {
         let menu_lock = self.standard_menu.lock().expect("unable to get lock");
         if *respect_enable && !menu_lock.enable {
-            return 0.0;
+            return vec![0.0; node_list.len()];
         }
         let local = Arc::clone(&self.input_nodes);
         let locals = <DashMap<Id, InputNode> as Clone>::clone(&local).into_read_only();
         let values = locals.values();
         let input_list = values.collect::<Vec<&InputNode>>();
-        algo.interp(node, input_list)
+        algo.interp(node_list, input_list)
     }
 }
 
