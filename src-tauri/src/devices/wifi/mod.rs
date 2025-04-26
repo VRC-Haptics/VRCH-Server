@@ -62,8 +62,11 @@ impl WifiDevice {
     /// Called in regular intervals. Optionally returns a packet to be sent to the device.
     pub fn tick(
         &mut self,
+        // if the Device should be considered ready for haptics
         is_alive: &mut bool,
+        // output factors specific to nodes under this device only
         factors: &mut OutputFactors,
+        // All inputs that are supposed to span the entire array.
         inputs: &GlobalMap,
     ) -> Option<Packet> {
         if !self.been_pinged {
@@ -75,7 +78,7 @@ impl WifiDevice {
         // keep track of heartbeat timings and whatnot
         manage_hrtbt(is_alive, &mut self.been_pinged, &self.connection_manager);
 
-        // check if we filled out the wifiConfig yet
+        // check if we recieved and parsed the config yet.
         if let Some(conf) = self.connection_manager.config.write().unwrap().as_ref() {
             //push config to device if necessary
             if self.push_map {
@@ -84,10 +87,12 @@ impl WifiDevice {
                 return Some(set_map);
             }
 
+
             // Collect haptic values and scale to output.
             let mut intensities =
                 inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
-            intensities.iter_mut().for_each(|x| *x *= factors.sens_mult);
+            let global_offset = inputs.standard_menu.lock().expect("Global Lock").intensity;
+            intensities.iter_mut().for_each(|x| *x *= global_offset * factors.sens_mult);
             return Some(self.compile_message(&intensities));
         } else {
             // If no mapping configuration found
@@ -123,6 +128,7 @@ impl WifiDevice {
             .collect();
         let full = base + &hex_str;
 
+        // compile to osc formatted packet
         let message = rosc::OscMessage {
             addr: "/command".to_string(),
             args: vec![OscType::String(full)],

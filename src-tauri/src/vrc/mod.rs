@@ -2,6 +2,7 @@ pub mod config;
 pub mod discovery;
 pub mod parsing;
 
+use crate::api::ApiManager;
 // crate dependencies
 use crate::mapping::{global_map::StandardMenu, input_node::InputNode, Id};
 use crate::osc::server::OscServer;
@@ -60,7 +61,7 @@ pub struct VrcInfo {
 }
 
 impl VrcInfo {
-    pub fn new(global_map: Arc<Mutex<GlobalMap>>) -> Arc<Mutex<VrcInfo>> {
+    pub fn new(global_map: Arc<Mutex<GlobalMap>>, api: Arc<Mutex<ApiManager>>) -> Arc<Mutex<VrcInfo>> {
         let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
 
         // Instantiate
@@ -77,7 +78,7 @@ impl VrcInfo {
         let vrc = Arc::new(Mutex::new(vrc));
 
         // Start the thread that handles finding available vrc parameters
-        start_filling_available_parameters(Arc::clone(&vrc));
+        start_filling_available_parameters(Arc::clone(&vrc), api);
 
         // create clone for closure
         let mut vrc_lock = vrc.lock().expect("couldn't get lock");
@@ -118,6 +119,22 @@ impl VrcInfo {
             let avi_option = avi_refresh.read().expect("Unable to lock avi");
             if let Some(avi_read) = &*avi_option {
                 if let Some(conf) = &avi_read.conf {
+                    // upate menu items if we have something to dupate them with
+                    let mut menu_l = menu.lock().expect("couldn't lock the menu");
+                    if let Some(intensity) =
+                        params_refresh.get(&OscPath(GLOBALS_PREFIX.to_owned() + "intensity"))
+                    {
+                        let intensity = intensity.value().clone();
+                        let intensity = intensity.float().unwrap();
+                        if intensity > 0.001 {
+                            menu_l.intensity = intensity;
+                            menu_l.enable = true;
+                        } else {
+                            menu_l.intensity = intensity;
+                            menu_l.enable = false;
+                        }
+                    }
+
                     // for each node in our config, see if we have recieved a value.
                     for node in &conf.nodes {
                         if let Some(value) = params_refresh.get(&OscPath(node.address.clone())) {
@@ -138,21 +155,6 @@ impl VrcInfo {
                             }
 
                             inputs.insert(Id(node.address.clone()), in_node);
-                        }
-                    }
-                    // upate menu items if we have something to dupate them with
-                    let mut menu_l = menu.lock().expect("couldn't lock the menu");
-                    if let Some(intensity) =
-                        params_refresh.get(&OscPath(GLOBALS_PREFIX.to_owned() + "intensity"))
-                    {
-                        let intensity = intensity.value().clone();
-                        let intensity = intensity.float().unwrap();
-                        if intensity > 0.001 {
-                            menu_l.intensity = intensity;
-                            menu_l.enable = true;
-                        } else {
-                            menu_l.intensity = intensity;
-                            menu_l.enable = false;
                         }
                     }
                 }

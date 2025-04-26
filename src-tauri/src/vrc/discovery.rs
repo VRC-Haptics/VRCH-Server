@@ -1,10 +1,10 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
-use crate::vrc::config::load_vrc_config;
+use crate::api::ApiManager;
 use crate::vrc::AVATAR_ID_PATH;
 use crate::VrcInfo;
 
-use std::io::{BufRead, BufReader, ErrorKind};
+use std::io::{BufRead, BufReader};
 use std::process::{id, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex, RwLock};
 use std::thread;
@@ -15,7 +15,7 @@ use oyasumivr_oscquery;
 use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
 use serde;
 
-pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>) {
+pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api:Arc<Mutex<ApiManager>>) {
     let vrc_clone = Arc::clone(&vrc);
     thread::spawn(move || {
         // Launch the sidecar process.
@@ -49,7 +49,7 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>) {
                             let avatar = { Arc::clone(&vrc.avatar) };
                             drop(vrc);
                             // Call the sub-function with the extracted port.
-                            run_vrc_http_polling(port, params, avatar, Arc::clone(&vrc_clone));
+                            run_vrc_http_polling(port, params, avatar, Arc::clone(&vrc_clone), Arc::clone(&api));
                             // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
                         } else {
                             log::error!("Error: Could not parse port from message: {}", msg);
@@ -114,6 +114,7 @@ fn update_existing_avatar(
     params: &DashMap<OscPath, OscInfo>,
     avatar: &Arc<RwLock<Option<Avatar>>>,
     vrc: &Mutex<VrcInfo>,
+    api: Arc<Mutex<ApiManager>>,
 ) {
     // First, retrieve the current avatar ID (if any) using a read lock.
     let current_id = {
@@ -134,7 +135,7 @@ fn update_existing_avatar(
                 lock.purge_cache();
                 drop(lock);
                 // Attempt to load the new configuration using OSC parameters.
-                if let Some(new_config) = load_and_merge_configs(params) {
+                if let Some(new_config) = load_and_merge_configs(params, api) {
                     //log::trace!("new config: {:?}", new_config.nodes.len());
                     let mut avi_write = avatar.write().expect("unable to get write lock");
                     if let Some(avi_mut) = avi_write.as_mut() {
@@ -180,16 +181,14 @@ fn update_existing_avatar(
 ///
 /// * `Some(GameMap)` if configurations were successfully loaded and merged.
 /// * `None` if no configs were found or loaded.
-fn load_and_merge_configs(params: &DashMap<OscPath, OscInfo>) -> Option<GameMap> {
+fn load_and_merge_configs(params: &DashMap<OscPath, OscInfo>, api: Arc<Mutex<ApiManager>>) -> Option<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
-            match load_vrc_config(prefab.0, prefab.1, prefab.2, vec!["./map_configs/".into()]) {
+            let mut lock = api.lock().expect("Unable to obtain api lock");
+            match lock.load_map(prefab.0, prefab.1, prefab.2) {
                 Ok(map) => configs.push(map),
-                Err(err) => match err.kind() {
-                    ErrorKind::NotFound => {
-                        log::error!("Unable to load config: not found");
-                    }
+                Err(err) => match err {
                     other => {
                         log::error!("Error loading config: {:?}", other);
                     }
@@ -228,6 +227,7 @@ fn run_vrc_http_polling(
     params: &DashMap<OscPath, OscInfo>,
     avatar: Arc<RwLock<Option<Avatar>>>,
     vrc: Arc<Mutex<VrcInfo>>,
+    api: Arc<Mutex<ApiManager>>,
 ) {
     let url = format!("http://127.0.0.1:{}/", port);
     log::debug!("Started polling HTTP.");
@@ -239,7 +239,7 @@ fn run_vrc_http_polling(
                 update_params_from_text(&text, params);
 
                 // Check for updates if an avatar is already active.
-                update_existing_avatar(params, &avatar, &vrc);
+                update_existing_avatar(params, &avatar, &vrc, Arc::clone(&api));
 
                 // Initialize the avatar if it hasn't been set yet.
                 //initialize_avatar(params, &avatar);

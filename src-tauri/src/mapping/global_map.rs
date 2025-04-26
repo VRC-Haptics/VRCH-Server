@@ -18,7 +18,7 @@ pub struct StandardMenu {
 /// Provides implementations for interpolating input haptic intensities to device nodes
 pub struct GlobalMap {
     input_nodes: Arc<DashMap<Id, InputNode>>,
-    standard_menu: Arc<Mutex<StandardMenu>>,
+    pub standard_menu: Arc<Mutex<StandardMenu>>,
     refresh_callbacks:
         Vec<Box<dyn Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static>>,
 }

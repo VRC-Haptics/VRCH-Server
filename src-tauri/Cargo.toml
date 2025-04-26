@@ -43,7 +43,7 @@ dunce = "1.0.5"
 log = "0.4.27"
 runas = "1.2.0"
 windows = "0.61.1"
-tokio-rustls = "0.26.2"
+tokio-rustls = {version = "0.26", default-features = false, features = ["ring"] }
 tokio-websockets = {version = "0.11.3", features = ["native-tls", "server", "sha1_smol"] }
 futures-util = "0.3.31"
 rustls-pemfile = "2.2.0"

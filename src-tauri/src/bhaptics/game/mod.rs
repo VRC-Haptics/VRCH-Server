@@ -21,6 +21,7 @@ use tokio::sync::mpsc;
 use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_util::sync::CancellationToken;
 use tokio_websockets::Message;
+use tokio_rustls::rustls::crypto::CryptoProvider;
 
 const PATH_TO_CERT: &str = "security/localhost.crt";
 const PATH_TO_KEY: &str = "security/localhost.key";
