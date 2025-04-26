@@ -35,9 +35,7 @@ pub fn load_vrc_config(
         // Walk the directory recursively
         for entry in WalkDir::new(&dir).into_iter().filter_map(Result::ok) {
             // Check if the current entry is a file and if its name matches
-            if entry.file_type().is_file() &&
-               entry.file_name().to_string_lossy() == file_name
-            {
+            if entry.file_type().is_file() && entry.file_name().to_string_lossy() == file_name {
                 // Read the file to a string
                 let content = fs::read_to_string(entry.path())?;
                 // Deserialize JSON content into GameMap
@@ -63,7 +61,7 @@ pub struct GameMap {
 }
 
 /// Haptic Node information from the game config
-/// Contains more information than the default HapticNode to help with locating 
+/// Contains more information than the default HapticNode to help with locating
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct ConfNode {
     pub node_data: HapticNode,
@@ -310,7 +308,6 @@ pub enum TargetBone {
     /// </summary>
     LastBone,
 }
-
 
 impl TargetBone {
     pub fn to_str(&self) -> &str {

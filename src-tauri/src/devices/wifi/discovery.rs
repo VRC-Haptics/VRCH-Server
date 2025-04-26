@@ -2,11 +2,10 @@ use if_addrs::get_if_addrs;
 use serde_json::Value;
 use std::io;
 use std::net::{Ipv4Addr, UdpSocket};
-use std::sync::{ atomic::AtomicBool, atomic::Ordering, Arc, Mutex};
+use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 use crate::devices::{Device, DeviceType, WifiDevice};
-
 
 /// Listen for wifi based device advertisements
 pub fn start_wifi_listener(
@@ -24,10 +23,7 @@ pub fn start_wifi_listener(
         let socket = UdpSocket::bind("0.0.0.0:8888").unwrap();
         let multicast_addr = Ipv4Addr::new(239, 0, 0, 1);
         multicast_all_interfaces(&socket, &multicast_addr).ok();
-        log::trace!(
-            "Listening for Devices on {}:8888",
-            multicast_addr
-        );
+        log::trace!("Listening for Devices on {}:8888", multicast_addr);
 
         // Buffer to store incoming data.
         let mut buf = [0u8; 1024];
@@ -109,7 +105,8 @@ fn multicast_all_interfaces(socket: &UdpSocket, multicast_addr: &Ipv4Addr) -> io
                 if let Err(e) = socket.join_multicast_v4(multicast_addr, &v4_addr.ip) {
                     log::error!(
                         "Failed to join multicast on interface {}: {}",
-                        v4_addr.ip, e
+                        v4_addr.ip,
+                        e
                     );
                 }
             }

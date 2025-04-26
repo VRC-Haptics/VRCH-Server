@@ -19,7 +19,8 @@ pub struct StandardMenu {
 pub struct GlobalMap {
     input_nodes: Arc<DashMap<Id, InputNode>>,
     standard_menu: Arc<Mutex<StandardMenu>>,
-    refresh_callbacks: Vec<Box<dyn Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static>>,
+    refresh_callbacks:
+        Vec<Box<dyn Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static>>,
 }
 
 impl GlobalMap {
@@ -38,7 +39,7 @@ impl GlobalMap {
     pub fn register_refresh<F>(&mut self, fun: F)
     where
         F: Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static,
-    {        
+    {
         self.refresh_callbacks.push(Box::new(fun));
     }
 

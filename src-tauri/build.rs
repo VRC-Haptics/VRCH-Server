@@ -54,24 +54,27 @@ fn main() {
             "publish",
             "../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj",
             "-c",
-            "Release",              // Configuration: Release mode
+            "Release", // Configuration: Release mode
             "--self-contained=true",
             "-p:PublishSingleFile=true",
             "-p:PublishTrimmed=true", // Optional: trims unused code, reducing the binary size.
             "-o",
-            output_folder,          // Output directory for the published files
+            output_folder, // Output directory for the published files
         ])
-        .output()  // Capture the output rather than just the status.
+        .output() // Capture the output rather than just the status.
         .expect("Failed to execute dotnet publish.");
 
     if !output.status.success() {
         // Convert stdout from bytes to a string and print.
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        p!("dotnet publish failed with output:\n{} ERR:{}", stdout, stderr);
+        p!(
+            "dotnet publish failed with output:\n{} ERR:{}",
+            stdout,
+            stderr
+        );
         panic!("Sidecar build failed!");
     }
-
 
     // Copy Sidecar to sidecars directory of main app
     let source = Path::new("../src-proxy/target/release/BhapticsPlayer.exe");

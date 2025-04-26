@@ -4,12 +4,12 @@
 
 // make local modules available
 mod bhaptics;
+mod commands;
 mod devices;
 pub mod mapping;
 pub mod osc;
 pub mod util;
 mod vrc;
-mod commands;
 
 // local modules
 use bhaptics::game::BhapticsGame;
@@ -27,8 +27,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
-use tauri_plugin_store::StoreExt;
 use tauri_plugin_log::{Target, TargetKind};
+use tauri_plugin_store::StoreExt;
 
 /// Helper to set persistant store values
 fn set_device_store_field<T: serde::Serialize>(
@@ -55,7 +55,7 @@ fn set_device_store_field<T: serde::Serialize>(
         }
 
         // Write back the updated device data.
-        store.set(mac, device_data);  
+        store.set(mac, device_data);
     } else {
         // create new device data instance.
         let mut device_data = json!({});
@@ -65,7 +65,7 @@ fn set_device_store_field<T: serde::Serialize>(
         map.insert(field.to_string(), serde_json::to_value(value).unwrap());
 
         // Write back the updated device data.
-        store.set(mac, device_data);  
+        store.set(mac, device_data);
     };
 }
 
@@ -86,13 +86,13 @@ fn get_device_store_field<T: serde::de::DeserializeOwned>(
             .and_then(|value| serde_json::from_value(value.clone()).ok())
     } else {
         None
-    }  
+    }
 }
 
 fn tick_devices(
-    device_list: Arc<Mutex<Vec<Device>>>, 
-    input_list: Arc<Mutex<GlobalMap>>, 
-    app: &tauri::AppHandle
+    device_list: Arc<Mutex<Vec<Device>>>,
+    input_list: Arc<Mutex<GlobalMap>>,
+    app: &tauri::AppHandle,
 ) {
     log::info!("starting tick");
     io::stdout().flush().unwrap();
@@ -106,7 +106,6 @@ fn tick_devices(
             timer.tick().await;
             {
                 // call update up here (does it matter? timing wise)
-                
 
                 let mut device_list_guard = device_list.lock().unwrap();
 
@@ -161,7 +160,7 @@ fn close_app(window: &Window) {
     //cleanup vrc TODO:
 }
 
-/// Opens a window if we can't use the default VRC ports. 
+/// Opens a window if we can't use the default VRC ports.
 /// Using OSCQuery results in inconsistent delivery of packets.
 fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
     let vrc_lock = vrc.lock().unwrap();
@@ -184,16 +183,17 @@ fn main() {
     // Core state machines that interface devices and the haptics providers
     // The GlobalMap; provides interpolated feedback values.
     let input_list: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
-    // Global device list; contains all active devices. 
-    let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); 
+    // Global device list; contains all active devices.
+    let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new()));
 
     // Managers for game integrations; each handling connectivity and communications
     // Global VRC State; connection management and GlobalMap interaction
-    let vrc_info: Arc<Mutex<VrcInfo>> =  VrcInfo::new(Arc::clone(&input_list)); 
+    let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(Arc::clone(&input_list));
     // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
     let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new();
-                                                                        
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -203,10 +203,10 @@ fn main() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(Target::new(TargetKind::Webview))
-                .filter(|metadata| 
-                    !metadata.target().starts_with("mio") && 
-                    !metadata.target().starts_with("reqwest")
-                )
+                .filter(|metadata| {
+                    !metadata.target().starts_with("mio")
+                        && !metadata.target().starts_with("reqwest")
+                })
                 .max_file_size(200_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
                 .build(),
@@ -240,5 +240,5 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+        .expect("error while running tauri application");
 }

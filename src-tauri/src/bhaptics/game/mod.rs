@@ -1,26 +1,26 @@
-mod player_messages;
 /// A mess of serialization crap that sorta works to deserialize the weirdly formatted AuthenticationInit Message
 mod auth_message;
+mod player_messages;
 
 use auth_message::handle_auth_init;
 use serde;
 
 use std::{
-    thread,
     fs::File,
     io::{self, BufReader},
     net::SocketAddr,
     sync::{Arc, Mutex},
+    thread,
 };
 
 use futures_util::{SinkExt, StreamExt};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use tokio::sync::mpsc;
 use tokio::net::TcpListener;
+use tokio::sync::mpsc;
 use tokio_rustls::{rustls, TlsAcceptor};
-use tokio_websockets::Message;
 use tokio_util::sync::CancellationToken;
+use tokio_websockets::Message;
 
 const PATH_TO_CERT: &str = "security/localhost.crt";
 const PATH_TO_KEY: &str = "security/localhost.key";
@@ -76,12 +76,9 @@ impl BhapticsGame {
         let game_clone = Arc::clone(&game);
         // Spawn the server thread.
         thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new()
-                    .expect("Failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
             rt.block_on(async {
-                if let Err(e) =
-                    run_server(game_clone, shutdown_token.clone()).await
-                {
+                if let Err(e) = run_server(game_clone, shutdown_token.clone()).await {
                     log::error!("Server error: {:?}", e);
                 }
             });
@@ -100,8 +97,7 @@ impl BhapticsGame {
     /// If no connection is available, a warning is logged.
     pub fn send(&self, msg: Vec<SendMessage>) {
         if let Some(ref sender) = self.ws_sender {
-            let data = serde_json::to_string(&msg)
-                .expect("couldn't create json for sending");
+            let data = serde_json::to_string(&msg).expect("couldn't create json for sending");
             if let Err(e) = sender.send(Message::text(data)) {
                 log::error!("Failed to send message: {}", e);
             }
@@ -111,8 +107,7 @@ impl BhapticsGame {
     }
 }
 
-
-/// Runs the server by setting up TLS, binding the TCP listener, and 
+/// Runs the server by setting up TLS, binding the TCP listener, and
 /// handling incoming connections with cancellation support.
 async fn run_server(
     game: Arc<Mutex<BhapticsGame>>,
@@ -149,7 +144,7 @@ async fn run_server(
                         let game_clone = Arc::clone(&game);
                         tokio::spawn(async move {
                             if let Err(e) = handle_connection(
-                                stream, 
+                                stream,
                                 acceptor_clone,
                                 game_clone
                             ).await {
@@ -176,15 +171,13 @@ async fn handle_connection(
     game: Arc<Mutex<BhapticsGame>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let stream = acceptor.accept(stream).await?;
-    let (_request, ws_stream) =
-        tokio_websockets::ServerBuilder::new()
-            .accept(stream)
-            .await?;
+    let (_request, ws_stream) = tokio_websockets::ServerBuilder::new()
+        .accept(stream)
+        .await?;
     log::info!("New WebSocket connection established");
 
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-    let (tx, mut rx) =
-        mpsc::unbounded_channel::<tokio_websockets::Message>();
+    let (tx, mut rx) = mpsc::unbounded_channel::<tokio_websockets::Message>();
 
     // Store the sender in the shared game state.
     {
@@ -226,25 +219,21 @@ async fn handle_connection(
 /// Handles decoding message strings into their respective structs.
 fn msg_received(msg: Message, game: Arc<Mutex<BhapticsGame>>) {
     // Convert the message into a String.
-    let raw_text = msg.as_text()
-        .expect("Failed to convert message to text");
-    let decoded: RecievedMessage = serde_json::from_str(&raw_text)
-        .expect("couldn't decode incoming packet");
+    let raw_text = msg.as_text().expect("Failed to convert message to text");
+    let decoded: RecievedMessage =
+        serde_json::from_str(&raw_text).expect("couldn't decode incoming packet");
 
     //  Need to handle errors here
     match decoded {
-        RecievedMessage::SdkRequestAuthInit(contents) => 
-            handle_auth_init(&contents, game),
-        RecievedMessage::SdkPlay(event) => 
-            handle_sdk_play(&event, &game),
-        RecievedMessage::SdkStopAll => 
-            log::error!("SdkStopAll not impelemented"),
+        RecievedMessage::SdkRequestAuthInit(contents) => handle_auth_init(&contents, game),
+        RecievedMessage::SdkPlay(event) => handle_sdk_play(&event, &game),
+        RecievedMessage::SdkStopAll => log::error!("SdkStopAll not impelemented"),
     }
 }
 
 fn handle_sdk_play(input: &str, _game: &Arc<Mutex<BhapticsGame>>) {
-    let content: SdkPlayMessage = serde_json::from_str(input)
-        .expect("Couldn't decode play request");
+    let content: SdkPlayMessage =
+        serde_json::from_str(input).expect("Couldn't decode play request");
     log::debug!("Play Event: {:?}", content);
 }
 
@@ -275,7 +264,7 @@ enum RecievedMessage {
 pub enum SendMessage {
     ServerReady,
     ServerEventNameList(Vec<String>),
-    ServerEventList(Vec<ServerEvent>)
+    ServerEventList(Vec<ServerEvent>),
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

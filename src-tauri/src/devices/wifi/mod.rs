@@ -77,7 +77,6 @@ impl WifiDevice {
 
         // check if we filled out the wifiConfig yet
         if let Some(conf) = self.connection_manager.config.write().unwrap().as_ref() {
-
             //push config to device if necessary
             if self.push_map {
                 self.push_map = false;
@@ -86,7 +85,8 @@ impl WifiDevice {
             }
 
             // Collect haptic values and scale to output.
-            let mut intensities = inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
+            let mut intensities =
+                inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
             intensities.iter_mut().for_each(|x| *x *= factors.sens_mult);
             return Some(self.compile_message(&intensities));
         } else {

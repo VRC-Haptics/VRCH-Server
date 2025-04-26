@@ -1,11 +1,11 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
-use super::{Avatar, OscPath, PREFAB_PREFIX, GameMap};
+use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
 use crate::vrc::config::load_vrc_config;
 use crate::vrc::AVATAR_ID_PATH;
 use crate::VrcInfo;
 
 use std::io::{BufRead, BufReader, ErrorKind};
-use std::process::{Command, Stdio, id};
+use std::process::{id, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -82,10 +82,7 @@ fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
 ///
 /// * `text` - The HTTP response text to parse.
 /// * `params` - The DashMap containing OSC parameter information.
-fn update_params_from_text(
-    text: &str,
-    params: &DashMap<OscPath, OscInfo>,
-) {
+fn update_params_from_text(text: &str, params: &DashMap<OscPath, OscInfo>) {
     let node_info = parse_incoming(text);
     for node in node_info {
         let path = remove_version(&node.full_path.0);
@@ -129,7 +126,7 @@ fn update_existing_avatar(
         if let Some(new_values) = &new_contents.value {
             // Unwrap the new id from the OSC data.
             let new_id = new_values.first().unwrap().clone().string().unwrap();
-            
+
             // Compare the new id with the current avatar's id.
             if current_id.as_deref() != Some(&new_id) {
                 log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
@@ -145,10 +142,10 @@ fn update_existing_avatar(
                         avi_mut.conf = Some(new_config.clone());
                         avi_mut.prefab_name = Some(new_config.meta.map_name.clone());
                     } else {
-                        let new_avi = Avatar{
+                        let new_avi = Avatar {
                             id: new_id,
                             conf: Some(new_config.clone()),
-                            prefab_name: Some(new_config.meta.map_name.clone())
+                            prefab_name: Some(new_config.meta.map_name.clone()),
                         };
                         *avi_write = Some(new_avi);
                     };
@@ -157,7 +154,7 @@ fn update_existing_avatar(
                     // we don't have enough information to do haptics.
                     // put shell avatar together.
                     let mut avi_write = avatar.write().expect("unable to get write lock");
-                    let new_avi = Avatar{
+                    let new_avi = Avatar {
                         id: new_id,
                         conf: None,
                         prefab_name: None,
@@ -183,18 +180,11 @@ fn update_existing_avatar(
 ///
 /// * `Some(GameMap)` if configurations were successfully loaded and merged.
 /// * `None` if no configs were found or loaded.
-fn load_and_merge_configs(
-    params: &DashMap<OscPath, OscInfo>,
-) -> Option<GameMap> {
+fn load_and_merge_configs(params: &DashMap<OscPath, OscInfo>) -> Option<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
-            match load_vrc_config(
-                prefab.0,
-                prefab.1,
-                prefab.2,
-                vec!["./map_configs/".into()],
-            ) {
+            match load_vrc_config(prefab.0, prefab.1, prefab.2, vec!["./map_configs/".into()]) {
                 Ok(map) => configs.push(map),
                 Err(err) => match err.kind() {
                     ErrorKind::NotFound => {
@@ -286,16 +276,17 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
                 let name = parts[1].to_string();
                 let author = parts[0].to_string();
 
-                let num_str = parts[2]
-                    .strip_prefix('v').expect("no v in version entry.");
+                let num_str = parts[2].strip_prefix('v').expect("no v in version entry.");
 
                 // parse the remainder as an i32
-                let version = num_str.parse::<u32>().expect(&format!("Could not parse verison number: {:?}", key_str));
+                let version = num_str
+                    .parse::<u32>()
+                    .expect(&format!("Could not parse verison number: {:?}", key_str));
 
                 // sometimes I hate this language
                 log::info!("Avatar has prefab: {:?}", (&author, &name, &version));
                 results.push((author, name, version));
-            }// could be malformed, but probably just partial path.
+            } // could be malformed, but probably just partial path.
         }
     }
 

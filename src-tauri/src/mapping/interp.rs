@@ -1,7 +1,4 @@
-use super::{
-    haptic_node::HapticNode, 
-    input_node::InputNode
-};
+use super::{haptic_node::HapticNode, input_node::InputNode};
 
 pub trait Interpolate {
     fn interp(&self, node: &Vec<HapticNode>, in_nodes: Vec<&InputNode>) -> Vec<f32>;
@@ -10,16 +7,16 @@ pub trait Interpolate {
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(tag = "algo", content = "state")]
 /// Interpolation Algorithm Options.
-/// 
-/// Each entry implements the mapping::Interpolate trait and provides a self-contained 
+///
+/// Each entry implements the mapping::Interpolate trait and provides a self-contained
 /// method for interpolation
 pub enum InterpAlgo {
-    Gaussian(GaussianState)
+    Gaussian(GaussianState),
 }
 
 impl Interpolate for InterpAlgo {
     /// node: the haptic node (output position) that will be used to determine the feedback value
-    /// 
+    ///
     /// in_nodes: The haptic Nodes that will be used to calculate the output value
     fn interp(&self, node: &Vec<HapticNode>, in_nodes: Vec<&InputNode>) -> Vec<f32> {
         match self {
@@ -31,7 +28,7 @@ impl Interpolate for InterpAlgo {
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 /// A container class holding variables required for gaussian distribution calculations
-/// 
+///
 /// Provides `Interpolate` Implementation  
 pub struct GaussianState {
     sigma: f32,
@@ -43,7 +40,7 @@ impl GaussianState {
     /// Creates a new Gaussian interpolation instance
     /// Initializes parameters
     pub fn new(merge: f32, falloff: f32, cutoff: f32) -> GaussianState {
-        let mut  g = GaussianState {
+        let mut g = GaussianState {
             sigma: 0.0,
             cutoff: cutoff,
             merge: merge,
@@ -85,7 +82,9 @@ impl GaussianState {
             if result > 1.0 {
                 log::error!(
                     "Strength greater than one on device node: x:{} y:{} z:{}",
-                    node.x, node.y, node.z
+                    node.x,
+                    node.y,
+                    node.z
                 );
                 return 1.0;
             } else {
@@ -101,7 +100,7 @@ impl Interpolate for GaussianState {
     /// Takes in the list of output nodes on a device, and the input nodes that should influence it.
     fn interp(&self, node_list: &Vec<HapticNode>, in_nodes: Vec<&InputNode>) -> Vec<f32> {
         let mut out_list: Vec<f32> = vec![0.0; node_list.len()];
-        
+
         // calimed inputs share an index for the referenced claimed value
         // (node, index in respective input list)
         let mut claimed_inputs: Vec<(&InputNode, usize)> = vec![];
@@ -126,9 +125,9 @@ impl Interpolate for GaussianState {
         {
             out_list[*out_idx] = input.get_intensity()
         }
-        
+
         // need to setup these...
-        // all nodes that haven't been claimed 
+        // all nodes that haven't been claimed
         let unique_inputs: Vec<&InputNode> = in_nodes
             .iter()
             .enumerate()
@@ -139,7 +138,7 @@ impl Interpolate for GaussianState {
                     None
                 }
             })
-        .collect();
+            .collect();
 
         let unique_outputs: Vec<(&HapticNode, usize)> = node_list
             .iter()
@@ -151,8 +150,7 @@ impl Interpolate for GaussianState {
                     None
                 }
             })
-        .collect();
-
+            .collect();
 
         // fill in the rest of the out_list (all indices should be convered at some point.)
         for (output, main_index) in unique_outputs.iter() {

@@ -45,7 +45,7 @@ impl Device {
     /// Consumes wifi_device and creates a generic Device (with the wifiDevice as a child)
     pub fn from_wifi(wifi_device: WifiDevice, app_handle: &AppHandle) -> Device {
         let init_interp = GaussianState::new(0.002, 0.1, 0.1);
-        
+
         let mut new_device = Device {
             id: wifi_device.mac.clone(),
             name: wifi_device.name.clone(),
@@ -54,7 +54,7 @@ impl Device {
             factors: OutputFactors {
                 sens_mult: 1.0,
                 user_sense: 1.0,
-                interp_algo: InterpAlgo::Gaussian(init_interp)
+                interp_algo: InterpAlgo::Gaussian(init_interp),
             },
             device_type: DeviceType::Wifi(wifi_device),
         };

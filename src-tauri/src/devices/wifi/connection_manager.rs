@@ -56,7 +56,7 @@ impl WifiConnManager {
                         *conf = None;
                         log::trace!("Set to None");
                     }
-                    
+
                     match serde_json::from_str::<WifiConfig>(cmd_str) {
                         Ok(command) => {
                             //log::trace!("Set device config: {:?}", command);

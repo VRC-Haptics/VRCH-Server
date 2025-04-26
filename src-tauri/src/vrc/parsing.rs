@@ -1,10 +1,10 @@
 use super::OscPath;
 
-use std::vec;
-use std::collections::HashMap;
 use regex::Regex;
 use rosc::OscType;
 use serde_json::Value;
+use std::collections::HashMap;
+use std::vec;
 
 /// Removes the VRC Fury naming from the parameters
 pub fn remove_version(path: &str) -> String {
@@ -18,8 +18,7 @@ pub fn remove_version(path: &str) -> String {
 
 /// convenience function for parsing returned HTTP OSCQuery messages
 pub fn parse_incoming(input: &str) -> Vec<OscInfo> {
-    let recursive_nodes: OscQueryNode = serde_json::from_str(input)
-    .expect("couldn't parse json");
+    let recursive_nodes: OscQueryNode = serde_json::from_str(input).expect("couldn't parse json");
     return recursive_nodes.to_info();
 }
 
@@ -29,23 +28,23 @@ pub struct OscQueryNode {
     // REQUIRED: every node must have a FULL_PATH.
     #[serde(rename = "FULL_PATH")]
     full_path: String,
-    
+
     // OPTIONAL: ACCESS (if missing, we assume full read/write if a VALUE is supported)
     #[serde(rename = "ACCESS", default)]
     access: Option<u8>,
-    
+
     // OPTIONAL: human-readable description.
     #[serde(rename = "DESCRIPTION", default)]
     description: Option<String>,
-    
+
     // OPTIONAL: the OSC type tag string (present if this node is an OSC method).
     #[serde(rename = "TYPE", default)]
     osc_type: Option<String>,
-    
+
     // OPTIONAL: the value(s) associated with an OSC method.
     #[serde(rename = "VALUE", default)]
     value: Option<Vec<serde_json::Value>>,
-    
+
     // REQUIRED for containers: the sub-node hierarchy.
     // If omitted, the node should be considered an OSC method.
     #[serde(rename = "CONTENTS", default)]
@@ -55,7 +54,7 @@ pub struct OscQueryNode {
 impl OscQueryNode {
     /// Turns a tree of QueryNodes into a list of OscInfo
     pub fn to_info(&self) -> Vec<OscInfo> {
-        let mut fill:Vec<OscInfo>  = vec![];
+        let mut fill: Vec<OscInfo> = vec![];
 
         // if has children nodes
         if let Some(children) = &self.contents {
@@ -81,10 +80,10 @@ impl OscQueryNode {
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub enum OscAccessLevel {
-    Refused,    // 0 – no value associated
-    OnlyRead,   // 1 – value may only be retrieved
-    OnlyWrite,  // 2 – value may only be set
-    Full,       // 3 – value may be both retrieved and set
+    Refused,   // 0 – no value associated
+    OnlyRead,  // 1 – value may only be retrieved
+    OnlyWrite, // 2 – value may only be set
+    Full,      // 3 – value may be both retrieved and set
 }
 
 impl OscAccessLevel {
@@ -136,24 +135,24 @@ impl OscInfo {
                     // if more type tags then contents
                     if contents.len() <= i {
                         break;
-                    } 
+                    }
                     // if we don't have read access
                     if !access.is_readable() {
                         things.push(OscType::Nil);
                         break;
-                    }                        
+                    }
 
                     things.push(match_tag(tag, &contents[i]));
-                }   
+                }
                 things.reverse();
                 types = Some(things);
             }
         }
 
-        OscInfo { 
-            full_path: OscPath(node.full_path.clone()), 
-            access: access, 
-            value: types, 
+        OscInfo {
+            full_path: OscPath(node.full_path.clone()),
+            access: access,
+            value: types,
             description: node.description.clone(),
         }
     }
@@ -161,7 +160,7 @@ impl OscInfo {
 
 fn match_tag(tag: char, content: &Value) -> OscType {
     match tag {
-        's'|'S' => {
+        's' | 'S' => {
             if let Some(s) = content.as_str() {
                 OscType::String(s.to_string())
             } else if let Some(obj) = content.as_object() {
@@ -170,7 +169,7 @@ fn match_tag(tag: char, content: &Value) -> OscType {
                 log::error!("Couldn't coerce string: {:?}", content);
                 OscType::Nil
             }
-        },
+        }
         'i' => {
             if let Some(num) = content.as_i64() {
                 OscType::Int(num as i32)
@@ -180,9 +179,9 @@ fn match_tag(tag: char, content: &Value) -> OscType {
                 log::error!("Couldn't coerce integer: {:?}", content);
                 OscType::Nil
             }
-        },
+        }
         'f' => {
-            if let Some(num) = content.as_f64()  {
+            if let Some(num) = content.as_f64() {
                 OscType::Float(num as f32)
             } else if let Some(obj) = content.as_object() {
                 handle_obj(obj)
@@ -190,7 +189,7 @@ fn match_tag(tag: char, content: &Value) -> OscType {
                 log::error!("Couldn't coerce float: {:?}", content);
                 OscType::Nil
             }
-        },
+        }
         'T' => OscType::Bool(true),
         'F' => OscType::Bool(false),
         'I' => OscType::Inf,
@@ -198,7 +197,7 @@ fn match_tag(tag: char, content: &Value) -> OscType {
         't' => {
             log::error!("time tag types are unsupported");
             OscType::Nil
-        },
+        }
         tag => {
             log::error!("Unsupported OSC Type tag: {}", tag);
             log::error!("Contents: {:?}", content);
@@ -208,7 +207,8 @@ fn match_tag(tag: char, content: &Value) -> OscType {
 }
 
 fn handle_obj(obj: &serde_json::Map<String, Value>) -> OscType {
-    if obj.is_empty() { // if empty object we can safely skip it
+    if obj.is_empty() {
+        // if empty object we can safely skip it
         OscType::Nil
     } else {
         log::error!("Found object that was not empty");

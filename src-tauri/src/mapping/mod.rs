@@ -1,6 +1,6 @@
+pub mod global_map;
 pub mod haptic_node;
 pub mod input_node;
-pub mod global_map;
 pub mod interp;
 use global_map::GlobalMap;
 use haptic_node::HapticNode;

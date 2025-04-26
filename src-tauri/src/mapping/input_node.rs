@@ -16,21 +16,21 @@ pub struct InputNode {
 
 impl InputNode {
     /// Factory for creating InputNode's
-    /// 
+    ///
     /// id: Unique id
-    /// 
+    ///
     /// node: Fully generated HapticNode in standard space
-    /// 
+    ///
     /// tags: Use these to find groups of InputNodes
-    /// 
+    ///
     /// **NOTE:** Initializes intensity to 0.0, set the intensity using class functions
     pub fn new(node: HapticNode, tags: Vec<String>, id: Id) -> InputNode {
         return InputNode {
             id: id,
             haptic_node: node,
             intensity: 0.0,
-            tags: tags
-        }
+            tags: tags,
+        };
     }
 
     /// sets the intensity of this node

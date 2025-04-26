@@ -1,18 +1,18 @@
+pub mod config;
 pub mod discovery;
 pub mod parsing;
-pub mod config;
 
 // crate dependencies
+use crate::mapping::{global_map::StandardMenu, input_node::InputNode, Id};
 use crate::osc::server::OscServer;
-use crate::GlobalMap;
 use crate::vrc::parsing::OscInfo;
-use crate::mapping::{input_node::InputNode, Id, global_map::StandardMenu};
+use crate::GlobalMap;
 // module dependencies
-use parsing::remove_version;
 use config::GameMap;
-use discovery::{OscQueryServer, start_filling_available_parameters};
-use rosc::{OscType, OscMessage};
 use dashmap::DashMap;
+use discovery::{start_filling_available_parameters, OscQueryServer};
+use parsing::remove_version;
+use rosc::{OscMessage, OscType};
 // std imports
 use std::{
     net::Ipv4Addr,
@@ -37,7 +37,7 @@ pub struct VrcInfo {
     /// Holds data from http server about the given avatar
     pub avatar: Arc<RwLock<Option<Avatar>>>,
     /// Parameters VRC advertises as available, is empty if not resolved yet
-    /// 
+    ///
     /// NOTE: The values actual values contained in this struct are out of date by ~2S.
     pub available_parameters: Arc<DashMap<OscPath, OscInfo>>,
     /// Buffer that is filled with values collected from the OSC stream.
@@ -45,18 +45,24 @@ pub struct VrcInfo {
     pub parameter_cache: Arc<DashMap<OscPath, OscType>>,
     /// The OSC server we recieve updates from
     #[serde(skip)]
-    #[allow(dead_code, reason = "Keeps The threads in scope, and might be needed later")]
+    #[allow(
+        dead_code,
+        reason = "Keeps The threads in scope, and might be needed later"
+    )]
     osc_server: Option<OscServer>,
-    /// Spawns our own OSCQuery advertising 
+    /// Spawns our own OSCQuery advertising
     #[allow(dead_code)]
-    #[allow(dead_code, reason = "Keeps The threads in scope, and might be needed later")]
+    #[allow(
+        dead_code,
+        reason = "Keeps The threads in scope, and might be needed later"
+    )]
     query_server: Option<OscQueryServer>,
 }
 
 impl VrcInfo {
     pub fn new(global_map: Arc<Mutex<GlobalMap>>) -> Arc<Mutex<VrcInfo>> {
-        let avi:Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
-        
+        let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
+
         // Instantiate
         let vrc = VrcInfo {
             vrc_connected: false,
@@ -69,7 +75,7 @@ impl VrcInfo {
             parameter_cache: Arc::new(DashMap::new()),
         };
         let vrc = Arc::new(Mutex::new(vrc));
-        
+
         // Start the thread that handles finding available vrc parameters
         start_filling_available_parameters(Arc::clone(&vrc));
 
@@ -80,7 +86,7 @@ impl VrcInfo {
         let on_receive = move |msg: OscMessage| {
             // remove VRC Fury tagging if needed
             let addr = remove_version(&msg.addr);
-            
+
             // if there is a value push it to our cache.
             if let Some(arg) = msg.args.first() {
                 cached_parameters_rcve.insert(OscPath(addr), arg.to_owned());
@@ -107,7 +113,7 @@ impl VrcInfo {
         // the callback called when each device tick starts
         let avi_refresh = Arc::clone(&avi);
         let params_refresh = Arc::clone(&vrc_lock.parameter_cache);
-        let on_refresh = move |inputs: &DashMap<Id, InputNode>, menu: &Mutex<StandardMenu> | {          
+        let on_refresh = move |inputs: &DashMap<Id, InputNode>, menu: &Mutex<StandardMenu>| {
             // If we have an avi in use, and haptics are on the avatar we can use haptics
             let avi_option = avi_refresh.read().expect("Unable to lock avi");
             if let Some(avi_read) = &*avi_option {
@@ -118,11 +124,11 @@ impl VrcInfo {
                             //create node basic's
                             let position = &node.node_data;
                             let mut in_node = InputNode::new(
-                                position.to_owned(), 
+                                position.to_owned(),
                                 vec![node.target_bone.to_str().to_string()],
-                                Id(node.address.clone())
+                                Id(node.address.clone()),
                             );
-                            
+
                             // insert the value into our hashmap
                             if let Some(intensity) = value.clone().float() {
                                 in_node.set_intensity(intensity);
@@ -130,13 +136,15 @@ impl VrcInfo {
                                 log::error!("Couldn't find f32 value for: {:?}", position);
                                 in_node.set_intensity(0.0);
                             }
-                            
+
                             inputs.insert(Id(node.address.clone()), in_node);
                         }
                     }
                     // upate menu items if we have something to dupate them with
                     let mut menu_l = menu.lock().expect("couldn't lock the menu");
-                    if let Some(intensity) = params_refresh.get(&OscPath(GLOBALS_PREFIX.to_owned() + "intensity") ) {
+                    if let Some(intensity) =
+                        params_refresh.get(&OscPath(GLOBALS_PREFIX.to_owned() + "intensity"))
+                    {
                         let intensity = intensity.value().clone();
                         let intensity = intensity.float().unwrap();
                         if intensity > 0.001 {
@@ -147,8 +155,7 @@ impl VrcInfo {
                             menu_l.enable = false;
                         }
                     }
-                
-                }   
+                }
             }
         };
 
