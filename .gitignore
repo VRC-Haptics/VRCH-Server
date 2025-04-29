@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+src-tauri/sidecars/elevated-register.exe
+src-tauri/sidecars/listen-for-vrc.exe
+src-tauri/sidecars/listen-for-vrc.pdb
+src-tauri/sidecars/bHapticsPlayer/BhapticsPlayer.exe
