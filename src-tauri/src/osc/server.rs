@@ -6,6 +6,8 @@ use std::thread;
 use rosc::{OscMessage, OscPacket};
 use tokio::sync::mpsc;
 
+use crate::util::next_free_port_with_address;
+
 #[derive(serde::Serialize, Clone)]
 pub struct OscServer {
     pub port: u16,
@@ -30,6 +32,7 @@ impl fmt::Debug for OscServer {
 
 impl OscServer {
     /// create new Osc Server, it will need to be started with the start() command
+    /// THE ADDRESS IS USUALLY JUST "0.0.0.0". THIS IS THE ADDRESS WE OWN.
     pub fn new<F>(port: u16, address: Ipv4Addr, on_receive: F) -> Self
     where
         F: Fn(OscMessage) + Send + Sync + 'static,
@@ -44,9 +47,24 @@ impl OscServer {
     }
 
     /// Starts a server listening in a new thread.
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> u16 {
+        let mut used_port = self.port;
         let addr = format!("{}:{}", self.address, self.port);
-        let socket = UdpSocket::bind(addr).expect("Couldn't bind to address");
+        let socket = match UdpSocket::bind(&addr) {
+            Ok(s) => s,
+            Err(_) => {
+                // The desired port is not available. Look for a fallback.
+                if let Some(free_port) =
+                    next_free_port_with_address(self.port, std::net::IpAddr::V4(self.address))
+                {
+                    used_port = free_port;
+                    let addr = format!("{}:{}", self.address, free_port);
+                    UdpSocket::bind(&addr).unwrap() //assume we will be able to bind to thisone
+                } else {
+                    panic!("Couldn't find free port");
+                }
+            }
+        };
 
         let on_receive = Arc::clone(&self.on_receive);
         let filter_prefix = self.filter_prefix.clone();
@@ -55,13 +73,16 @@ impl OscServer {
         self.close_handle = Some(tx);
 
         thread::spawn(move || {
-            //println!("Spawned UDP OSC Server on: {}", socket.local_addr().unwrap());
+            log::trace!(
+                "Spawned UDP OSC Server on: {}",
+                socket.local_addr().unwrap()
+            );
 
             let mut buf = [0u8; rosc::decoder::MTU];
             loop {
                 // Check for stop signal
                 if let Ok(_) = rx.try_recv() {
-                    println!("Stopping server thread.");
+                    log::info!("Stopping server thread.");
                     break;
                 }
 
@@ -69,7 +90,7 @@ impl OscServer {
                     Ok((size, _src)) => {
                         if let Ok((left_over, packet)) = rosc::decoder::decode_udp(&buf[..size]) {
                             if !left_over.is_empty() {
-                                println!(
+                                log::trace!(
                                     "leftover bytes: {} on socket: {}",
                                     String::from_utf8_lossy(left_over),
                                     socket.local_addr().unwrap().to_string()
@@ -79,11 +100,12 @@ impl OscServer {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error receiving packet: {:?}", e);
+                        log::error!("Error receiving packet: {:?}", e);
                     }
                 }
             }
         });
+        return used_port;
     }
 
     //kills the server thread.

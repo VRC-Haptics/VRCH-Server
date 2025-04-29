@@ -22,11 +22,11 @@ interface Group {
 // Component for individual settings item
 const SettingsItem: React.FC<Setting> = ({ title, help, type, getFunction, setFunction, options }) => {
   return (
-    <div title= {help} className="flex flex-col p-2">
+    <div title= {help} className="flex flex-col p-2 bg-base-200 rounded-md">
       <h3 className="font-semibold text-lg">{title}</h3>
       <h6 className="text-info text-sm p-1">{help}</h6>
 
-      <div className="max-h-min rounded-md bg-base-200 p-1">
+      <div className="max-h-min rounded-md p-1">
         {type === 'toggle' ? (
           <div className="form-control left">
             <label className="label cursor-pointer">

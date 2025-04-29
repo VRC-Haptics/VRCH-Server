@@ -1,85 +1,104 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(non_camel_case_types)]
+#![warn(unused_extern_crates)]
 
 // make local modules available
-mod haptic;
+mod bhaptics;
+mod commands;
+mod devices;
+pub mod mapping;
 pub mod osc;
 pub mod util;
+pub mod api;
 mod vrc;
 
-//use local modules
-use haptic::{mdns::start_device_listener, AddressGroup, Device};
-use vrc::{discovery::get_vrc, VrcInfo};
+// local modules
+use bhaptics::game::BhapticsGame;
+use devices::wifi::discovery::start_wifi_listener;
+use devices::{Device, DeviceType};
+use mapping::global_map::GlobalMap;
+use vrc::VrcInfo;
+use api::ApiManager;
 
 //standard imports
-use serde_json::{from_value, json};
+use commands::*;
+use serde_json::json;
+use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Manager, Window, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, Window, WindowEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
 
-use std::io::{self, Write};
-
-#[tauri::command]
-fn get_device_list(state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Vec<Device> {
-    let devices = state.lock().unwrap();
-    devices.clone()
-}
-
-#[tauri::command]
-fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
-    let vrc_info = state.lock().unwrap();
-    vrc_info.clone()
-}
-
-#[tauri::command]
-async fn update_device_groups(
-    window: tauri::Window,
-    mac: String,
-    groups: Vec<AddressGroup>,
-    devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-) -> Result<(), ()> {
+/// Helper to set persistant store values
+fn set_device_store_field<T: serde::Serialize>(
+    window: &tauri::Window,
+    mac: &str,
+    field: &str,
+    value: T,
+) {
     let app_handle = window.app_handle();
     let store = app_handle
         .store("known_devices.json")
         .expect("couldn't access known_devices.json");
 
-    let mut devices = devices_mutex.lock().unwrap();
-    if let Some(existing) = devices.iter_mut().find(|d| d.mac == mac) {
-        existing.addr_groups = groups.clone();
-        store.set(mac, json!(groups));
-        println!("updated groups to: {:?}", groups);
-        existing.purge_cache();
-    }
-    Ok(())
-}
+    // Try to retrieve the existing device data.
+    if let Some(mut device_data) = store.get(mac) {
+        // Ensure we have a JSON object.
+        if !device_data.is_object() {
+            device_data = json!({});
+        }
 
-fn recall_device_group(handle: &AppHandle, mac: &String) -> Option<Vec<AddressGroup>> {
-    let store = handle.store("known_devices.json").unwrap();
-    if let Some(old_groups) = store.get(mac) {
-        return Some(from_value(old_groups).unwrap());
+        // Insert or update the field.
+        if let Some(map) = device_data.as_object_mut() {
+            map.insert(field.to_string(), serde_json::to_value(value).unwrap());
+        }
+
+        // Write back the updated device data.
+        store.set(mac, device_data);
     } else {
-        return None;
+        // create new device data instance.
+        let mut device_data = json!({});
+
+        // Insert the field.
+        let map = device_data.as_object_mut().unwrap();
+        map.insert(field.to_string(), serde_json::to_value(value).unwrap());
+
+        // Write back the updated device data.
+        store.set(mac, device_data);
+    };
+}
+
+/// Helper to get persistant store values
+fn get_device_store_field<T: serde::de::DeserializeOwned>(
+    app_handle: &tauri::AppHandle,
+    mac: &str,
+    field: &str,
+) -> Option<T> {
+    let store = app_handle
+        .store("known_devices.json")
+        .expect("couldn't access known_devices.json");
+
+    if let Some(device_data) = store.get(mac) {
+        let map = device_data.as_object()?;
+
+        map.get(field)
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+    } else {
+        None
     }
 }
 
-#[tauri::command]
-async fn invalidate_cache(
-    devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-) -> Result<(), ()> {
-    let mut devices = devices_mutex.lock().unwrap();
-    let iterator = devices.iter_mut();
-    for device in iterator {
-        device.purge_cache();
-    }
-    Ok(())
-}
-
-fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device>>>) {
-    println!("starting tick");
+fn tick_devices(
+    device_list: Arc<Mutex<Vec<Device>>>,
+    input_list: Arc<Mutex<GlobalMap>>,
+    app: &tauri::AppHandle,
+) {
+    log::info!("starting tick");
     io::stdout().flush().unwrap();
+    let app_handle = app.clone();
 
     tauri::async_runtime::spawn(async move {
         let mut timer = tokio::time::interval(Duration::from_millis(10)); // 100 Hz
@@ -88,24 +107,44 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
         loop {
             timer.tick().await;
             {
+                // call update up here (does it matter? timing wise)
+
                 let mut device_list_guard = device_list.lock().unwrap();
-                let vrc_info_guard = vrc_info.lock().expect("couldn't get mutable");
 
-                let addresses = vrc_info_guard.raw_parameters.as_ref();
-                let hashmap = addresses.read().expect("Poisoned OSC Hashmap");
-                let menu = vrc_info_guard.menu_parameters.as_ref();
-                let menu_parameters = menu.read().expect("couldnt get guard");
+                // Remove devices that need to be killed.
+                // Collect removed devices (dead devices).
+                let removed_devices: Vec<Device> = device_list_guard
+                    .iter()
+                    .filter(|device| !device.is_alive)
+                    .cloned()
+                    .collect();
 
+                // Print the removed devices.
+                for device in &removed_devices {
+                    log::info!("Removed device: {:?}", device.name);
+                    // NOTE: ALWAYS EMIT DEVICE-REMOVED or added, otherwise many issues.....
+                    app_handle.emit("device-removed", device).unwrap();
+                }
+
+                // Remove dead devices
+                device_list_guard.retain(|device| device.is_alive);
+
+                let mut inputs_guard = input_list.lock().expect("couldn't find inputs guard");
+                inputs_guard.refresh_inputs();
                 for device in device_list_guard.iter_mut() {
-                    if let Some(packet) = device.tick(
-                         &hashmap, 
-                         &menu_parameters,
-                        "/avatar/parameters/h".to_string()
-                    ) {
-                        if let Err(err) = device_socket
-                            .send_to(&packet.packet, format!("{}:{}", device.ip, device.port))
-                        {
-                            eprintln!("Failed to send to {}: {}", device.display_name, err);
+                    // handle device specific tick functions
+                    match &mut device.device_type {
+                        DeviceType::Wifi(wifi_device) => {
+                            // Send packet if we got one from tick
+                            if let Some(packet) = wifi_device.tick(
+                                &mut device.is_alive,
+                                &mut device.factors,
+                                &inputs_guard,
+                            ) {
+                                let addr = format!("{}:{}", wifi_device.ip, wifi_device.send_port);
+                                // TODO: Actually error handle
+                                let _ = device_socket.send_to(&packet.packet, addr);
+                            }
                         }
                     }
                 }
@@ -114,34 +153,97 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
     });
 }
 
-fn close_app(_: &Window) {
-    println!("TODO: Properly shut down")
+fn close_app(window: &Window) {
+    log::info!("Cleaning up and Shutting Down.");
+    let bhaptics = window.state::<Arc<Mutex<BhapticsGame>>>();
+    let bh_lock = bhaptics.lock().expect("unable to lock bhaptics");
+    bh_lock.shutdown();
+    log::trace!("Shutdown bhaptics server");
     //cleanup vrc TODO:
 }
 
-fn main() {
-    let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
-    let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
+/// Opens a window if we can't use the default VRC ports.
+/// Using OSCQuery results in inconsistent delivery of packets.
+fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
+    let vrc_lock = vrc.lock().unwrap();
+    if vrc_lock.in_port.unwrap() != 9001 {
+        app.dialog()
+            .message(format!(
+                "Default VRC ports busy, expect higher latency. Port: {}",
+                vrc_lock.in_port.unwrap()
+            ))
+            .kind(MessageDialogKind::Warning)
+            .title("Ports Unavailable")
+            .show(|result| match result {
+                true => (),
+                false => (),
+            });
+    }
+}
 
-    tick_devices(vrc_info.clone(), device_list.clone());
+fn main() {
+
+    //let _ = CryptoProvider::install_default();
+
+    // Core state machines that interface devices and the haptics providers
+    // The GlobalMap; provides interpolated feedback values.
+    let input_list: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
+    // Global device list; contains all active devices.
+    let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new()));
+    // Provides a unified interface for interacting with external api's 
+    let api_manager: Arc<Mutex<ApiManager>> = Arc::new(Mutex::new(ApiManager::new()));
+
+    // Managers for game integrations; each handling connectivity and communications
+    // Global VRC State; connection management and GlobalMap interaction
+    let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager));
+    // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
+    let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
-        .manage(device_list.clone())
-        .manage(vrc_info.clone())
-        .setup(|app| {
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(Target::new(TargetKind::Webview))
+                .filter(|metadata| {
+                    !metadata.target().starts_with("mio")
+                        && !metadata.target().starts_with("reqwest")
+                })
+                .max_file_size(200_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+                .build(),
+        )
+        .manage(Arc::clone(&input_list))
+        .manage(Arc::clone(&device_list))
+        .manage(Arc::clone(&vrc_info))
+        .manage(Arc::clone(&bhaptics))
+        .manage(Arc::clone(&api_manager))
+        .setup(move |app| {
             let app_handle = app.handle();
-            start_device_listener(app_handle.clone(), app.state(), 2);
+            // Initialize stuff that needs the app handle. (interacts directly with GUI)
+            tick_devices(device_list.clone(), input_list.clone(), app_handle);
+            start_wifi_listener(app_handle.clone(), app.state());
+            throw_vrc_notif(app_handle, vrc_info.clone());
+            let mut lock = api_manager.lock().unwrap();
+            lock.refresh_caches();
+            drop(lock);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_device_list,
-            get_vrc_info,
-            invalidate_cache,
-            update_device_groups
+            commands::get_device_list,
+            commands::get_vrc_info,
+            commands::upload_device_map,
+            commands::set_address,
+            commands::update_device_multiplier,
+            bhaptics_launch_default,
+            bhaptics_launch_vrch,
+            commands::play_point,
+            commands::swap_conf_nodes,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {

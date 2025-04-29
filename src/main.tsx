@@ -8,7 +8,7 @@ import Settings from "./routes/settings";
 import { TauriProvider } from "./context/TauriProvider";
 import "./styles.css";
 import { SettingsProvider } from "./context/SettingsProvider";
-import AppConnections from "./routes/connections";
+import GameSettings from "./routes/game_settings/game_settings";
 
 const router = createBrowserRouter([
   {
@@ -25,8 +25,8 @@ const router = createBrowserRouter([
         element: <Settings />,
       },
       {
-        path: "/connections",
-        element: <AppConnections />,
+        path: "/game_settings",
+        element: <GameSettings />,
       },
     ],
   },

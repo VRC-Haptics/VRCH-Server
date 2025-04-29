@@ -15,7 +15,7 @@ export default function ConnectedDevices({
   return (
     <div
       id="ConnectedDevicesContainer"
-      className="flex flex-col min-w-fit bg-base-200 rounded-md p-2 space-y-2"
+      className="flex-shrink-0 flex-col min-w-0 bg-base-200 rounded-md p-2 space-y-2"
     >
       <div
         className="font-bold bg-base-300 rounded-md px-2 py-1 h-min"
@@ -32,7 +32,7 @@ export default function ConnectedDevices({
         </div>
       ) : (
         devices.map((device) => {
-          const isSelected = selectedDevice === device.mac;
+          const isSelected = selectedDevice === device.id;
           const deviceClass = clsx(
             "h-max rounded-md px-2 py-1 hover:bg-base-200",
             isSelected
@@ -42,15 +42,15 @@ export default function ConnectedDevices({
 
           return (
             <div
-              key={device.mac}
+              key={device.id}
               className={deviceClass}
-              title={device.mac+"@"+device.ip}
+              title={device.id+"@"+device.id}
               onClick={() => {
-                onSelectDevice(device.mac);
-                setSelectedDevice(device.mac);
+                onSelectDevice(device.id);
+                setSelectedDevice(device.id);
               }}
             >
-              {device.display_name}
+              {device.name}
             </div>
           );
         })
