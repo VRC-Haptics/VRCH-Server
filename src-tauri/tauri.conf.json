@@ -1,5 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "mainBinaryName": "VR Haptics Player",
   "productName": "vrch-gui",
   "version": "0.0.2",
   "identifier": "com.vrch.app",
@@ -12,9 +13,10 @@
   "app": {
     "windows": [
       {
-        "title": "vrch-gui",
+        "title": "Haptics",
         "width": 1000,
-        "height": 600
+        "height": 600,
+        "devtools": true
       }
     ],
     "security": {
@@ -31,6 +33,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["sidecars/vrc-sidecar.exe"]
+    "resources": [
+      "sidecars/vrc-sidecar.exe", 
+      "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
+      "sidecars/elevated-register.exe",
+      "sidecars/listen-for-vrc.exe",
+      "security/localhost.crt",
+      "security/localhost.key",
+      "security/README.md",
+      "security/selfsigned_cert.sh",
+      "map_configs/**/*.json"
+    ]
   }
 }

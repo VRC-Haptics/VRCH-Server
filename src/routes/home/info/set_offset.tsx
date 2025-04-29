@@ -7,18 +7,18 @@ interface DeviceOffsetProps {
 }
 
 export const DeviceOffset: React.FC<DeviceOffsetProps> = ({ selectedDevice }) => {
-  const [multiplier, setMultiplier] = useState<number>(selectedDevice.sens_mult);
+  const [multiplier, setMultiplier] = useState<number>(selectedDevice.factors.sens_mult);
 
   // Update the multiplier if we switch devices
   useEffect(() => {
-    setMultiplier(selectedDevice.sens_mult);
+    setMultiplier(selectedDevice.factors.sens_mult);
   }, [selectedDevice]);
 
   const handleMultiplierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value);
     setMultiplier(newValue);
-    invoke("update_device_multiplier", {mac: selectedDevice.mac, multiplier: multiplier});
-  };
+    invoke("update_device_multiplier", { deviceId: selectedDevice.id, multiplier: newValue });
+  };  
 
   return (
     <div id="SensitivityMultiplier" className="p-2 min-w-full mx-auto">

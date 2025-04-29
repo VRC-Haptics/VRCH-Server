@@ -1,7 +1,7 @@
 {
   "name": "vrch-gui",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,9 +10,13 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "~2.2.0",
+    "@tauri-apps/plugin-dialog": "~2.2.1",
     "@tauri-apps/plugin-fs": "^2.2.0",
+    "@tauri-apps/plugin-http": "~2.4.3",
+    "@tauri-apps/plugin-log": "~2.4.0",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-os": "^2.2.0",
     "@tauri-apps/plugin-store": "~2.2.0",
@@ -20,7 +24,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^5.4.0",
-    "react-router-dom": "^7.1.1"
+    "react-router-dom": "^7.1.1",
+    "three": "^0.176.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
@@ -33,5 +38,13 @@
     "tailwindcss": "^3.4.17",
     "typescript": "~5.6.2",
     "vite": "^6.1.0"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "esbuild"
+    ],
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

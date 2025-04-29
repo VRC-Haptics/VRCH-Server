@@ -1,41 +1,38 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(non_camel_case_types)]
+#![warn(unused_extern_crates)]
 
 // make local modules available
-mod haptic;
+mod bhaptics;
+mod commands;
+mod devices;
+pub mod mapping;
 pub mod osc;
 pub mod util;
+pub mod api;
 mod vrc;
 
-//use local modules
-use haptic::{mdns::start_device_listener, AddressGroup, Device};
-use vrc::{discovery::get_vrc, VrcInfo};
+// local modules
+use bhaptics::game::BhapticsGame;
+use devices::wifi::discovery::start_wifi_listener;
+use devices::{Device, DeviceType};
+use mapping::global_map::GlobalMap;
+use vrc::VrcInfo;
+use api::ApiManager;
 
 //standard imports
-use rosc::OscType;
+use commands::*;
 use serde_json::json;
 use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{Emitter, AppHandle, Manager, Window, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
 
-#[tauri::command]
-fn get_device_list(state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Vec<Device> {
-    let devices = state.lock().unwrap();
-    devices.clone()
-}
-
-#[tauri::command]
-fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
-    let vrc_info = state.lock().unwrap();
-    vrc_info.clone()
-}
-
-/// Helper to set store values
+/// Helper to set persistant store values
 fn set_device_store_field<T: serde::Serialize>(
     window: &tauri::Window,
     mac: &str,
@@ -48,22 +45,33 @@ fn set_device_store_field<T: serde::Serialize>(
         .expect("couldn't access known_devices.json");
 
     // Try to retrieve the existing device data.
-    let mut device_data = store.get(mac).unwrap();
+    if let Some(mut device_data) = store.get(mac) {
+        // Ensure we have a JSON object.
+        if !device_data.is_object() {
+            device_data = json!({});
+        }
 
-    // Ensure we have a JSON object.
-    if !device_data.is_object() {
-        device_data = json!({});
-    }
+        // Insert or update the field.
+        if let Some(map) = device_data.as_object_mut() {
+            map.insert(field.to_string(), serde_json::to_value(value).unwrap());
+        }
 
-    // Insert or update the field.
-    if let Some(map) = device_data.as_object_mut() {
+        // Write back the updated device data.
+        store.set(mac, device_data);
+    } else {
+        // create new device data instance.
+        let mut device_data = json!({});
+
+        // Insert the field.
+        let map = device_data.as_object_mut().unwrap();
         map.insert(field.to_string(), serde_json::to_value(value).unwrap());
-    }
 
-    // Write back the updated device data.
-    store.set(mac, device_data);
+        // Write back the updated device data.
+        store.set(mac, device_data);
+    };
 }
 
+/// Helper to get persistant store values
 fn get_device_store_field<T: serde::de::DeserializeOwned>(
     app_handle: &tauri::AppHandle,
     mac: &str,
@@ -73,83 +81,22 @@ fn get_device_store_field<T: serde::de::DeserializeOwned>(
         .store("known_devices.json")
         .expect("couldn't access known_devices.json");
 
-    let device_data = store.get(mac).unwrap();
-    let map = device_data.as_object()?;
+    if let Some(device_data) = store.get(mac) {
+        let map = device_data.as_object()?;
 
-    map.get(field)
-        .and_then(|value| serde_json::from_value(value.clone()).ok())
-}
-
-#[tauri::command]
-async fn update_device_groups(
-    window: tauri::Window,
-    mac: String,
-    groups: Vec<AddressGroup>,
-    devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-) -> Result<(), ()> {
-    let mut devices = devices_mutex.lock().unwrap();
-    if let Some(existing) = devices.iter_mut().find(|d| d.mac == mac) {
-        existing.addr_groups = groups.clone();
-        // Update the "addr_groups" field without losing other data.
-        set_device_store_field(&window, &mac, "addr_groups", groups);
-        println!("updated groups to: {:?}", existing.addr_groups);
-        existing.purge_cache();
+        map.get(field)
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+    } else {
+        None
     }
-    Ok(())
 }
 
-#[tauri::command]
-async fn update_device_multiplier(
-    mac: String,
-    multiplier: f32,
-    devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-    window: tauri::Window,
-) -> Result<(), ()> {
-    let mut devices_lock = devices_store.lock().unwrap();
-    if let Some(dev) = devices_lock.iter_mut().find(|d| d.mac == mac) {
-        dev.sens_mult = multiplier;
-        set_device_store_field(&window, &mac, "sens_mult", multiplier);
-    }
-    Ok(())
-}
-
-fn recall_device_group(handle: &AppHandle, mac: &String) -> Option<Vec<AddressGroup>> {
-    let store = handle.store("known_devices.json").unwrap();
-    // Retrieve the stored device data
-    let device_data = store.get(mac)?;
-    let groups_value = device_data.as_object()?.get("addr_groups")?;
-    serde_json::from_value(groups_value.clone()).ok()
-}
-
-#[tauri::command]
-async fn set_address(
-    vrc_mutex: tauri::State<'_, Arc<Mutex<VrcInfo>>>,
-    address: String,
-    percentage: f32,
-) -> Result<(), ()> {
-    let vrc = vrc_mutex.lock().unwrap();
-    let mut parameters = vrc.raw_parameters.as_ref().write().unwrap();
-
-    println!("set parameter: {:?}, to {:?}", address, percentage);
-    parameters.insert(address, vec![OscType::Float(percentage)]);
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn invalidate_cache(
-    devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-) -> Result<(), ()> {
-    let mut devices = devices_mutex.lock().unwrap();
-    let iterator = devices.iter_mut();
-    for device in iterator {
-        device.purge_cache();
-    }
-    Ok(())
-}
-
-fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device>>>, app: &tauri::AppHandle) {
-    println!("starting tick");
+fn tick_devices(
+    device_list: Arc<Mutex<Vec<Device>>>,
+    input_list: Arc<Mutex<GlobalMap>>,
+    app: &tauri::AppHandle,
+) {
+    log::info!("starting tick");
     io::stdout().flush().unwrap();
     let app_handle = app.clone();
 
@@ -160,13 +107,9 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
         loop {
             timer.tick().await;
             {
-                let mut device_list_guard = device_list.lock().unwrap();
-                let vrc_info_guard = vrc_info.lock().expect("couldn't get mutable");
+                // call update up here (does it matter? timing wise)
 
-                let addresses = vrc_info_guard.raw_parameters.as_ref();
-                let hashmap = addresses.read().expect("Poisoned OSC Hashmap");
-                let menu = vrc_info_guard.menu_parameters.as_ref();
-                let menu_parameters = menu.read().expect("couldn't get guard");
+                let mut device_list_guard = device_list.lock().unwrap();
 
                 // Remove devices that need to be killed.
                 // Collect removed devices (dead devices).
@@ -178,24 +121,30 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
 
                 // Print the removed devices.
                 for device in &removed_devices {
-                    println!("Removed device: {:?}", device.full_name);
+                    log::info!("Removed device: {:?}", device.name);
                     // NOTE: ALWAYS EMIT DEVICE-REMOVED or added, otherwise many issues.....
                     app_handle.emit("device-removed", device).unwrap();
                 }
 
-                // Retain only the alive devices.
+                // Remove dead devices
                 device_list_guard.retain(|device| device.is_alive);
 
+                let mut inputs_guard = input_list.lock().expect("couldn't find inputs guard");
+                inputs_guard.refresh_inputs();
                 for device in device_list_guard.iter_mut() {
-                    if let Some(packet) = device.tick(
-                        &hashmap,
-                        &menu_parameters,
-                        "/avatar/parameters/h".to_string(),
-                    ) {
-                        if let Err(err) = device_socket
-                            .send_to(&packet.packet, format!("{}:{}", device.ip, device.port))
-                        {
-                            eprintln!("Failed to send to {}: {}", device.display_name, err);
+                    // handle device specific tick functions
+                    match &mut device.device_type {
+                        DeviceType::Wifi(wifi_device) => {
+                            // Send packet if we got one from tick
+                            if let Some(packet) = wifi_device.tick(
+                                &mut device.is_alive,
+                                &mut device.factors,
+                                &inputs_guard,
+                            ) {
+                                let addr = format!("{}:{}", wifi_device.ip, wifi_device.send_port);
+                                // TODO: Actually error handle
+                                let _ = device_socket.send_to(&packet.packet, addr);
+                            }
                         }
                     }
                 }
@@ -204,11 +153,17 @@ fn tick_devices(vrc_info: Arc<Mutex<VrcInfo>>, device_list: Arc<Mutex<Vec<Device
     });
 }
 
-fn close_app(_: &Window) {
-    println!("TODO: Properly shut down")
+fn close_app(window: &Window) {
+    log::info!("Cleaning up and Shutting Down.");
+    let bhaptics = window.state::<Arc<Mutex<BhapticsGame>>>();
+    let bh_lock = bhaptics.lock().expect("unable to lock bhaptics");
+    bh_lock.shutdown();
+    log::trace!("Shutdown bhaptics server");
     //cleanup vrc TODO:
 }
 
+/// Opens a window if we can't use the default VRC ports.
+/// Using OSCQuery results in inconsistent delivery of packets.
 fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
     let vrc_lock = vrc.lock().unwrap();
     if vrc_lock.in_port.unwrap() != 9001 {
@@ -227,31 +182,68 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 }
 
 fn main() {
-    let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new())); //device list
-    let vrc_info: Arc<Mutex<VrcInfo>> = Arc::new(Mutex::new(get_vrc())); //the vrc state
+
+    //let _ = CryptoProvider::install_default();
+
+    // Core state machines that interface devices and the haptics providers
+    // The GlobalMap; provides interpolated feedback values.
+    let input_list: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
+    // Global device list; contains all active devices.
+    let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new()));
+    // Provides a unified interface for interacting with external api's 
+    let api_manager: Arc<Mutex<ApiManager>> = Arc::new(Mutex::new(ApiManager::new()));
+
+    // Managers for game integrations; each handling connectivity and communications
+    // Global VRC State; connection management and GlobalMap interaction
+    let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager));
+    // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
+    let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
-        .manage(device_list.clone())
-        .manage(vrc_info.clone())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(Target::new(TargetKind::Webview))
+                .filter(|metadata| {
+                    !metadata.target().starts_with("mio")
+                        && !metadata.target().starts_with("reqwest")
+                })
+                .max_file_size(200_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+                .build(),
+        )
+        .manage(Arc::clone(&input_list))
+        .manage(Arc::clone(&device_list))
+        .manage(Arc::clone(&vrc_info))
+        .manage(Arc::clone(&bhaptics))
+        .manage(Arc::clone(&api_manager))
         .setup(move |app| {
             let app_handle = app.handle();
-            tick_devices(vrc_info.clone(), device_list.clone(), app_handle);
-            start_device_listener(app_handle.clone(), app.state(), 4);
+            // Initialize stuff that needs the app handle. (interacts directly with GUI)
+            tick_devices(device_list.clone(), input_list.clone(), app_handle);
+            start_wifi_listener(app_handle.clone(), app.state());
             throw_vrc_notif(app_handle, vrc_info.clone());
+            let mut lock = api_manager.lock().unwrap();
+            lock.refresh_caches();
+            drop(lock);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_device_list,
-            get_vrc_info,
-            invalidate_cache,
-            update_device_groups,
-            set_address,
-            update_device_multiplier,
+            commands::get_device_list,
+            commands::get_vrc_info,
+            commands::upload_device_map,
+            commands::set_address,
+            commands::update_device_multiplier,
+            bhaptics_launch_default,
+            bhaptics_launch_vrch,
+            commands::play_point,
+            commands::swap_conf_nodes,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {

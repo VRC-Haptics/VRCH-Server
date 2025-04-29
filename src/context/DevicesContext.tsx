@@ -22,31 +22,24 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
   // Wrap the original setter
   const setDevices = async (valueOrUpdater: SetStateAction<Device[]>) => {
     setInternalDevices(valueOrUpdater);
-
-    // invoke rust
-    try {
-      await invoke('invalidate_cache');
-    } catch (err) {
-      console.error("Failed to invalidate address cache:", err);
-    }
   };
 
   useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const deviceList = await invoke<Device[]>('get_device_list');
-        setInternalDevices(deviceList);
-      } catch (error) {
-        console.error("Failed to fetch devices:", error);
+    let active = true;
+    const loop = async () => {
+      while (active) {
+        try {
+          const devs = await invoke<Device[]>("get_device_list");
+          setInternalDevices(devs);
+        } catch (err) {
+          console.error("fetchDevices error:", err);
+        }
+        // wait 500ms before next iteration
+        await new Promise((r) => setTimeout(r, 500));
       }
     };
-
-    // Initial fetch
-    fetchDevices();
-
-    // Polling interval
-    const intervalId = setInterval(fetchDevices, 500);
-    return () => clearInterval(intervalId);
+    loop();
+    return () => { active = false; };
   }, []);
 
   return (
