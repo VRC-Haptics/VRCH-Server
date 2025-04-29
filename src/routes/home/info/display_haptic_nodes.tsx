@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { Device, HapticNode } from '../../../utils/commonClasses';
+import { Html } from '@react-three/drei';
 
 interface DisplayHapticNodesProps {
   selectedDevice: Device;
@@ -14,6 +15,8 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
     selectedDevice.device_type.variant === 'Wifi'
       ? selectedDevice.device_type.value.connection_manager?.config?.node_map ?? []
       : [];
+
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // Track up to two selected node indices for actions
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
@@ -55,7 +58,6 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
 
   // Swap the two selected nodes in the device config
   const handleSwap = () => {
-    console.log("into swap");
     const struct = {
       deviceId: selectedDevice.id,
       index1: selectedIndices[0],
@@ -75,7 +77,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
         <div className="max-w-full h-96 outline-2 outline outline-current">
           <Canvas
             className="w-full h-full" 
-            camera={{ position: [0, 0, 5], fov: 60 }}
+            camera={{ position: [0, 2, 2], fov: 60 }}
           >
             <gridHelper args={[2, 5, 'gray', 'lightgray']} />
             <axesHelper args={[0.2]} />
@@ -87,15 +89,28 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
               <mesh
                 key={idx}
                 position={[node.x, node.y, node.z]}
-                onClick={e => {
-                  e.stopPropagation();
-                  handleSelect(idx);
-                }}
+                onClick={e => { e.stopPropagation(); handleSelect(idx); }}
+                onPointerOver={() => setHoveredIdx(idx)}
+                onPointerOut={() => setHoveredIdx(null)}
               >
                 <sphereGeometry args={[0.02, 16, 16]} />
-                <meshStandardMaterial
-                  color={selectedIndices.includes(idx) ? 'red' : 'blue'}
-                />
+                <meshStandardMaterial color={selectedIndices.includes(idx) ? 'red' : 'blue'} />
+
+                {hoveredIdx === idx && (
+                  <Html
+                    style={{
+                      pointerEvents: 'none',
+                      whiteSpace: 'nowrap',
+                      fontSize: '12px',
+                      background: '#000',
+                      color: '#fff',
+                      padding: '2px 4px',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    {node.groups.join(', ')}
+                  </Html>
+                )}
               </mesh>
             ))}
           </Canvas>

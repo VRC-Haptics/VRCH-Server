@@ -15,7 +15,7 @@ pub enum InterpAlgo {
 }
 
 impl Interpolate for InterpAlgo {
-    /// node: the haptic node (output position) that will be used to determine the feedback value
+    /// node: the haptic nodes (output positions) that will be used to determine the feedback value
     ///
     /// in_nodes: The haptic Nodes that will be used to calculate the output value
     fn interp(&self, node: &Vec<HapticNode>, in_nodes: Vec<&InputNode>) -> Vec<f32> {
@@ -33,7 +33,8 @@ impl Interpolate for InterpAlgo {
 pub struct GaussianState {
     sigma: f32,
     cutoff: f32,
-    merge: f32,
+    merge: f32, // TODO: Maybe look at caching interacted values?
+    sigma_const: f32,
 }
 
 impl GaussianState {
@@ -44,22 +45,24 @@ impl GaussianState {
             sigma: 0.0,
             cutoff: cutoff,
             merge: merge,
+            sigma_const: 100.,
         };
         g.set_fallof(falloff);
         return g;
     }
 
-    /// Sets the devices fallof in meters to reach 5% of input value.
+    /// Sets the devices falloff in meters to reach 5% of input value.
     pub fn set_fallof(&mut self, falloff: f32) {
         self.sigma = falloff / (-2.0 * 0.05_f32.ln());
+        self.sigma_const = 2.0 * self.sigma.powi(2);
     }
 
     /// used in interp function
-    fn gaussian_kernel(&self, distance: f32, sigma: f32) -> f32 {
-        (-distance.powi(2) / (2.0 * sigma.powi(2))).exp()
+    fn gaussian_kernel(&self, distance: f32) -> f32 {
+        (-distance.powi(2) / self.sigma_const).exp()
     }
 
-    /// returns the straight interpolation for the node and whether it was a perfect match
+    /// returns the straight interpolation for the node.
     fn single_node(&self, node: &HapticNode, in_nodes: &Vec<&InputNode>) -> f32 {
         let mut numerator = 0.0;
         let mut denominator = 0.0;
@@ -70,7 +73,7 @@ impl GaussianState {
                 let distance = node.dist(&in_node.haptic_node);
                 // if below our threshold, return early with that nodes intensity
                 if !distance.is_nan() && distance < self.cutoff {
-                    let weight = self.gaussian_kernel(distance, self.sigma);
+                    let weight = self.gaussian_kernel(distance);
                     numerator += weight * in_node.get_intensity();
                     denominator += weight;
                 }

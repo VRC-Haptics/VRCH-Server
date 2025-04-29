@@ -5,6 +5,7 @@ use crate::vrc::AVATAR_ID_PATH;
 use crate::VrcInfo;
 
 use std::io::{BufRead, BufReader};
+use std::os::windows::process::CommandExt;
 use std::process::{id, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex, RwLock};
 use std::thread;
@@ -21,11 +22,9 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api:Arc<Mute
         // Launch the sidecar process.
         let mut child = Command::new("./sidecars/listen-for-vrc.exe")
             .arg(format!("--pid={}", id()))
-            // Do not attach a terminal to the sidecar.
+            .creation_flags(0x08000000 as u32)
             .stdin(Stdio::null())
-            // Capture its stdout so we can read the FOUND messages.
             .stdout(Stdio::piped())
-            // Optionally inherit stderr to see error messages.
             .stderr(Stdio::inherit())
             .spawn()
             .expect("Failed to launch sidecar");
@@ -94,6 +93,7 @@ fn update_params_from_text(text: &str, params: &DashMap<OscPath, OscInfo>) {
                 // Explicitly drop the guard before calling insert.
                 drop(old_node);
                 if should_update {
+                    //log::trace!("Params: {:?}", &path);
                     params.insert(OscPath(path), node);
                 }
             }
@@ -150,7 +150,7 @@ fn update_existing_avatar(
                         };
                         *avi_write = Some(new_avi);
                     };
-                    log::info!("Updated avatar with new configuration.");
+                    log::info!("Updated avatar with new configuration");
                 } else {
                     // we don't have enough information to do haptics.
                     // put shell avatar together.

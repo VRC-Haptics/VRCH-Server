@@ -8,11 +8,9 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "store:default",
+    "http:default",
     "store:default",
     "dialog:default",
-    "dialog:default",
-    "log:default",
-    "http:default"
+    "log:default"
   ]
 }

@@ -25,6 +25,7 @@ use std::{
 // I think having trailing "/" references the contents of the path, not all the children paths.
 pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";
 pub const GLOBALS_PREFIX: &str = "/avatar/parameters/haptic/global/";
+pub const INTENSITY_PATH: &str = "/avatar/parameters/haptic/global/intensity";
 pub const AVATAR_ID_PATH: &str = "/avatar/change";
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -122,7 +123,7 @@ impl VrcInfo {
                     // upate menu items if we have something to dupate them with
                     let mut menu_l = menu.lock().expect("couldn't lock the menu");
                     if let Some(intensity) =
-                        params_refresh.get(&OscPath(GLOBALS_PREFIX.to_owned() + "intensity"))
+                        params_refresh.get(&OscPath(INTENSITY_PATH.to_owned()))
                     {
                         let intensity = intensity.value().clone();
                         let intensity = intensity.float().unwrap();

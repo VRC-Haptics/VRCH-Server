@@ -1,8 +1,5 @@
-import { useContext } from "react";
-import { VrcContext } from "../../context/VrcContext";
-
 export default function GameSettings() {
-  const vrcInfo = useContext(VrcContext);
+  //const vrcInfo = useContext(VrcContext);
 
   return (
     <div

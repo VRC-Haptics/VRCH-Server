@@ -52,3 +52,6 @@ tokio-util = "0.7.14"
 walkdir = "2.5.0"
 strum = {version = "0.27.1", features = ["strum_macros", "std", "derive"] }
 tauri-plugin-http = { version = "2", features = ["blocking"] }
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"

@@ -8,7 +8,7 @@ use std::vec;
 
 /// Removes the VRC Fury naming from the parameters
 pub fn remove_version(path: &str) -> String {
-    let re = Regex::new(r"/VF\d+_").unwrap();
+    let re = Regex::new(r"VF\d+_").unwrap();
     // We capture the leading slash.
     //let re = Regex::new(r"(/)VF\d{2}_").unwrap();
 

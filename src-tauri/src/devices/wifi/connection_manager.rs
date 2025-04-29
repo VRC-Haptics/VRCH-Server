@@ -54,7 +54,8 @@ impl WifiConnManager {
                         log::trace!("Recieved set to command: {:?}", cmd_str);
                         let mut conf = last_command_cpy.write().expect("Couldn't get write");
                         *conf = None;
-                        log::trace!("Set to None");
+
+                        return;
                     }
 
                     match serde_json::from_str::<WifiConfig>(cmd_str) {

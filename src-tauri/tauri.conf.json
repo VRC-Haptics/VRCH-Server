@@ -42,7 +42,7 @@
       "security/localhost.key",
       "security/README.md",
       "security/selfsigned_cert.sh",
-      "map_configs/**/*"
+      "map_configs/**/*.json"
     ]
   }
 }

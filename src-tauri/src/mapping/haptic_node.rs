@@ -1,4 +1,8 @@
+use std::f32::consts::PI;
+
 use crate::mapping::NodeGroup;
+use crate::util::math::{self, Vec3};
+
 
 /// Struct defining all needed properties for a haptic node.
 /// Used for mapping from one haptic model to another.
@@ -26,23 +30,30 @@ impl HapticNode {
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
 
+    pub fn to_vec3(&self) -> math::Vec3 {
+        Vec3 {
+            x: self.x,
+            y: self.y,
+            z: self.z
+        }
+    }
+
     /// Returns true if self and other share any common NodeGroup.
     pub fn interacts(&self, other: &HapticNode) -> bool {
-        //TODO: Better filter this
-        // Iterate over the smaller group vector for efficiency.
-        if self.groups.len() <= other.groups.len() {
-            for group in &self.groups {
-                if other.groups.contains(group) {
+        for shared_group in &self.groups {
+            if other.groups.contains(shared_group) {
+                let this = self.to_vec3();
+                let that = other.to_vec3();
+                
+                let (top, bottom) = shared_group.to_points();
+                let angle = math::angle_between_points(top, bottom, this, that).expect("Unable to get angle");
+                if angle <= (PI / 2.) { // only return interactions that are with the 180 deg window
                     return true;
                 }
-            }
-        } else {
-            for group in &other.groups {
-                if self.groups.contains(group) {
-                    return true;
-                }
+                
             }
         }
+        
         false
     }
 
