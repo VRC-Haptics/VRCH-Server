@@ -210,6 +210,9 @@ fn main() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(Target::new(TargetKind::Webview))
+                .target(Target::new(TargetKind::LogDir {
+                    file_name: Some("logs".to_string())
+                }))
                 .filter(|metadata| {
                     !metadata.target().starts_with("mio")
                         && !metadata.target().starts_with("reqwest")
