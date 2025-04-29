@@ -217,8 +217,8 @@ fn main() {
                     !metadata.target().starts_with("mio")
                         && !metadata.target().starts_with("reqwest")
                 })
-                .max_file_size(200_000)
-                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+                .max_file_size(20_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
                 .build(),
         )
         .manage(Arc::clone(&input_list))
