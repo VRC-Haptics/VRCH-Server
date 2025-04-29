@@ -1,27 +1,29 @@
 pub mod config;
 pub mod discovery;
 pub mod parsing;
+pub mod cache_node;
 
-use crate::api::ApiManager;
 // crate dependencies
+use crate::api::ApiManager;
 use crate::mapping::{global_map::StandardMenu, input_node::InputNode, Id};
 use crate::osc::server::OscServer;
 use crate::vrc::parsing::OscInfo;
 use crate::GlobalMap;
+
 // module dependencies
+use cache_node::CacheNode;
 use config::GameMap;
 use dashmap::DashMap;
 use discovery::{start_filling_available_parameters, OscQueryServer};
 use parsing::remove_version;
-use rosc::{OscMessage, OscType};
-// std imports
+
+use rosc::OscMessage;
 use std::{
     net::Ipv4Addr,
     sync::{Arc, Mutex, RwLock},
 };
 
 // "/avatar/parameters/haptic/prefabs/<author>/<name>/<version>"
-// "/avatar/parameters/haptic/prefabs/Average/test-00/1"
 // I think having trailing "/" references the contents of the path, not all the children paths.
 pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";
 pub const GLOBALS_PREFIX: &str = "/avatar/parameters/haptic/global/";
@@ -44,7 +46,11 @@ pub struct VrcInfo {
     pub available_parameters: Arc<DashMap<OscPath, OscInfo>>,
     /// Buffer that is filled with values collected from the OSC stream.
     /// If the buffer doesn't contain value it hasn't been seen since last flush.
-    pub parameter_cache: Arc<DashMap<OscPath, OscType>>,
+    pub parameter_cache: Arc<DashMap<OscPath, CacheNode>>,
+    /// Number of value entries to keep around for each `self.parameter_cache` entry
+    /// 
+    /// VRC Refreshes at 10hz max, so 10*seconds should work just fine.
+    pub cache_length: usize,
     /// The OSC server we recieve updates from
     #[serde(skip)]
     #[allow(
@@ -64,6 +70,7 @@ pub struct VrcInfo {
 impl VrcInfo {
     pub fn new(global_map: Arc<Mutex<GlobalMap>>, api: Arc<Mutex<ApiManager>>) -> Arc<Mutex<VrcInfo>> {
         let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
+        let value_cache_size = 100;
 
         // Instantiate
         let vrc = VrcInfo {
@@ -75,6 +82,7 @@ impl VrcInfo {
             avatar: Arc::clone(&avi),
             available_parameters: Arc::new(DashMap::new()),
             parameter_cache: Arc::new(DashMap::new()),
+            cache_length: value_cache_size,
         };
         let vrc = Arc::new(Mutex::new(vrc));
 
@@ -82,8 +90,9 @@ impl VrcInfo {
         start_filling_available_parameters(Arc::clone(&vrc), api);
 
         // create clone for closure
-        let mut vrc_lock = vrc.lock().expect("couldn't get lock");
+        let vrc_lock = vrc.lock().unwrap();
         let cached_parameters_rcve = Arc::clone(&vrc_lock.parameter_cache);
+        let default_clone = vrc_lock.cache_length.clone();
         // Our closure that gets called whenever an OSC message is recieved
         let on_receive = move |msg: OscMessage| {
             // remove VRC Fury tagging if needed
@@ -91,10 +100,17 @@ impl VrcInfo {
 
             // if there is a value push it to our cache.
             if let Some(arg) = msg.args.first() {
-                cached_parameters_rcve.insert(OscPath(addr), arg.to_owned());
+                // if we have a cache going otherwise build it.
+                if let Some(mut cache) = cached_parameters_rcve.get(&OscPath(addr)) {
+                    cache.update(arg.to_owned());
+                } else {
+                    cached_parameters_rcve.insert(
+                        OscPath(addr), 
+                        CacheNode::new(arg.to_owned(), default_clone,)
+                    );
+                }
             } else {
                 log::warn!("empty message recieved: {:?}", msg);
-                cached_parameters_rcve.insert(OscPath(addr), OscType::Nil);
             }
         };
 
@@ -126,7 +142,8 @@ impl VrcInfo {
                         params_refresh.get(&OscPath(INTENSITY_PATH.to_owned()))
                     {
                         let intensity = intensity.value().clone();
-                        let intensity = intensity.float().unwrap();
+                        let (intensity, _) = intensity.latest().unwrap();
+                        let intensity = intensity.float().expect("Non-float value for");
                         if intensity > 0.001 {
                             menu_l.intensity = intensity;
                             menu_l.enable = true;
@@ -136,9 +153,21 @@ impl VrcInfo {
                         }
                     }
 
-                    // for each node in our config, see if we have recieved a value.
+                    // for each node in our config, see if we have received a value.
                     for node in &conf.nodes {
-                        if let Some(value) = params_refresh.get(&OscPath(node.address.clone())) {
+                        if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone())) { 
+                            if let Some(mut old_node) = inputs.get(&Id(node.address.clone())) {
+                                let value = cache_node.interp()
+                                // insert the value into our hashmap
+                                if let Some(intensity) = value.clone().float() {
+                                    old_node.set_intensity(intensity);
+                                } else {
+                                    log::error!("Couldn't find f32 value for: {:?}", position);
+                                    old_node.set_intensity(0.0);
+                                }
+                                continue;
+                            }
+
                             //create node basic's
                             let position = &node.node_data;
                             let mut in_node = InputNode::new(
@@ -147,7 +176,7 @@ impl VrcInfo {
                                 Id(node.address.clone()),
                             );
 
-                            // insert the value into our hashmap
+                            // see if we can set our intensity
                             if let Some(intensity) = value.clone().float() {
                                 in_node.set_intensity(intensity);
                             } else {
@@ -157,7 +186,7 @@ impl VrcInfo {
 
                             inputs.insert(Id(node.address.clone()), in_node);
                         }
-                    }
+                    } // for loop
                 }
             }
         };

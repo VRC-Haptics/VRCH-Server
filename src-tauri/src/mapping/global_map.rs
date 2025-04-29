@@ -10,9 +10,10 @@ use std::sync::Mutex;
 use std::{fmt, sync::Arc};
 
 /// The common factors that will be used across all devices to modify output.
+/// Game inputs should insert values that will be used in device calculations here.
 pub struct StandardMenu {
-    pub intensity: f32,
-    pub enable: bool,
+    pub intensity: f32, // multiplier set by user in-game
+    pub enable: bool, // Flat enable or disable all haptics
 }
 
 /// Provides implementations for interpolating input haptic intensities to device nodes
