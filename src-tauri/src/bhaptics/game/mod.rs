@@ -2,8 +2,10 @@
 mod auth_message;
 mod player_messages;
 pub mod network;
+mod device_maps;
 
 use auth_message::handle_auth_init;
+use network::event_map::GameMapping;
 use serde;
 
 use std::{
@@ -22,7 +24,6 @@ use tokio::sync::mpsc;
 use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_util::sync::CancellationToken;
 use tokio_websockets::Message;
-use tokio_rustls::rustls::crypto::CryptoProvider;
 
 const PATH_TO_CERT: &str = "security/localhost.crt";
 const PATH_TO_KEY: &str = "security/localhost.key";
@@ -41,7 +42,7 @@ fn load_key(path: &str) -> io::Result<PrivateKeyDer<'static>> {
 /// Holds information for the bhaptics game server.
 pub struct BhapticsGame {
     // if a game has been connected
-    pub game_connected: bool,
+    pub game_mapping: Option<GameMapping>,
     // info for bHaptics API
     pub api_info: Option<ApiInfo>,
     // user facing name
@@ -67,7 +68,7 @@ impl BhapticsGame {
     pub fn new() -> Arc<Mutex<Self>> {
         let shutdown_token = CancellationToken::new();
         let game = Arc::new(Mutex::new(BhapticsGame {
-            game_connected: false,
+            game_mapping: None,
             api_info: None,
             name: None,
             sdk_api_version: None,
@@ -203,9 +204,7 @@ async fn handle_connection(
             Ok(msg) if msg.is_text() => {
                 msg_received(msg, Arc::clone(&game));
             }
-            Ok(msg) if msg.is_ping() || msg.is_pong() => {
-                // Ignore ping/pong messages.
-            }
+            Ok(msg) if msg.is_ping() || msg.is_pong() => {/* Ignore ping/pong messages.*/}
             Ok(_) => {
                 log::warn!("Received non-text message");
             }
@@ -234,9 +233,14 @@ fn msg_received(msg: Message, game: Arc<Mutex<BhapticsGame>>) {
 }
 
 fn handle_sdk_play(input: &str, _game: &Arc<Mutex<BhapticsGame>>) {
-    let content: SdkPlayMessage =
-        serde_json::from_str(input).expect("Couldn't decode play request");
-    log::debug!("Play Event: {:?}", content);
+    let content = serde_json::from_str::<SdkPlayMessage>(input);
+
+    match content {
+        Ok(content) => {
+            log::trace!("play Bhaptics event: {:?}", content);
+        },
+        Err(err) => log::error!("Error decoding bhaptics play message: {}", err)
+    }
 }
 
 fn create_init_response() -> Vec<SendMessage> {
@@ -270,24 +274,20 @@ pub enum SendMessage {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ServerEvent {
-    #[serde(rename = "eventName")]
     event_name: String,
-    #[serde(rename = "eventTime")]
     event_time: u32,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SdkPlayMessage {
-    #[serde(rename = "eventName")]
     event_name: String,
-    #[serde(rename = "requestId")]
     request_id: u32,
     position: u32,
     intensity: f32,
     duration: f32,
-    #[serde(rename = "offsetAngleX")]
     offset_angle_x: f32,
-    #[serde(rename = "offsetY")]
     offset_y: f32,
 }

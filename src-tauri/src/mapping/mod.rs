@@ -2,8 +2,11 @@ pub mod global_map;
 pub mod haptic_node;
 pub mod input_node;
 pub mod interp;
+pub mod event;
+
 use global_map::GlobalMap;
 use haptic_node::HapticNode;
+use uuid::Uuid;
 
 use crate::util::math::Vec3;
 
@@ -31,12 +34,19 @@ pub enum NodeGroup {
     LowerLegLeft,
     FootRight,
     FootLeft,
+    /// A meta tag reserved for in-server use only. 
+    /// Should not be exported to devices or imported from games.
+    All,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 /// Id unique to the node it references.
 /// if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
 pub struct Id(pub String);
+
+impl Id {
+    pub fn new() -> Self {Id(Uuid::new_v4().to_string())}
+}
 
 impl NodeGroup {
     /// maps node groups into two points defining an axis that runs through the center of the model.
@@ -74,6 +84,7 @@ impl NodeGroup {
             NodeGroup::UpperLegLeft  => mirror_x(NodeGroup::UpperLegRight.to_points()),
             NodeGroup::LowerLegLeft  => mirror_x(NodeGroup::LowerLegRight.to_points()),
             NodeGroup::FootLeft      => mirror_x(NodeGroup::FootRight.to_points()),
+            NodeGroup::All           => (Vec3::new(0., 0., 0.), Vec3::new(0., 0., 0.))
         }
     }
 
@@ -109,6 +120,7 @@ impl NodeGroup {
                 NodeGroup::LowerArmLeft => 1 << 12,
                 NodeGroup::LowerLegRight => 1 << 13,
                 NodeGroup::LowerLegLeft => 1 << 14,
+                NodeGroup::All => 0,
             }
         }
         flag

@@ -33,7 +33,7 @@ oyasumivr_oscquery = { git = "https://github.com/Raphiiko/oyasumivr_oscquery.git
 tokio = {version = "1.42.1", features = ["rt-multi-thread"] }
 rosc = { git = "https://github.com/virtuallyaverage/rosc-serde.git" }
 regex = "1.11.1"
-uuid = "1.14.0"
+uuid = { version = "1.14", features = ["v7"] }
 if-addrs = "0.13.3"
 btleplug = "0.11.7"
 dunce = "1.0.5"

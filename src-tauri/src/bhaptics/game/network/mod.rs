@@ -1,7 +1,6 @@
 pub mod event_map;
 
 use event_map::{BaseMessage, GameMapping};
-use tauri::http::request;
 use tauri_plugin_http::reqwest::blocking::get;
 
 /// Tries to get a response from the api and parse it.
@@ -15,7 +14,7 @@ pub fn fetch_mappings(api_key: String, app_id: String, version: i32) -> Result<G
             match resp.text() {
                 Ok(body) => {
                     match serde_json::from_str::<BaseMessage>(&body) {
-                        Ok(msg) => Ok(msg.),
+                        Ok(msg) => Ok(msg.message),
                         Err(err) => Err(FetchMappingsError::DeserializeError(err, body)),
                     }
                 }

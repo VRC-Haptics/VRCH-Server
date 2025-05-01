@@ -182,7 +182,6 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 }
 
 fn main() {
-
     //let _ = CryptoProvider::install_default();
 
     // Core state machines that interface devices and the haptics providers
@@ -234,7 +233,7 @@ fn main() {
             throw_vrc_notif(app_handle, vrc_info.clone());
             let mut lock = api_manager.lock().unwrap();
             lock.refresh_caches();
-            log::trace!("Actually got: {:?}", bhaptics::game::network::fetch_mappings("0jTPyQjylL9KOPMoekos".to_string(), "yDec5gpu5pqR490S4FLc".to_string(), -1));
+            //log::trace!("Actually got: {:?}", bhaptics::game::network::fetch_mappings("0jTPyQjylL9KOPMoekos".to_string(), "yDec5gpu5pqR490S4FLc".to_string(), -1));
             drop(lock);
             Ok(())
         })

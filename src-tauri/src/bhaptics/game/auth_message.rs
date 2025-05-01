@@ -1,6 +1,6 @@
 use crate::util::deserialization::skip_outer_quotes;
 
-use crate::bhaptics::game::{create_init_response, ApiInfo, BhapticsGame};
+use crate::bhaptics::game::{create_init_response, ApiInfo, BhapticsGame, network};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -47,6 +47,20 @@ pub fn handle_auth_init(contents: &str, game: Arc<Mutex<BhapticsGame>>) {
 
             // send the OK message
             game_lock.send(create_init_response());
+
+            // see if we can get our game mapping info from api
+            
+            if let Some(api_info) = &game_lock.api_info {
+                let api_key = api_info.api_key.clone();
+                let app_id = api_info.application_id.clone();
+                let version = -1;
+                drop(game_lock); // drop lock so it doesn't hold while network fetching.
+
+                if let Ok(mapp) =  network::fetch_mappings(api_key, app_id, version) {
+                    let mut lock = game.lock().expect("Couldn't get lock on game");
+                    lock.game_mapping = Some(mapp); 
+                }
+            }
         }
         Err(err) => {
             log::error!("Unable to parse authorization message: {}", err);

@@ -1,3 +1,5 @@
+use crate::util::math::Vec3;
+
 use super::haptic_node::HapticNode;
 use super::Id;
 
@@ -31,6 +33,12 @@ impl InputNode {
             intensity: 0.0,
             tags: tags,
         };
+    }
+
+    pub fn set_position(&mut self, pos: Vec3) {
+        self.haptic_node.x = pos.x;
+        self.haptic_node.y = pos.y;
+        self.haptic_node.z = pos.z;
     }
 
     /// sets the intensity of this node

@@ -1,4 +1,5 @@
 use super::Id;
+use super::event::Event;
 use super::{
     input_node::InputNode,
     interp::{InterpAlgo, Interpolate},
@@ -18,6 +19,7 @@ pub struct StandardMenu {
 
 /// Provides implementations for interpolating input haptic intensities to device nodes
 pub struct GlobalMap {
+    active_events: Vec<Event>,
     input_nodes: Arc<DashMap<Id, InputNode>>,
     pub standard_menu: Arc<Mutex<StandardMenu>>,
     refresh_callbacks:
@@ -27,6 +29,7 @@ pub struct GlobalMap {
 impl GlobalMap {
     pub fn new() -> GlobalMap {
         return GlobalMap {
+            active_events: Vec::new(),
             input_nodes: Arc::new(DashMap::new()),
             standard_menu: Arc::new(Mutex::new(StandardMenu {
                 intensity: 1.0,
@@ -36,7 +39,11 @@ impl GlobalMap {
         };
     }
 
-    /// registers a function to be called on a refresh event
+    pub fn start_event(&mut self, event: Event) {
+        self.active_events.push(event);
+    }
+
+    /// registers a function to be called on a refresh event before every device update.
     pub fn register_refresh<F>(&mut self, fun: F)
     where
         F: Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static,
@@ -45,12 +52,26 @@ impl GlobalMap {
     }
 
     /// called immediately before each device tick.
-    /// It invites each of the game integrations to insert their values into the global map
+    /// It invites each of the game integrations to insert their values into the global map.
+    /// Then cycles all events.
     pub fn refresh_inputs(&mut self) {
+        // refresh direct game inputs.
         for callback in &self.refresh_callbacks {
             let clone = Arc::clone(&self.input_nodes);
             let menu = Arc::clone(&self.standard_menu);
             callback(&clone, &menu);
+        }
+
+        // tick events and remove what's needed
+        let mut to_remove = Vec::new();
+        for (index, event) in self.active_events.iter_mut().enumerate() {
+            let clone = Arc::clone(&self.input_nodes);
+            if event.tick(clone) {
+                to_remove.push(index);
+            }
+        }
+        for i in to_remove {
+            self.active_events.remove(i);
         }
     }
 
