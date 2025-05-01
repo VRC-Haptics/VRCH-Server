@@ -18,6 +18,7 @@ use discovery::{start_filling_available_parameters, OscQueryServer};
 use parsing::remove_version;
 
 use rosc::OscMessage;
+use std::time::Duration;
 use std::{
     net::Ipv4Addr,
     sync::{Arc, Mutex, RwLock},
@@ -26,7 +27,6 @@ use std::{
 // "/avatar/parameters/haptic/prefabs/<author>/<name>/<version>"
 // I think having trailing "/" references the contents of the path, not all the children paths.
 pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";
-pub const GLOBALS_PREFIX: &str = "/avatar/parameters/haptic/global/";
 pub const INTENSITY_PATH: &str = "/avatar/parameters/haptic/global/intensity";
 pub const AVATAR_ID_PATH: &str = "/avatar/change";
 
@@ -90,7 +90,7 @@ impl VrcInfo {
         start_filling_available_parameters(Arc::clone(&vrc), api);
 
         // create clone for closure
-        let vrc_lock = vrc.lock().unwrap();
+        let mut vrc_lock = vrc.lock().unwrap();
         let cached_parameters_rcve = Arc::clone(&vrc_lock.parameter_cache);
         let default_clone = vrc_lock.cache_length.clone();
         // Our closure that gets called whenever an OSC message is recieved
@@ -101,12 +101,18 @@ impl VrcInfo {
             // if there is a value push it to our cache.
             if let Some(arg) = msg.args.first() {
                 // if we have a cache going otherwise build it.
-                if let Some(mut cache) = cached_parameters_rcve.get(&OscPath(addr)) {
-                    cache.update(arg.to_owned());
+                if let Some(mut cache) = cached_parameters_rcve.get_mut(&OscPath(addr.clone())) {
+                    let _ = cache.update(arg.to_owned());
                 } else {
                     cached_parameters_rcve.insert(
                         OscPath(addr), 
-                        CacheNode::new(arg.to_owned(), default_clone,)
+                        CacheNode::new(
+                            arg.to_owned(),
+                            default_clone,
+                            Duration::from_secs_f32(0.2),
+                            0.2,
+
+                        )
                     );
                 }
             } else {
@@ -142,8 +148,7 @@ impl VrcInfo {
                         params_refresh.get(&OscPath(INTENSITY_PATH.to_owned()))
                     {
                         let intensity = intensity.value().clone();
-                        let (intensity, _) = intensity.latest().unwrap();
-                        let intensity = intensity.float().expect("Non-float value for");
+                        let intensity = intensity.raw_last();
                         if intensity > 0.001 {
                             menu_l.intensity = intensity;
                             menu_l.enable = true;
@@ -156,15 +161,9 @@ impl VrcInfo {
                     // for each node in our config, see if we have received a value.
                     for node in &conf.nodes {
                         if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone())) { 
-                            if let Some(mut old_node) = inputs.get(&Id(node.address.clone())) {
-                                let value = cache_node.interp()
+                            if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
                                 // insert the value into our hashmap
-                                if let Some(intensity) = value.clone().float() {
-                                    old_node.set_intensity(intensity);
-                                } else {
-                                    log::error!("Couldn't find f32 value for: {:?}", position);
-                                    old_node.set_intensity(0.0);
-                                }
+                                old_node.set_intensity(cache_node.latest());
                                 continue;
                             }
 
@@ -176,14 +175,14 @@ impl VrcInfo {
                                 Id(node.address.clone()),
                             );
 
-                            // see if we can set our intensity
-                            if let Some(intensity) = value.clone().float() {
-                                in_node.set_intensity(intensity);
+                            // set intensity and push to map.
+                            let mut intensity = 0.0;
+                            if node.is_external_address {
+                                intensity = cache_node.raw_last();
                             } else {
-                                log::error!("Couldn't find f32 value for: {:?}", position);
-                                in_node.set_intensity(0.0);
+                                intensity = cache_node.latest();
                             }
-
+                            in_node.set_intensity(intensity);
                             inputs.insert(Id(node.address.clone()), in_node);
                         }
                     } // for loop

@@ -1,6 +1,7 @@
 /// A mess of serialization crap that sorta works to deserialize the weirdly formatted AuthenticationInit Message
 mod auth_message;
 mod player_messages;
+pub mod network;
 
 use auth_message::handle_auth_init;
 use serde;

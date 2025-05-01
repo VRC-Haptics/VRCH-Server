@@ -13,8 +13,6 @@ fn main() {
 
     p!("Building proxy sidecar");
 
-    println!("cargo:rerun-if-changed=../src-proxy/Cargo.toml");
-    println!("cargo:rerun-if-changed=../src-proxy/src/");
     let status = Command::new("cargo")
         .args(&[
             "build",
@@ -30,8 +28,6 @@ fn main() {
 
     p!("Building elevated sidecar");
 
-    println!("cargo:rerun-if-changed=../src-elevated-register/Cargo.toml");
-    println!("cargo:rerun-if-changed=../src-elevated-register/src/");
     let status = Command::new("cargo")
         .args(&[
             "build",
@@ -47,8 +43,6 @@ fn main() {
 
     p!("Building C# VRC sidecar");
 
-    println!("cargo:rerun-if-changed=../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj");
-    println!("cargo:rerun-if-changed=../src-vrc-oscquery/listen-for-vrc/Program.cs");
     let output = Command::new("dotnet")
         .args(&[
             "publish",

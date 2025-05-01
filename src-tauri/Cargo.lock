@@ -5513,6 +5513,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vrch-gui"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
  "btleplug",
  "dashmap 6.1.0",
  "dunce",

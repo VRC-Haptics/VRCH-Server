@@ -133,21 +133,6 @@ pub async fn update_device_multiplier(
     Ok(())
 }
 
-#[tauri::command]
-pub async fn set_address(
-    vrc_mutex: tauri::State<'_, Arc<Mutex<VrcInfo>>>,
-    address: String,
-    percentage: f32,
-) -> Result<(), ()> {
-    let vrc = vrc_mutex.lock().unwrap();
-
-    log::info!("set parameter: {:?}, to {:?}", address, percentage);
-    vrc.parameter_cache
-        .insert(OscPath(address), OscType::Float(percentage));
-
-    Ok(())
-}
-
 /// Handles setting our app to launch instead of the bHapticsPlayer
 #[tauri::command]
 pub async fn bhaptics_launch_vrch() {

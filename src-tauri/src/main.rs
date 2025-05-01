@@ -234,6 +234,7 @@ fn main() {
             throw_vrc_notif(app_handle, vrc_info.clone());
             let mut lock = api_manager.lock().unwrap();
             lock.refresh_caches();
+            log::trace!("Actually got: {:?}", bhaptics::game::network::fetch_mappings("0jTPyQjylL9KOPMoekos".to_string(), "yDec5gpu5pqR490S4FLc".to_string(), -1));
             drop(lock);
             Ok(())
         })
@@ -241,7 +242,6 @@ fn main() {
             commands::get_device_list,
             commands::get_vrc_info,
             commands::upload_device_map,
-            commands::set_address,
             commands::update_device_multiplier,
             bhaptics_launch_default,
             bhaptics_launch_vrch,

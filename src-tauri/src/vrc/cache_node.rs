@@ -1,5 +1,5 @@
 use rosc::OscType;
-use std::time::{SystemTime, SystemTimeError};
+use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH, Duration};
 use std::collections::VecDeque;
 use std::mem::discriminant;
 
@@ -17,25 +17,36 @@ pub struct CacheNode {
     /// the max_len of entries we will keep track of.
     max_len: usize,
     /// The state of haptics returned from this node.
-    state: HapticsState,
-}
-
-struct HapticsState {
-    prev_dist: f32,
-    prev_time: f32,           // seconds
-    env_amp: f32,             // running envelope 0–1
-    vel_impulse: f32,         // transient kick 0–1
+    smoothing_time: Duration,
+    position_weight: f32,
+    velocity_weight: f32,
 }
 
 impl CacheNode {
-    pub fn new(value_type: OscType, max_entries: usize) -> CacheNode {
+    /// Create a new CacheNode that blends position + smoothed-velocity.
+    /// 
+    /// `smoothing_time` is how far back (in seconds) to average velocity.
+    /// `position_weight` + `velocity_weight` should each be in [0,1] and sum to 1.0.
+    pub fn new(
+        value_type: OscType,
+        max_entries: usize,
+        smoothing_time: Duration,
+        position_weight: f32,
+    ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
-        values.push_front((value_type.clone(), SystemTime::UNIX_EPOCH));
-        CacheNode { 
-            values: values, 
-            osc_type: value_type, 
-            max_len: max_entries
+        values.push_front((value_type.clone(), UNIX_EPOCH));
+        CacheNode {
+            values,
+            osc_type: value_type,
+            max_len: max_entries,
+            smoothing_time:smoothing_time,
+            position_weight: position_weight.clone(),
+            velocity_weight: 1.0 - position_weight,
         }
+    }
+
+    pub fn raw_last(&self) -> f32 {
+        self.values.front().unwrap().0.clone().float().unwrap()
     }
 
     /// Returns the velocity interpreted latest value.
@@ -125,9 +136,28 @@ impl CacheNode {
         return Ok(());
     }
 
-    /// returns the latest value for this node.
-    pub fn latest(&self) -> Option<&(OscType, SystemTime)> {
-        self.values.front()
+     /// Returns  (velocity_weight * avg |velocity| over `smoothing_time`)
+    ///       + (position_weight * current_position)
+    /// all clamped into [0,1].
+    pub fn latest(&self) -> f32 {
+        let now = SystemTime::now();
+        let limit = now
+            .checked_sub(self.smoothing_time)
+            .unwrap_or(UNIX_EPOCH);
+
+        // 1) pull current position
+        let pos = self
+            .values
+            .front()
+            .map(|(v, _)| v.clone().float().unwrap_or(0.0))
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0);
+
+        // 2) compute smoothed absolute velocity
+        let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
+
+        // 3) blend and clamp
+        (self.velocity_weight * vel + self.position_weight * pos).clamp(0.0, 1.0)
     }
 
     /// Trys to parse OscType into a delta value in f32
