@@ -1,7 +1,15 @@
 use crate::util::deserialization::skip_outer_quotes;
 
-use crate::bhaptics::game::{create_init_response, ApiInfo, BhapticsGame, network};
+use super::{
+    create_init_response, 
+    ApiInfo, 
+    BhapticsGame, 
+    network,
+    device_maps::pattern_to_events,
+};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tokio::task;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// Collects alot of weird classes to handle serialization and deserialization of the AuthInit Message
@@ -49,17 +57,36 @@ pub fn handle_auth_init(contents: &str, game: Arc<Mutex<BhapticsGame>>) {
             game_lock.send(create_init_response());
 
             // see if we can get our game mapping info from api
-            
             if let Some(api_info) = &game_lock.api_info {
                 let api_key = api_info.api_key.clone();
                 let app_id = api_info.application_id.clone();
-                let version = -1;
+
                 drop(game_lock); // drop lock so it doesn't hold while network fetching.
 
-                if let Ok(mapp) =  network::fetch_mappings(api_key, app_id, version) {
-                    let mut lock = game.lock().expect("Couldn't get lock on game");
-                    lock.game_mapping = Some(mapp); 
-                }
+                let game_clone = Arc::clone(&game);
+                tokio::spawn(async move {
+                    match task::spawn_blocking(move || {
+                        network::fetch_mappings(api_key, app_id, -1)
+                    })
+                    .await
+                    {
+                        Ok(Ok(mapping)) => {
+                            if let Ok(mut game) = game_clone.lock() {
+                                let mut out = HashMap::new();
+
+                                for hapt in mapping.haptic_mappings {
+                                    let key = hapt.key.clone();
+                                    let events = pattern_to_events(hapt);
+                                    out.insert(key, events);
+                                }
+
+                                game.game_mapping = Some(out);
+                            }
+                        }
+                        Ok(Err(e)) => log::error!("fetch_mappings error: {e:?}"),
+                        Err(join)   => log::error!("blocking task panicked: {join:?}"),
+                    }
+                });
             }
         }
         Err(err) => {

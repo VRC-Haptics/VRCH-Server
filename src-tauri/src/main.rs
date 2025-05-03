@@ -182,8 +182,6 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 }
 
 fn main() {
-    //let _ = CryptoProvider::install_default();
-
     // Core state machines that interface devices and the haptics providers
     // The GlobalMap; provides interpolated feedback values.
     let input_list: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
@@ -191,12 +189,6 @@ fn main() {
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new()));
     // Provides a unified interface for interacting with external api's 
     let api_manager: Arc<Mutex<ApiManager>> = Arc::new(Mutex::new(ApiManager::new()));
-
-    // Managers for game integrations; each handling connectivity and communications
-    // Global VRC State; connection management and GlobalMap interaction
-    let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager));
-    // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
-    let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
@@ -222,10 +214,17 @@ fn main() {
         )
         .manage(Arc::clone(&input_list))
         .manage(Arc::clone(&device_list))
-        .manage(Arc::clone(&vrc_info))
-        .manage(Arc::clone(&bhaptics))
         .manage(Arc::clone(&api_manager))
         .setup(move |app| {
+            // Managers for game integrations; each handling connectivity and communications
+            // Global VRC State; connection management and GlobalMap interaction
+            let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager));
+            // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
+            let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&input_list));
+
+            app.manage(Arc::clone(&vrc_info));
+            app.manage(Arc::clone(&bhaptics));
+
             let app_handle = app.handle();
             // Initialize stuff that needs the app handle. (interacts directly with GUI)
             tick_devices(device_list.clone(), input_list.clone(), app_handle);
@@ -233,7 +232,6 @@ fn main() {
             throw_vrc_notif(app_handle, vrc_info.clone());
             let mut lock = api_manager.lock().unwrap();
             lock.refresh_caches();
-            //log::trace!("Actually got: {:?}", bhaptics::game::network::fetch_mappings("0jTPyQjylL9KOPMoekos".to_string(), "yDec5gpu5pqR490S4FLc".to_string(), -1));
             drop(lock);
             Ok(())
         })

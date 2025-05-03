@@ -43,6 +43,12 @@ impl GlobalMap {
         self.active_events.push(event);
     }
 
+    pub fn clear_events(&mut self, tag: &String) {
+        self.active_events
+            .retain(|event| !event.tags.contains(tag));
+    }
+    
+
     /// registers a function to be called on a refresh event before every device update.
     pub fn register_refresh<F>(&mut self, fun: F)
     where
@@ -62,17 +68,11 @@ impl GlobalMap {
             callback(&clone, &menu);
         }
 
-        // tick events and remove what's needed
-        let mut to_remove = Vec::new();
-        for (index, event) in self.active_events.iter_mut().enumerate() {
-            let clone = Arc::clone(&self.input_nodes);
-            if event.tick(clone) {
-                to_remove.push(index);
-            }
-        }
-        for i in to_remove {
-            self.active_events.remove(i);
-        }
+        // Tick every event and keep only those that should continue running.
+        self.active_events.retain_mut(|event| {
+            let finished = event.tick(Arc::clone(&self.input_nodes));
+            !finished
+        });
     }
 
     /// checks for duplicates and registers input node for writing to
@@ -101,6 +101,11 @@ impl GlobalMap {
         }
 
         Err(DoesNotExistError { id: id })
+    }
+
+    /// Removes all input nodes with the given tag.
+    pub fn remove_all_with_tag(&self, tag: &String) {
+        self.input_nodes.retain(|_, node| !node.tags.contains(tag));
     }
 
     /// Sets a nodes intensity by id

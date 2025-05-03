@@ -5,6 +5,7 @@ use dashmap::DashMap;
 use super::{haptic_node::HapticNode, input_node::InputNode, Id, NodeGroup};
 
 /// Describes what effect an event should have.
+#[derive(Clone)]
 pub enum EventEffectType {
     /// Will try to set this node id to this value,
     /// Does not remove node after finished.
@@ -16,10 +17,11 @@ pub enum EventEffectType {
     /// Inserts a node at the given location, automatically removes node when event expires.
     Location(Vec3),
     /// Divides locations between the duration of the event and moves the node to that location.
-    MovingLocation(Vec<Vec3>)
+    MovingLocation(Vec<Vec3>),
 }
 
 /// Represents a haptic event that takes place over time.
+#[derive(Clone)]
 pub struct Event {
     /// user facing name
     pub name: String,
@@ -32,7 +34,7 @@ pub struct Event {
     /// Steps will be distributed across this duration.
     pub duration: Duration,
     /// Tags that will be inserted to each node created by this event.
-    tags: Vec<String>,
+    pub tags: Vec<String>,
     managed_nodes: Vec<Id>, // nodes we have control over.
     time_step: Duration,
     steps_completed: usize,
@@ -50,7 +52,7 @@ impl Event {
     /// 
     /// `duration`: The duration this event will be spread over (num_steps/duration must be > 10ms) 
     /// 
-    /// `tags`: Any special tags to add to the event during operation. Useful for clearing all events
+    /// `tags`: Any special tags to add to the event during operation. (atleast one required) Useful for clearing all events
     /// associated with a given event source.
     pub fn new(name: String, effect: EventEffectType, steps: Vec<f32>, duration: Duration, tags: Vec<String>) -> Result<Event, CreateEventError> {
         if steps.len() < 1 {
@@ -122,7 +124,7 @@ impl Event {
     /// Returns early if start_time is already defined.
     fn initiate(&mut self, input_nodes: &DashMap<Id, InputNode>) {
         if self.start_time.is_some() { return; }         // already started
-        log::trace!("Starting event: {}", self.name);
+        //log::trace!("Starting event: {}", self.name);
 
         match &self.effect {
             EventEffectType::Location(pos) => {
@@ -195,7 +197,7 @@ impl Event {
 
     /// cleans up the leftover nodes when an event is finished.
     fn cleanup(&self, input_nodes: &DashMap<Id, InputNode>) {
-        log::trace!("Finished event: {}", self.name);
+        //log::trace!("Finished event: {}", self.name);
         match &self.effect {
             EventEffectType::Location(_) | EventEffectType::MovingLocation(_) => {
                 // Remove transient node(s) that were spawned only for this event
@@ -203,6 +205,11 @@ impl Event {
                     input_nodes.remove(ids);
                 };
             },
+            EventEffectType::SingleNode(id) => {
+                if let Some(mut node) = input_nodes.get_mut(id) {
+                    node.set_intensity(0.);
+                } 
+            }
             _ => { /* nothing to remove */ }
         }
     }

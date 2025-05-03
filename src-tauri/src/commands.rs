@@ -48,7 +48,7 @@ pub fn play_point(
     use strum::IntoEnumIterator;
     let all_bones: Vec<NodeGroup> = NodeGroup::iter().collect();
     let temp_node = HapticNode {
-        x: feedback_location.0,
+        x: -feedback_location.0, // TODO: Actually find out why these are swapped
         y: feedback_location.1,
         z: feedback_location.2,
         groups: all_bones,

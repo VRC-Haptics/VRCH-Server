@@ -51,7 +51,7 @@ impl HapticNode {
                 
                 let (top, bottom) = shared_group.to_points();
                 let angle = math::angle_between_points(top, bottom, this, that).expect("Unable to get angle");
-                if angle <= (PI / 2.) { // only return interactions that are with the 180 deg window
+                if angle >= (PI / 2.) { // only return interactions that are with the 180 deg window
                     return true;
                 }
                 
