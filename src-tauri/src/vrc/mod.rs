@@ -109,7 +109,7 @@ impl VrcInfo {
                         CacheNode::new(
                             arg.to_owned(),
                             default_clone,
-                            Duration::from_secs_f32(0.2),
+                            Duration::from_secs_f32(0.4),
                             0.2,
 
                         )
@@ -163,7 +163,7 @@ impl VrcInfo {
                         if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone())) { 
                             if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
                                 // insert the value into our hashmap
-                                old_node.set_intensity(cache_node.latest());
+                                old_node.set_intensity(cache_node.raw_last());
                                 continue;
                             }
 
@@ -180,7 +180,7 @@ impl VrcInfo {
                             if node.is_external_address {
                                 intensity = cache_node.raw_last();
                             } else {
-                                intensity = cache_node.latest();
+                                intensity = cache_node.raw_last();
                             }
                             in_node.set_intensity(intensity);
                             inputs.insert(Id(node.address.clone()), in_node);
