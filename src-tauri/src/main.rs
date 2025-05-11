@@ -27,10 +27,12 @@ use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager, Window, WindowEvent};
+use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
+
+use tokio::time::{Instant, Interval};
 
 /// Helper to set persistant store values
 fn set_device_store_field<T: serde::Serialize>(
@@ -44,7 +46,7 @@ fn set_device_store_field<T: serde::Serialize>(
         .store("known_devices.json")
         .expect("couldn't access known_devices.json");
 
-    // Try to retrieve the existing device data.
+    // Try to retrieve the existing device data.d
     if let Some(mut device_data) = store.get(mac) {
         // Ensure we have a JSON object.
         if !device_data.is_object() {
@@ -91,43 +93,53 @@ fn get_device_store_field<T: serde::de::DeserializeOwned>(
     }
 }
 
+/// Waits until the next tick and logs an error if an overrun occurs.
+async fn wait_for_tick(timer: &mut Interval, prev_tick: &mut Instant, period: &Duration) -> Instant {
+    let tick_instant = timer.tick().await;
+    let schedule_slip = tick_instant.duration_since(*prev_tick);
+
+    if schedule_slip > *period {
+        let missed = schedule_slip.as_micros() / period.as_micros();
+        log::error!(
+            "Device loop timer slipped by {:?} ({} missed tick(s)). High CPU Usage Likely.",
+            schedule_slip,
+            missed
+        );
+    }
+    tick_instant
+}
+
 fn tick_devices(
     device_list: Arc<Mutex<Vec<Device>>>,
     input_list: Arc<Mutex<GlobalMap>>,
-    app: &tauri::AppHandle,
+    _: &tauri::AppHandle,
 ) {
     log::info!("starting tick");
     io::stdout().flush().unwrap();
-    let app_handle = app.clone();
 
     tauri::async_runtime::spawn(async move {
-        let mut timer = tokio::time::interval(Duration::from_millis(10)); // 100 Hz
+        let period = Duration::from_millis(10); // 100 Hz
+        let mut timer = tokio::time::interval(period); 
+        timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip); // don't ever call too fast.
         let device_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
-        loop {
-            timer.tick().await;
-            {
-                // call update up here (does it matter? timing wise)
+        let mut prev_tick = Instant::now();
 
+        loop {
+            prev_tick = wait_for_tick(&mut timer, &mut prev_tick, &period).await;
+            {
                 let mut device_list_guard = device_list.lock().unwrap();
 
                 // Remove devices that need to be killed.
                 // Collect removed devices (dead devices).
-                let removed_devices: Vec<Device> = device_list_guard
-                    .iter()
-                    .filter(|device| !device.is_alive)
-                    .cloned()
-                    .collect();
-
-                // Print the removed devices.
-                for device in &removed_devices {
-                    log::info!("Removed device: {:?}", device.name);
-                    // NOTE: ALWAYS EMIT DEVICE-REMOVED or added, otherwise many issues.....
-                    app_handle.emit("device-removed", device).unwrap();
-                }
-
-                // Remove dead devices
-                device_list_guard.retain(|device| device.is_alive);
+                device_list_guard.retain(|device| {
+                    if device.is_alive {
+                        true
+                    } else {
+                        log::info!("Removed device: {:?}", device.name);
+                        false
+                    }
+                });
 
                 let mut inputs_guard = input_list.lock().expect("couldn't find inputs guard");
                 inputs_guard.refresh_inputs();

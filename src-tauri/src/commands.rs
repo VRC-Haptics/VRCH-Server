@@ -4,9 +4,8 @@ use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::NodeGroup;
 use crate::set_device_store_field;
-use crate::vrc::{config::GameMap, OscPath, VrcInfo};
+use crate::vrc::{config::GameMap, VrcInfo};
 //standard imports
-use rosc::OscType;
 use runas::Command;
 use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
@@ -24,10 +23,10 @@ pub fn swap_conf_nodes(
     log::trace!("Into command");
     for dev in device_lock.iter_mut() {
         if dev.id == device_id {
-            if let DeviceType::Wifi(wifi_cfg) = &mut dev.device_type {
-                wifi_cfg.swap_nodes(index_1 as usize, index_2 as usize)?;
-                let _ = wifi_cfg;
-            }
+            let DeviceType::Wifi(wifi_cfg) = &mut dev.device_type;
+            wifi_cfg.swap_nodes(index_1 as usize, index_2 as usize)?;
+            let _ = wifi_cfg;
+            
             drop(device_lock);
             log::trace!("Finished Command");
             return Ok(());

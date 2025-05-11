@@ -101,7 +101,7 @@ impl WifiDevice {
             let diff = now
                 .duration_since(self.last_queried)
                 .expect("Error getting difference");
-            if diff > Duration::from_millis(500) || self.last_queried == SystemTime::UNIX_EPOCH {
+            if diff > Duration::from_millis(2000) || self.last_queried == SystemTime::UNIX_EPOCH {
                 self.last_queried = now;
                 return Some(self.build_get_all());
             }
@@ -211,13 +211,10 @@ impl WifiDevice {
             return Err("no_map".to_string());
         }
     }
-
-    pub fn stop(&self) {
-        log::info!("DO stop stuff now")
-    }
 }
 
 /// Manipulates the given flags according to the heartbeat timings.
+/// If is_alive is set to false, device will be removed from being tracked immediatly.
 fn manage_hrtbt(
     is_alive: &mut bool,
     _been_pinged: &mut bool,
@@ -235,12 +232,14 @@ fn manage_hrtbt(
         }
     };
 
-    let ttl = Duration::from_secs(2);
+    let ttl = Duration::from_secs(3);
+    // if outlived time to live and we are currently set as alive
     if diff > ttl && is_alive.to_owned() {
         *is_alive = false;
         *_been_pinged = false;
         log::trace!("Set to false");
-    } else if diff <= ttl && !is_alive.to_owned() {
+    // if the not ttl has passed.
+    } else if diff <= ttl {
         *is_alive = true;
     }
 }

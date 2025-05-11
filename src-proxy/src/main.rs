@@ -1,5 +1,6 @@
 use std::env;
 use std::process;
+use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -11,13 +12,13 @@ fn main() {
     let bhaptics_dir = current_exe.parent().expect("couldn't back out of parent");
     let exe_dir = bhaptics_dir.parent().expect("Failed to get out of bhpatics");
     let main_dir = exe_dir.parent().expect("Couldn't back out of sidecars folder");
-    let main_program = main_dir.join("vrch-gui.exe");
+    let main_program = main_dir.join("vr-haptics-player.exe");
 
     // if our haptics setup isn't running
-    println!("Checking if vrch-gui.exe is already running...");
+    println!("Checking if Haptics server is already running...");
     let mut system = System::new_all();
-    if find_process("vrch-gui.exe", &mut system).is_none() {
-        println!("vrch-gui.exe is not running. Launching new process...");
+    if find_process("vr-haptics-player.exe", &mut system).is_none() {
+        println!("Haptics Server is not running. Launching new process...");
         
         let _status = process::Command::new(main_program)
             .output()
@@ -28,11 +29,12 @@ fn main() {
 
         // if it already is running
     } else {
-        println!("vrch-gui.exe is already running. Attaching to its lifetime...");
-        track_process_and_exit("vrch-gui.exe", &mut system);
+        println!("haptics server is already running. Attaching to its lifetime...");
+        track_process_and_exit("vr-haptics-player.exe", &mut system);
     }
 
     println!("vrch-gui.exe has exited. Proxy shutting down.");
+    exit(0);
 }
 
 fn track_process_and_exit(process_name: &str, system: &mut System) {
@@ -66,6 +68,7 @@ fn track_process_and_exit(process_name: &str, system: &mut System) {
 
         if !process_found {
             println!("Process '{}' has closed. Exiting host process.", process_name);
+            exit(0);
         }
 
         // Sleep for a fixed duration before checking again.

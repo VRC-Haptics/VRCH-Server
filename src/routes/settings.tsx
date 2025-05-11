@@ -1,86 +1,162 @@
-//import { Outlet } from "react-router-dom";
+// import { Outlet } from "react-router-dom";
 import themes from "../utils/themes";
 import { useSettingsContext } from "../context/SettingsProvider";
 
-// Define the types for the settings
-type SettingType = 'toggle' | 'dropdown';
+type SettingType = "toggle" | "dropdown" | "int" | "float";
 
-interface Setting {
+export interface Setting<T = string | number | boolean> {
   title: string;
-  help: string;
-  type: SettingType;
-  getFunction:  string | number | readonly string[] | undefined;
-  setFunction: (value: string) => void;
-  options?: string[]; // Only for dropdown type
+  help:  string;
+  type:  SettingType;
+  defaultValue: T;
+  getFunction: T;                  // current value
+  setFunction: (value: T) => void; // updater
+  options?: string[];              // <‑‑ dropdown‑only
 }
 
 interface Group {
   title: string;
-  help: string;
+  help:  string;
 }
 
-// Component for individual settings item
-const SettingsItem: React.FC<Setting> = ({ title, help, type, getFunction, setFunction, options }) => {
+/// A single Settings item. 
+function SettingsItem<T extends string | number | boolean>({
+  title,
+  help,
+  type,
+  defaultValue,
+  getFunction,
+  setFunction,
+  options,
+}: Setting<T>) {
+  const numberHandler = (raw: string) => {
+    const parsed =
+      type === "int" ? parseInt(raw, 10) :
+      type === "float" ? parseFloat(raw) :
+      (raw as unknown as T);
+
+    if (typeof parsed === "number" ? !Number.isNaN(parsed) : true) {
+      setFunction(parsed as T);
+    }
+  };
+
   return (
-    <div title= {help} className="flex flex-col p-2 bg-base-200 rounded-md">
+    <div title={help} className="flex flex-col p-2 bg-base-200 rounded-md">
       <h3 className="font-semibold text-lg">{title}</h3>
       <h6 className="text-info text-sm p-1">{help}</h6>
 
       <div className="max-h-min rounded-md p-1">
-        {type === 'toggle' ? (
-          <div className="form-control left">
+        {type === "toggle" && (
             <label className="label cursor-pointer">
-              <input type="checkbox" className="toggle-primary" value={getFunction} onChange={(e)=> setFunction(e.target.value)}/>
-            </label>
-          </div>
-        ) : (
-          <select className="select-primary rounded-md select-bordered" value={getFunction} onChange={(e) => setFunction(e.target.value)}>
-            {options?.map((option, index) => (
-              <option key={index} value={option}>
-                {option}
-              </option>
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={Boolean(getFunction)}
+              onChange={e => setFunction(e.target.checked as T)}
+            />
+            <span className="text-xs opacity-70">(Default {String(defaultValue)})</span>
+          </label>
+          
+        )}
+
+        {type === "dropdown" && (
+          <select
+            className="select-s select-primary select-bordered rounded"
+            value={String(getFunction)}
+            onChange={e => setFunction(e.target.value as T)}
+          >
+            {options?.map(o => (
+              <option key={o} value={o}>{o}</option>
             ))}
           </select>
+        )}
+
+        {(type === "int" || type === "float") && (
+          <>
+          <input
+            type="number"
+            className="input input-primary input-sm w-20 text-right"
+            value={String(getFunction)}
+            step={type === "int" ? 1 : "any"}
+            inputMode={type === "int" ? "numeric" : "decimal"}
+            pattern={type === "int" ? "\\d+" : undefined}
+            onChange={e => numberHandler(e.target.value)}
+          />
+          <p className="text-xs opacity-70 mt-1">Default: {String(defaultValue)}</p>
+        </>
         )}
       </div>
     </div>
   );
-};
+}
 
-// Component for a group of settings
-const SettingsGroup: React.FC<{ group: Group, settings: Setting[] }> = ({ group, settings }) => {
+function SettingsGroup<T extends string | number | boolean>({
+  group,
+  settings,
+}: {
+  group: Group;
+  settings: Setting<T>[];
+}) {
   return (
-    <div id= {group.title} className="h-fit w-full px-4">
+    <div id={group.title} className="h-fit w-full px-4">
       <div className="text-md font-bold w-fit text-center text-lg">
         <h2 title={group.help}>{group.title}</h2>
       </div>
-      <div className="flex flex-col h-fit justify-center p-1 w-full">  
-        {settings.map((setting, index) => (
-          <SettingsItem key={index} {...setting} />
+      <div className="flex flex-col h-fit justify-center p-1 w-full">
+        {settings.map((s, i) => (
+          <SettingsItem key={i} {...s} />
         ))}
       </div>
     </div>
   );
-};
-
-
+}
 
 export default function Settings() {
-  const { setTheme, theme: currentTheme } = useSettingsContext();
+  const {
+    theme: currentTheme,
+    setTheme,
+    wifiDeviceTimeout,
+    setWifiTimeout,
+  } = useSettingsContext();
 
-  // app settings group
-  const appGroup: Group = { title: 'App Settings', help: 'Settings for the app' };
-  const appData: Setting[] = [
-    { title: 'Theme', help: 'Select your preferred theme', type: 'dropdown', options: themes, getFunction: currentTheme, setFunction: setTheme },
+  /* App‑level settings */
+  const appGroup: Group = { title: "App Settings", help: "Settings for the app" };
+  const appData: Setting<string>[] = [
+    {
+      title: "Theme",
+      help: "Select your preferred theme",
+      type: "dropdown",
+      defaultValue: "dark",
+      options: themes,
+      getFunction: currentTheme,
+      setFunction: setTheme,
+    },
+  ];
+
+  /* Wi‑Fi device settings */
+  const wifiGroup: Group = {
+    title: "Wifi Device Settings",
+    help: "Settings for devices connected via Wifi.",
+  };
+  const wifiData: Setting<number>[] = [
+    {
+      title: "Timeout (s)",
+      help:
+        "Seconds until a device is considered disconnected. Raise this if devices keep dropping out.",
+      type: "int",
+      defaultValue: 3,
+      getFunction: wifiDeviceTimeout,
+      setFunction: setWifiTimeout,
+    },
   ];
 
   return (
     <div className="flex flex-col h-full w-full">
-      <h1 className="text-2xl font-bold padding-5 text-center">
-        Settings
-      </h1>
+      <h1 className="text-2xl font-bold padding-5 text-center">Settings</h1>
 
-      <SettingsGroup group={appGroup} settings={appData} />
+      {/* generic inference keeps each group type‑safe */}
+      <SettingsGroup group={appGroup}  settings={appData} />
+      <SettingsGroup group={wifiGroup} settings={wifiData} />
     </div>
   );
 }
