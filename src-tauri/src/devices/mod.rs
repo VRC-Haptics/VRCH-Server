@@ -7,11 +7,23 @@ use tauri::AppHandle;
 use wifi::WifiDevice;
 
 use crate::mapping::interp::{GaussianState, InterpAlgo};
+use crate::GlobalMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceType {
     Wifi(WifiDevice),
+}
+
+impl DeviceType {
+    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors, inputs: &GlobalMap) {
+        match self {
+            DeviceType::Wifi(dev) => {
+                dev.tick(is_alive, factors, inputs);
+            }
+            _ => log::error!("unknown device type"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -44,7 +56,7 @@ pub struct OutputFactors {
 impl Device {
     /// Consumes wifi_device and creates a generic Device (with the wifiDevice as a child)
     pub fn from_wifi(wifi_device: WifiDevice, app_handle: &AppHandle) -> Device {
-        let init_interp = GaussianState::new(0.002, 0.1, 0.1);
+        let init_interp = GaussianState::new(0.000002, 0.1, 0.1);
 
         let mut new_device = Device {
             id: wifi_device.mac.clone(),

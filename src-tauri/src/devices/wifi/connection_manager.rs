@@ -44,10 +44,9 @@ impl WifiConnManager {
             if msg.addr == hrtbt_addr_cpy {
                 let mut time_lock = last_hrtbt_cpy.lock().unwrap();
                 *time_lock = SystemTime::now();
-            }
 
-            //if response to server command
-            if msg.addr == "/command" {
+            // command was sent
+            } else if msg.addr == "/command" {
                 if let Some(OscType::String(cmd_str)) = msg.args.get(0) {
                     // if confirmation that we reset something invalidate config
                     if cmd_str.contains(" set to ") {
@@ -72,6 +71,8 @@ impl WifiConnManager {
                         }
                     }
                 }
+            } else {
+                log::error!("Message with unknown address recieved: {}\tArgs: {:?}", msg.addr, msg.args);
             }
         };
 

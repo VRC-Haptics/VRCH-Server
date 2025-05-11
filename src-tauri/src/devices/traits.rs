@@ -1,3 +1,5 @@
+/* 
+
 use crate::{
     devices::{DeviceType, OutputFactors},
     mapping::global_map::GlobalMap,
@@ -14,23 +16,11 @@ trait Stop {
     fn stop(&mut self);
 }
 
-// Delegate the Tick trait implementation to the inner types.
-impl Tick for DeviceType {
-    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors, inputs: &GlobalMap) {
-        match self {
-            DeviceType::Wifi(dev) => {
-                dev.tick(is_alive, factors, inputs);
-            }
-            _ => log::error!("unknown device type"),
-        }
-    }
-}
-
 // Delegate the Stop trait implementation to the inner types.
 impl Stop for DeviceType {
     fn stop(&mut self) {
-        match self {
-            DeviceType::Wifi(dev) => dev.stop(),
-        }
+        log::error!("Stop not implemented for devices yet.");
     }
-}
+}*/
+
+

@@ -160,28 +160,29 @@ impl VrcInfo {
 
                     // for each node in our config, see if we have received a value.
                     for node in &conf.nodes {
-                        if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone())) { 
+                        if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone())) {             
                             if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
                                 // insert the value into our hashmap
                                 old_node.set_intensity(cache_node.raw_last());
                                 continue;
                             }
 
-                            //create node basic's
-                            let position = &node.node_data;
+                            //copy haptic node from data.
+                            let mut haptic_node = node.node_data.clone();
+                            // if external address apply all tag. 
+                            // (since it doesn't have an associated node it is garunteed to not be mergeable.)
+                            if node.is_external_address {
+                                haptic_node.groups.push(crate::mapping::NodeGroup::All);
+                            }
+                            // create input node
                             let mut in_node = InputNode::new(
-                                position.to_owned(),
-                                vec![node.target_bone.to_str().to_string()],
+                                haptic_node,
+                                vec![node.target_bone.to_str().to_string(), "vrc_config_node".to_string()],
                                 Id(node.address.clone()),
                             );
 
                             // set intensity and push to map.
-                            let mut intensity = 0.0;
-                            if node.is_external_address {
-                                intensity = cache_node.raw_last();
-                            } else {
-                                intensity = cache_node.raw_last();
-                            }
+                            let intensity = cache_node.raw_last();
                             in_node.set_intensity(intensity);
                             inputs.insert(Id(node.address.clone()), in_node);
                         }

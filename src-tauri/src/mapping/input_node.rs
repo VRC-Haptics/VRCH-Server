@@ -35,6 +35,10 @@ impl InputNode {
         };
     }
 
+    pub fn always_apply(&self) -> bool {
+        self.haptic_node.groups.contains(&super::NodeGroup::All)
+    }
+
     pub fn set_position(&mut self, pos: Vec3) {
         self.haptic_node.x = pos.x;
         self.haptic_node.y = pos.y;

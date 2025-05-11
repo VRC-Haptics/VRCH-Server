@@ -109,24 +109,25 @@ impl Interpolate for GaussianState {
         let mut claimed_inputs: Vec<(&InputNode, usize)> = vec![];
         let mut claimed_outputs: Vec<(&HapticNode, usize)> = vec![];
 
+
+        // nodes marked with the NodeGroup::All flag.
+        let external_inputs: Vec<&InputNode> =
+            in_nodes.iter().copied().filter(|n| n.always_apply()).collect();
+
         // gather all perfect pairing's first.
-        for (out_index, node) in node_list.iter().enumerate() {
-            for (in_index, input) in in_nodes.iter().enumerate() {
-                let distance = node.dist(&input.haptic_node);
-                // if below our threshold, return early it should be claimed
-                if distance <= self.merge {
-                    claimed_inputs.push((*input, in_index));
-                    claimed_outputs.push((node, out_index));
-                    break;
+        for (out_idx, out_node) in node_list.iter().enumerate() {
+            for (in_idx, in_node) in in_nodes.iter().enumerate() {
+                if out_node.dist(&in_node.haptic_node) <= self.merge {
+                    claimed_inputs.push((*in_node, in_idx));
+                    claimed_outputs.push((out_node, out_idx));
+
+                    // calculate only the claimed node + external inputs.
+                    let mut external_cpy = external_inputs.clone();
+                    external_cpy.push(in_node);
+                    out_list[out_idx] = self.single_node(out_node, &external_cpy);        // direct copy
+                    break;  // stop searching inputs at the first perfect pairing
                 }
             }
-        }
-
-        //move perfect pairings
-        for ((input, _in_idx), (_out_node, out_idx)) in
-            claimed_inputs.iter().zip(claimed_outputs.iter())
-        {
-            out_list[*out_idx] = input.get_intensity()
         }
 
         // need to setup these...

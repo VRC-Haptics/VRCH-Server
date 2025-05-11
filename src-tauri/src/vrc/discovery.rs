@@ -1,6 +1,7 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
 use crate::api::ApiManager;
+use crate::vrc::config::ConfNode;
 use crate::vrc::AVATAR_ID_PATH;
 use crate::VrcInfo;
 
@@ -16,7 +17,7 @@ use oyasumivr_oscquery;
 use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
 use serde;
 
-pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api:Arc<Mutex<ApiManager>>) {
+pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mutex<ApiManager>>) {
     let vrc_clone = Arc::clone(&vrc);
     thread::spawn(move || {
         // Launch the sidecar process.
@@ -48,7 +49,13 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api:Arc<Mute
                             let avatar = { Arc::clone(&vrc.avatar) };
                             drop(vrc);
                             // Call the sub-function with the extracted port.
-                            run_vrc_http_polling(port, params, avatar, Arc::clone(&vrc_clone), Arc::clone(&api));
+                            run_vrc_http_polling(
+                                port,
+                                params,
+                                avatar,
+                                Arc::clone(&vrc_clone),
+                                Arc::clone(&api),
+                            );
                             // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
                         } else {
                             log::error!("Error: Could not parse port from message: {}", msg);
@@ -136,7 +143,11 @@ fn update_existing_avatar(
                 drop(lock);
                 // Attempt to load the new configuration using OSC parameters.
                 if let Some(new_config) = load_and_merge_configs(params, api) {
-                    //log::trace!("new config: {:?}", new_config.nodes.len());
+                    /*let addresses = new_config.nodes
+                            .iter() // &Node
+                            .map(|n| n.address.clone())
+                            .collect::<Vec<String>>();
+                    log::trace!("Addresses: {:?}", addresses);*/
                     let mut avi_write = avatar.write().expect("unable to get write lock");
                     if let Some(avi_mut) = avi_write.as_mut() {
                         avi_mut.id = new_id;
@@ -181,7 +192,10 @@ fn update_existing_avatar(
 ///
 /// * `Some(GameMap)` if configurations were successfully loaded and merged.
 /// * `None` if no configs were found or loaded.
-fn load_and_merge_configs(params: &DashMap<OscPath, OscInfo>, api: Arc<Mutex<ApiManager>>) -> Option<GameMap> {
+fn load_and_merge_configs(
+    params: &DashMap<OscPath, OscInfo>,
+    api: Arc<Mutex<ApiManager>>,
+) -> Option<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
