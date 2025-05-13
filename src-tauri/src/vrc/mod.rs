@@ -1,7 +1,7 @@
+pub mod cache_node;
 pub mod config;
 pub mod discovery;
 pub mod parsing;
-pub mod cache_node;
 
 // crate dependencies
 use crate::api::ApiManager;
@@ -48,7 +48,7 @@ pub struct VrcInfo {
     /// If the buffer doesn't contain value it hasn't been seen since last flush.
     pub parameter_cache: Arc<DashMap<OscPath, CacheNode>>,
     /// Number of value entries to keep around for each `self.parameter_cache` entry
-    /// 
+    ///
     /// VRC Refreshes at 10hz max, so 10*seconds should work just fine.
     pub cache_length: usize,
     /// The OSC server we recieve updates from
@@ -68,7 +68,10 @@ pub struct VrcInfo {
 }
 
 impl VrcInfo {
-    pub fn new(global_map: Arc<Mutex<GlobalMap>>, api: Arc<Mutex<ApiManager>>) -> Arc<Mutex<VrcInfo>> {
+    pub fn new(
+        global_map: Arc<Mutex<GlobalMap>>,
+        api: Arc<Mutex<ApiManager>>,
+    ) -> Arc<Mutex<VrcInfo>> {
         let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
         let value_cache_size = 100;
 
@@ -105,14 +108,13 @@ impl VrcInfo {
                     let _ = cache.update(arg.to_owned());
                 } else {
                     cached_parameters_rcve.insert(
-                        OscPath(addr), 
+                        OscPath(addr),
                         CacheNode::new(
                             arg.to_owned(),
                             default_clone,
                             Duration::from_secs_f32(0.4),
                             0.2,
-
-                        )
+                        ),
                     );
                 }
             } else {
@@ -144,8 +146,7 @@ impl VrcInfo {
                 if let Some(conf) = &avi_read.conf {
                     // upate menu items if we have something to dupate them with
                     let mut menu_l = menu.lock().expect("couldn't lock the menu");
-                    if let Some(intensity) =
-                        params_refresh.get(&OscPath(INTENSITY_PATH.to_owned()))
+                    if let Some(intensity) = params_refresh.get(&OscPath(INTENSITY_PATH.to_owned()))
                     {
                         let intensity = intensity.value().clone();
                         let intensity = intensity.raw_last();
@@ -160,7 +161,8 @@ impl VrcInfo {
 
                     // for each node in our config, see if we have received a value.
                     for node in &conf.nodes {
-                        if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone())) {             
+                        if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone()))
+                        {
                             if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
                                 // insert the value into our hashmap
                                 old_node.set_intensity(cache_node.raw_last());
@@ -169,7 +171,7 @@ impl VrcInfo {
 
                             //copy haptic node from data.
                             let mut haptic_node = node.node_data.clone();
-                            // if external address apply all tag. 
+                            // if external address apply all tag.
                             // (since it doesn't have an associated node it is garunteed to not be mergeable.)
                             if node.is_external_address {
                                 haptic_node.groups.push(crate::mapping::NodeGroup::All);
@@ -177,7 +179,10 @@ impl VrcInfo {
                             // create input node
                             let mut in_node = InputNode::new(
                                 haptic_node,
-                                vec![node.target_bone.to_str().to_string(), "vrc_config_node".to_string()],
+                                vec![
+                                    node.target_bone.to_str().to_string(),
+                                    "vrc_config_node".to_string(),
+                                ],
                                 Id(node.address.clone()),
                             );
 

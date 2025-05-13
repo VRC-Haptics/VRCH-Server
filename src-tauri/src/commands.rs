@@ -26,7 +26,7 @@ pub fn swap_conf_nodes(
             let DeviceType::Wifi(wifi_cfg) = &mut dev.device_type;
             wifi_cfg.swap_nodes(index_1 as usize, index_2 as usize)?;
             let _ = wifi_cfg;
-            
+
             drop(device_lock);
             log::trace!("Finished Command");
             return Ok(());

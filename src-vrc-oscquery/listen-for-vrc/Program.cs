@@ -1,82 +1,89 @@
-﻿using Zeroconf;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using Zeroconf;
+
 namespace ServiceFinder
 {
     class Program
     {
-        static int currentPort = 0;
-        static int parentProcess = 0;
-        
-        /// <summary>
-        /// Blocks until an MDNS service of type "_oscjson._tcp.local." is found
-        /// whose display name starts with "VRChat-Client-". Returns the advertised port.
-        /// </summary>
-        public static int BlockUntilFound()
-        {
-            while (true)
-            {
-                // Asynchronously resolve services of the desired type.
-                var responses = ZeroconfResolver.ResolveAsync("_oscjson._tcp.local.").Result;
-                foreach (var host in responses)
-                {
-                    if (host.DisplayName.StartsWith("VRChat-Client"))
-                    {
-                        var (key, serv) = host.Services.First();
-                        return serv.Port;
-                    }
-                }
-                // Wait briefly before querying again.
-                Thread.Sleep(1000);
-            }
-        }
+        private static int currentPort = 0;
 
         static void Main(string[] args)
         {
-            // Look for the --pid argument. Example: "--pid=1234"
-            var pidArg = args.FirstOrDefault(arg => arg.StartsWith("--pid="));
-            if (pidArg != null)
+            // ── 0. Parse --pid=<N> ────────────────────────────────────────────────
+            var pidArg = args.FirstOrDefault(a => a.StartsWith("--pid=", StringComparison.Ordinal));
+            if (pidArg == null)
             {
-                var pidStr = pidArg.Split('=')[1];
-                if (int.TryParse(pidStr, out int pid))
-                {
-                    parentProcess = pid;
-                }
-                else
-                {
-                    Console.WriteLine("Invalid PID argument. Exiting.");
-                    return;
-                }
+                Console.WriteLine("No --pid=<number> argument supplied. Exiting.");
+                return;
             }
 
-            
-
-            while (true)
+            if (!int.TryParse(pidArg.Split('=')[1], out int parentPid))
             {
-                // Call the blocking function. It will only return when the service is found.
-                int newPort = BlockUntilFound();
+                Console.WriteLine("Invalid --pid value. Exiting.");
+                return;
+            }
 
-                // If a PID was provided, check to see if that process is still alive.
-                // Process.GetProcessById will throw an ArgumentException if the process does not exist.
-                if (parentProcess != 0)
+            // ── 1. Grab a handle to the parent process ────────────────────────────
+            Process parent;
+            try
+            {
+                parent = Process.GetProcessById(parentPid);
+            }
+            catch (ArgumentException)
+            {
+                Console.WriteLine($"Process with PID {parentPid} is not running. Exiting.");
+                return;
+            }
+
+            Console.WriteLine($"Attached to PID {parent.Id} ({parent.ProcessName}).");
+
+            // ── 2. Background monitor that blocks on WaitForExit() ────────────────
+            new Thread(() =>
+            {
+                try
                 {
-                    try
-                    {
-                        Process.GetProcessById(parentProcess);
-                    }
-                    catch (ArgumentException)
-                    {
-                        Console.WriteLine("Parent process no longer exists. Exiting.");
-                        // Optionally perform any cleanup here before exiting.
-                        return;
-                    }
+                    parent.WaitForExit();          // blocks until the process ends
+                }
+                catch (Exception ex)               // covers rare race where process ends first
+                {
+                    Console.WriteLine($"Monitor thread error: {ex.Message}");
                 }
 
+                Console.WriteLine("Parent process has closed. Shutting down side‑car.");
+                Environment.Exit(0);
+            })
+            { IsBackground = true }.Start();
+
+            // ── 3. Zeroconf work continues on main thread ────────────────────────
+            while (true)
+            {
+                int newPort = BlockUntilFound();
                 if (newPort != currentPort)
                 {
                     currentPort = newPort;
                     Console.WriteLine($"FOUND:{currentPort}");
                 }
-                
+            }
+        }
+
+        /// <summary>
+        /// Blocks until an MDNS service of type "_oscjson._tcp.local." is found
+        /// whose display name starts with "VRChat-Client". Returns the advertised port.
+        /// </summary>
+        private static int BlockUntilFound()
+        {
+            while (true)
+            {
+                var responses = ZeroconfResolver.ResolveAsync("_oscjson._tcp.local.").Result;
+                foreach (var host in responses)
+                {
+                    if (host.DisplayName.StartsWith("VRChat-Client", StringComparison.Ordinal))
+                    {
+                        var (_, svc) = host.Services.First();
+                        return svc.Port;
+                    }
+                }
+                Thread.Sleep(1000);
             }
         }
     }

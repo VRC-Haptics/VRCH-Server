@@ -1,7 +1,7 @@
 use rosc::OscType;
-use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH, Duration};
 use std::collections::VecDeque;
 use std::mem::discriminant;
+use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
 
 /// IMPORTANT: DO NOT FORGET SPECIAL CASE INTENSITY = 0. just set raw to zero.
 
@@ -24,7 +24,7 @@ pub struct CacheNode {
 
 impl CacheNode {
     /// Create a new CacheNode that blends position + smoothed-velocity.
-    /// 
+    ///
     /// `smoothing_time` is how far back (in seconds) to average velocity.
     /// `position_weight` + `velocity_weight` should each be in [0,1] and sum to 1.0.
     pub fn new(
@@ -39,7 +39,7 @@ impl CacheNode {
             values,
             osc_type: value_type,
             max_len: max_entries,
-            smoothing_time:smoothing_time,
+            smoothing_time: smoothing_time,
             position_weight: position_weight.clone(),
             velocity_weight: 1.0 - position_weight,
         }
@@ -58,9 +58,13 @@ impl CacheNode {
         let (latest_value, latest_time) = self.values.front().unwrap();
         let (old_value, old_time) = &self.values[1];
         // (percentage / second) * second = new delta
-        let velocity = self.value_delta(latest_value, &old_value) / latest_time.duration_since(*old_time).unwrap().as_secs_f32();
-        let seconds_since_last = SystemTime::now().duration_since(*latest_time).unwrap().as_secs_f32();
-        
+        let velocity = self.value_delta(latest_value, &old_value)
+            / latest_time.duration_since(*old_time).unwrap().as_secs_f32();
+        let seconds_since_last = SystemTime::now()
+            .duration_since(*latest_time)
+            .unwrap()
+            .as_secs_f32();
+
         let interp = latest_value.clone().float().unwrap() + (velocity * seconds_since_last);
         if interp > 1. {
             return 1.;
@@ -72,9 +76,9 @@ impl CacheNode {
     }
 
     /// Calculate average velocity from entries after `limit` timestamp.
-    /// 
+    ///
     /// The delta between `limit` and now can be seen as a smoothing time.
-    /// 
+    ///
     /// Units: [Change Value/Second]
     pub fn velocity_since(&self, limit: &SystemTime) -> f32 {
         let mut sum: f32 = 0.;
@@ -82,22 +86,25 @@ impl CacheNode {
 
         // itterate from newest to oldest.
         for (index, (val, time)) in self.values.iter().enumerate() {
-            if *time > *limit { // Shouldn't be necessary?
+            if *time > *limit {
+                // Shouldn't be necessary?
                 // get next step into past
-                let (older_val, older_time) = &self.values[index + 1 ];
-                if older_time > limit  {
+                let (older_val, older_time) = &self.values[index + 1];
+                if older_time > limit {
                     count += 1.;
-                    sum += self.value_delta(val, &older_val) / 
-                            time.duration_since(*older_time).unwrap().as_secs_f32();
+                    sum += self.value_delta(val, &older_val)
+                        / time.duration_since(*older_time).unwrap().as_secs_f32();
                 } else {
                     break;
-                }         
+                }
             } else {
                 break;
             }
         }
-        
-        if count == 0.0 {return count}
+
+        if count == 0.0 {
+            return count;
+        }
         return sum / count;
     }
 
@@ -107,16 +114,18 @@ impl CacheNode {
         // retrieve values
         if let Some((val, time)) = self.values.back() {
             if let Some((val_late, time_late)) = self.values.get(entries_back) {
-                
                 // try to get time delta
                 match time.duration_since(*time_late) {
                     Ok(dur) => {
                         return Ok(self.value_delta(val, val_late) / dur.as_secs_f32());
-                    },
+                    }
                     Err(err) => return Err(RetrievalError::TimeError(err)),
                 };
             } else {
-                return Err(RetrievalError::CacheTooSmall(self.values.len(), entries_back))
+                return Err(RetrievalError::CacheTooSmall(
+                    self.values.len(),
+                    entries_back,
+                ));
             }
         } else {
             return Err(RetrievalError::EmptyCache);
@@ -126,24 +135,25 @@ impl CacheNode {
     /// Pushes an update to the cached values with the current time as a timestamp.
     pub fn update(&mut self, value: OscType) -> Result<(), WrongNodeTypeError> {
         if discriminant(&self.osc_type) != discriminant(&value) {
-            return Err(WrongNodeTypeError{entered: value, expected: self.osc_type.clone()});
+            return Err(WrongNodeTypeError {
+                entered: value,
+                expected: self.osc_type.clone(),
+            });
         }
         if self.values.len() >= self.max_len {
             self.values.pop_back();
         }
         self.values.push_front((value, SystemTime::now()));
-        
+
         return Ok(());
     }
 
-     /// Returns  (velocity_weight * avg |velocity| over `smoothing_time`)
+    /// Returns  (velocity_weight * avg |velocity| over `smoothing_time`)
     ///       + (position_weight * current_position)
     /// all clamped into [0,1].
     pub fn latest(&self) -> f32 {
         let now = SystemTime::now();
-        let limit = now
-            .checked_sub(self.smoothing_time)
-            .unwrap_or(UNIX_EPOCH);
+        let limit = now.checked_sub(self.smoothing_time).unwrap_or(UNIX_EPOCH);
 
         // 1) pull current position
         let pos = self
@@ -164,25 +174,34 @@ impl CacheNode {
     /// value is left hand, val_late is right hand.
     fn value_delta(&self, value: &OscType, val_late: &OscType) -> f32 {
         match value {
-            OscType::Float(float) => {float - val_late.clone().float().unwrap()},
-            OscType::Int(int) => {(int - val_late.clone().int().unwrap()) as f32},
-            OscType::Double(double) => {(double - val_late.clone().double().unwrap()) as f32},
+            OscType::Float(float) => float - val_late.clone().float().unwrap(),
+            OscType::Int(int) => (int - val_late.clone().int().unwrap()) as f32,
+            OscType::Double(double) => (double - val_late.clone().double().unwrap()) as f32,
             OscType::Long(long) => (long - val_late.clone().long().unwrap()) as f32,
-            OscType::Bool(bool) => if *bool == val_late.clone().bool().unwrap() { 0.0 } else { 1.0 },
+            OscType::Bool(bool) => {
+                if *bool == val_late.clone().bool().unwrap() {
+                    0.0
+                } else {
+                    1.0
+                }
+            }
             _ => unimplemented!(),
         }
     }
 }
 
 /// The wrong node type was inserted into this node.
-pub struct WrongNodeTypeError{entered: OscType, expected: OscType}
+pub struct WrongNodeTypeError {
+    entered: OscType,
+    expected: OscType,
+}
 
 /// An Error occured during retrieval from cache.
 pub enum RetrievalError {
-    /// Value is requested but the cache is still empty 
+    /// Value is requested but the cache is still empty
     EmptyCache,
     /// the cache does not contain enough entries: `(required: usize, requested:usize)`
     CacheTooSmall(usize, usize),
     /// Time calcualtions results in an error: (SystemTimeError)
-    TimeError(SystemTimeError)
+    TimeError(SystemTimeError),
 }

@@ -109,10 +109,12 @@ impl Interpolate for GaussianState {
         let mut claimed_inputs: Vec<(&InputNode, usize)> = vec![];
         let mut claimed_outputs: Vec<(&HapticNode, usize)> = vec![];
 
-
         // nodes marked with the NodeGroup::All flag.
-        let external_inputs: Vec<&InputNode> =
-            in_nodes.iter().copied().filter(|n| n.always_apply()).collect();
+        let external_inputs: Vec<&InputNode> = in_nodes
+            .iter()
+            .copied()
+            .filter(|n| n.always_apply())
+            .collect();
 
         // gather all perfect pairing's first.
         for (out_idx, out_node) in node_list.iter().enumerate() {
@@ -124,8 +126,8 @@ impl Interpolate for GaussianState {
                     // calculate only the claimed node + external inputs.
                     let mut external_cpy = external_inputs.clone();
                     external_cpy.push(in_node);
-                    out_list[out_idx] = self.single_node(out_node, &external_cpy);        // direct copy
-                    break;  // stop searching inputs at the first perfect pairing
+                    out_list[out_idx] = self.single_node(out_node, &external_cpy); // direct copy
+                    break; // stop searching inputs at the first perfect pairing
                 }
             }
         }

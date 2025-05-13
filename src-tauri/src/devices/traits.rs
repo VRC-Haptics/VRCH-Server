@@ -1,4 +1,4 @@
-/* 
+/*
 
 use crate::{
     devices::{DeviceType, OutputFactors},
@@ -22,5 +22,3 @@ impl Stop for DeviceType {
         log::error!("Stop not implemented for devices yet.");
     }
 }*/
-
-

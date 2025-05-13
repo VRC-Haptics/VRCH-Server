@@ -3,22 +3,22 @@
 #![warn(unused_extern_crates)]
 
 // make local modules available
+pub mod api;
 mod bhaptics;
 mod commands;
 mod devices;
 pub mod mapping;
 pub mod osc;
 pub mod util;
-pub mod api;
 mod vrc;
 
 // local modules
+use api::ApiManager;
 use bhaptics::game::BhapticsGame;
 use devices::wifi::discovery::start_wifi_listener;
 use devices::{Device, DeviceType};
 use mapping::global_map::GlobalMap;
 use vrc::VrcInfo;
-use api::ApiManager;
 
 //standard imports
 use commands::*;
@@ -94,7 +94,11 @@ fn get_device_store_field<T: serde::de::DeserializeOwned>(
 }
 
 /// Waits until the next tick and logs an error if an overrun occurs.
-async fn wait_for_tick(timer: &mut Interval, prev_tick: &mut Instant, period: &Duration) -> Instant {
+async fn wait_for_tick(
+    timer: &mut Interval,
+    prev_tick: &mut Instant,
+    period: &Duration,
+) -> Instant {
     let tick_instant = timer.tick().await;
     let schedule_slip = tick_instant.duration_since(*prev_tick);
 
@@ -119,7 +123,7 @@ fn tick_devices(
 
     tauri::async_runtime::spawn(async move {
         let period = Duration::from_millis(10); // 100 Hz
-        let mut timer = tokio::time::interval(period); 
+        let mut timer = tokio::time::interval(period);
         timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip); // don't ever call too fast.
         let device_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
@@ -199,10 +203,15 @@ fn main() {
     let input_list: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
     // Global device list; contains all active devices.
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new()));
-    // Provides a unified interface for interacting with external api's 
+    // Provides a unified interface for interacting with external api's
     let api_manager: Arc<Mutex<ApiManager>> = Arc::new(Mutex::new(ApiManager::new()));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            let _ = app.get_webview_window("main")
+                       .expect("no main window")
+                       .set_focus();
+        }))
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -214,7 +223,7 @@ fn main() {
             tauri_plugin_log::Builder::new()
                 .target(Target::new(TargetKind::Webview))
                 .target(Target::new(TargetKind::LogDir {
-                    file_name: Some("logs".to_string())
+                    file_name: Some("logs".to_string()),
                 }))
                 .filter(|metadata| {
                     !metadata.target().starts_with("mio")
@@ -230,7 +239,8 @@ fn main() {
         .setup(move |app| {
             // Managers for game integrations; each handling connectivity and communications
             // Global VRC State; connection management and GlobalMap interaction
-            let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager));
+            let vrc_info: Arc<Mutex<VrcInfo>> =
+                VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager));
             // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
             let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&input_list));
 

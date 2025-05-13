@@ -57,3 +57,6 @@ tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
 base64 = "0.22.1"
 async-spin-sleep = "0.5.1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"

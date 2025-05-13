@@ -87,12 +87,13 @@ impl WifiDevice {
                 return Some(set_map);
             }
 
-
             // Collect haptic values and scale to output.
             let mut intensities =
                 inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
             let global_offset = inputs.standard_menu.lock().expect("Global Lock").intensity;
-            intensities.iter_mut().for_each(|x| *x *= global_offset * factors.sens_mult);
+            intensities
+                .iter_mut()
+                .for_each(|x| *x *= global_offset * factors.sens_mult);
             return Some(self.compile_message(&intensities));
         } else {
             // If no mapping configuration found

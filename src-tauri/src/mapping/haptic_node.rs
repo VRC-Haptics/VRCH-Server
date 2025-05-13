@@ -3,7 +3,6 @@ use std::f32::consts::PI;
 use crate::mapping::NodeGroup;
 use crate::util::math::{self, Vec3};
 
-
 /// Struct defining all needed properties for a haptic node.
 /// Used for mapping from one haptic model to another.
 /// Units are in Meters: Y is vertical, X is aligned with the Right Arm, Z is towards the front.
@@ -34,7 +33,7 @@ impl HapticNode {
         Vec3 {
             x: self.x,
             y: self.y,
-            z: self.z
+            z: self.z,
         }
     }
 
@@ -48,16 +47,17 @@ impl HapticNode {
             if other.groups.contains(shared_group) {
                 let this = self.to_vec3();
                 let that = other.to_vec3();
-                
+
                 let (top, bottom) = shared_group.to_points();
-                let angle = math::angle_between_points(top, bottom, this, that).expect("Unable to get angle");
-                if angle <= (PI / 2.) { // only return interactions that are with the 180 deg window
+                let angle = math::angle_between_points(top, bottom, this, that)
+                    .expect("Unable to get angle");
+                if angle <= (PI / 2.) {
+                    // only return interactions that are with the 180 deg window
                     return true;
                 }
-                
             }
         }
-        
+
         false
     }
 

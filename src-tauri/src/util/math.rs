@@ -1,7 +1,9 @@
 use core::f32::consts::PI;
 
 #[inline(always)]
-fn rad_to_deg(rad: f32) -> f32 { rad * 180.0 / PI }
+fn rad_to_deg(rad: f32) -> f32 {
+    rad * 180.0 / PI
+}
 
 /// Minimal 3‑vector with **f32** components for high‑throughput numeric geometry.
 #[derive(Copy, Clone, Debug, Default)]
@@ -13,7 +15,9 @@ pub struct Vec3 {
 
 impl Vec3 {
     #[inline(always)]
-    pub const fn new(x: f32, y: f32, z: f32) -> Self { Self { x, y, z } }
+    pub const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
 
     #[inline(always)]
     pub fn sub(self, other: Self) -> Self {
@@ -35,7 +39,9 @@ impl Vec3 {
     }
 
     #[inline(always)]
-    pub fn norm(self) -> f32 { self.dot(self).sqrt() }
+    pub fn norm(self) -> f32 {
+        self.dot(self).sqrt()
+    }
 }
 
 /// Compute the angle in radians around a center axis two points are. Axis is defined by two points.
@@ -43,11 +49,16 @@ impl Vec3 {
 /// * `Some(theta)` where `theta` is in **radians**, 0 ≤ θ ≤ π/2
 /// * `None` if either set of points fails to define a plane
 #[inline]
-pub fn angle_between_points(axis_one: Vec3, axis_two: Vec3, input: Vec3, output: Vec3) -> Option<f32> {
+pub fn angle_between_points(
+    axis_one: Vec3,
+    axis_two: Vec3,
+    input: Vec3,
+    output: Vec3,
+) -> Option<f32> {
     // In‑plane edges for plane ABC
     let u1 = axis_one.sub(input); // B – A
     let v1 = axis_two.sub(input); // C – A
-    // In‑plane edges for plane BCD
+                                  // In‑plane edges for plane BCD
     let u2 = axis_one.sub(output); // B – D
     let v2 = axis_two.sub(output); // C – D
 

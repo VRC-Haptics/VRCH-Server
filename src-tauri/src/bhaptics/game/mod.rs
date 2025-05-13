@@ -1,32 +1,32 @@
 /// A mess of serialization crap that sorta works to deserialize the weirdly formatted AuthenticationInit Message
 mod auth_message;
-mod player_messages;
-pub mod network;
 mod device_maps;
+pub mod network;
+mod player_messages;
 
+use crate::mapping::{event::Event, global_map::GlobalMap, haptic_node::HapticNode, NodeGroup};
 use auth_message::handle_auth_init;
 use network::event_map::PatternLocation;
-use crate::mapping::{event::Event, global_map::GlobalMap, haptic_node::HapticNode, NodeGroup};
 use serde;
 
 use std::{
+    collections::HashMap,
     fs::File,
     io::{self, BufReader},
     net::SocketAddr,
     sync::{Arc, Mutex},
     thread,
-    collections::HashMap,
 };
 
 use futures_util::{SinkExt, StreamExt};
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use strum::IntoEnumIterator;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_util::sync::CancellationToken;
 use tokio_websockets::Message;
-use strum::IntoEnumIterator;
 
 const PATH_TO_CERT: &str = "security/localhost.crt";
 const PATH_TO_KEY: &str = "security/localhost.key";
@@ -85,8 +85,7 @@ impl BhapticsGame {
         // this block runs at most once, no matter how many times new() is called
         let game_clone = Arc::clone(&game);
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new()
-                .expect("Failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
             rt.block_on(async move {
                 log::trace!("Started bhaptics thread");
                 if let Err(e) = run_server(game_clone, shutdown_token).await {
@@ -128,16 +127,17 @@ impl BhapticsGame {
                     x: position.x,
                     y: position.y,
                     z: position.z,
-                    groups: vec![NodeGroup::All] //TODO: Actually make the groups apply right.
+                    groups: vec![NodeGroup::All], //TODO: Actually make the groups apply right.
                 };
-                let tags = vec!["Bhaptics_Native".to_string(), loc.to_input_tag().to_string()];
+                let tags = vec![
+                    "Bhaptics_Native".to_string(),
+                    loc.to_input_tag().to_string(),
+                ];
                 if let Some(id) = loc.to_id(index) {
                     // doesn't really matter if it is already there, we want to keep only one instance.
                     let _ = input_lock.add_input_node(node, tags, id.0);
                 }
-               
             }
-            
         }
     }
 
@@ -191,7 +191,7 @@ async fn run_server(
                                 game_clone
                             ).await {
                                 log::error!("Connection error: {:?}", e);
-                            };                            
+                            };
                         });
                     }
                     Err(e) => {
@@ -248,7 +248,7 @@ async fn handle_connection(
             Ok(msg) if msg.is_text() => {
                 msg_received(msg, Arc::clone(&game));
             }
-            Ok(msg) if msg.is_ping() || msg.is_pong() => {/* Ignore ping/pong messages.*/}
+            Ok(msg) if msg.is_ping() || msg.is_pong() => { /* Ignore ping/pong messages.*/ }
             Ok(_) => {
                 log::warn!("Received non-text message");
             }
@@ -285,7 +285,6 @@ fn handle_sdk_play(input: &str, game: &Arc<Mutex<BhapticsGame>>) {
             if let Some(events) = &game.game_mapping {
                 // get event from struct
                 if let Some(event_list) = events.get(&content.event_name) {
-                    
                     let inputs_clone = Arc::clone(&game.input_list);
                     let mut lock = inputs_clone.lock().expect("unable to lock inputs");
                     for ev in event_list {
@@ -297,9 +296,9 @@ fn handle_sdk_play(input: &str, game: &Arc<Mutex<BhapticsGame>>) {
                 }
             } else {
                 log::trace!("No events yet: {}", content.event_name);
-            }            
-        },
-        Err(err) => log::error!("Error decoding bhaptics play message: {}", err)
+            }
+        }
+        Err(err) => log::error!("Error decoding bhaptics play message: {}", err),
     }
 }
 
