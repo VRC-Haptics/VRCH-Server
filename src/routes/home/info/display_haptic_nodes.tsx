@@ -41,7 +41,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
     const node = nodes[selectedIndices[0]];
     invoke('play_point', {
       feedbackLocation: [node.x, node.y, node.z] as [number, number, number],
-      power: 1.0,
+      power: 1.0*selectedDevice.factors.sens_mult,
       duration: 1.0,
     }).catch(err => console.error('play_point invoke failed:', err));
   };
