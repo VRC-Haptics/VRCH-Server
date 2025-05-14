@@ -1,8 +1,12 @@
 import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { invoke } from "@tauri-apps/api/core";
-import { defaultVrcInfo, VrcInfo } from '../utils/commonClasses';
+import { defaultVrcInfo, VrcInfo } from '../utils/vrc_info_classes';
 
-export const VrcContext = createContext<VrcInfo>(defaultVrcInfo);
+interface VrcContextValue {
+  vrcInfo: VrcInfo;
+}
+
+export const VrcContext = createContext<VrcContextValue>({vrcInfo: defaultVrcInfo});
 
 export const useVrcContext = () => useContext(VrcContext);
 
@@ -23,12 +27,12 @@ export const VrcProvider = ({ children }: { children: ReactNode}) => {
     fetchVrc();
 
     // Polling interval
-    const intervalId = setInterval(fetchVrc, 10000);
+    const intervalId = setInterval(fetchVrc, 1000);
     return () => clearInterval(intervalId);
   }, []);
 
   return (
-    <VrcContext.Provider value={vrcInfo}>
+    <VrcContext.Provider value={{vrcInfo: vrcInfo}}>
       {children}
     </VrcContext.Provider>
   );

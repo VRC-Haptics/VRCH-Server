@@ -42,7 +42,7 @@ pub struct VrcInfo {
     pub avatar: Arc<RwLock<Option<Avatar>>>,
     /// Parameters VRC advertises as available, is empty if not resolved yet
     ///
-    /// NOTE: The values actual values contained in this struct are out of date by ~2S.
+    /// NOTE: The values actual values contained in this struct are out of date by up to 2 seconds.
     pub available_parameters: Arc<DashMap<OscPath, OscInfo>>,
     /// Buffer that is filled with values collected from the OSC stream.
     /// If the buffer doesn't contain value it hasn't been seen since last flush.
@@ -180,7 +180,7 @@ impl VrcInfo {
                             let mut in_node = InputNode::new(
                                 haptic_node,
                                 vec![
-                                    node.target_bone.to_str().to_string(),
+                                    node.target_bone.to_string(),
                                     "vrc_config_node".to_string(),
                                 ],
                                 Id(node.address.clone()),
@@ -205,8 +205,9 @@ impl VrcInfo {
     }
 
     /// Purges the parameter cache.
-    pub fn purge_cache(&self) {
+    pub fn purge_cache(&mut self) {
         self.parameter_cache.clear();
+        log::info!("Purged Parameter cache.");
     }
 }
 

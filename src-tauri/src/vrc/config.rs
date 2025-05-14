@@ -257,9 +257,9 @@ pub enum TargetBone {
     LastBone,
 }
 
-impl TargetBone {
-    pub fn to_str(&self) -> &str {
-        match self {
+impl ToString for TargetBone {
+    fn to_string(&self) -> String {
+        let str = match self {
             TargetBone::Hips => "Hips",
             TargetBone::LeftUpperLeg => "LeftUpperLeg",
             TargetBone::RightUpperLeg => "RightUpperLeg",
@@ -316,6 +316,7 @@ impl TargetBone {
             TargetBone::RightLittleDistal => "RightLittleDistal",
             TargetBone::UpperChest => "UpperChest",
             TargetBone::LastBone => "LastBone",
-        }
+        };
+        str.to_string()
     }
 }
