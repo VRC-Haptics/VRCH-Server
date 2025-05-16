@@ -207,7 +207,7 @@ fn main() {
     let api_manager: Arc<Mutex<ApiManager>> = Arc::new(Mutex::new(ApiManager::new()));
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let _ = app.get_webview_window("main")
                        .expect("no main window")
                        .set_focus();
@@ -262,6 +262,7 @@ fn main() {
             commands::get_vrc_info,
             commands::upload_device_map,
             commands::update_device_multiplier,
+            commands::update_device_offset,
             bhaptics_launch_default,
             bhaptics_launch_vrch,
             commands::play_point,

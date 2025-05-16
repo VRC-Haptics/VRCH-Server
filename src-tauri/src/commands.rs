@@ -124,16 +124,29 @@ pub async fn update_device_multiplier(
     devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
     window: tauri::Window,
 ) -> Result<(), ()> {
-    let start_offset = 0.0;
     let mut devices_lock = devices_store.lock().unwrap();
     if let Some(dev) = devices_lock.iter_mut().find(|d| d.id == device_id) {
         dev.factors.sens_mult = multiplier;
-        dev.factors.start_offset = start_offset;
         set_device_store_field(&window, &device_id, "sens_mult", multiplier);
-        set_device_store_field(&window, &device_id, "start_offset", start_offset);
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn update_device_offset(
+    device_id: String,
+    offset: f32,
+    devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+    window: tauri::Window,
+) -> Result<(), ()> {
+    let mut devices_lock = devices_store.lock().unwrap();
+    if let Some(dev) = devices_lock.iter_mut().find(|d| d.id == device_id) {
+        dev.factors.start_offset = offset;
+        set_device_store_field(&window, &device_id, "start_offset", offset);
+    }
+    Ok(())
+}
+
 
 /// Handles setting our app to launch instead of the bHapticsPlayer
 #[tauri::command]

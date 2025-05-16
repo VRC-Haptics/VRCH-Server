@@ -9,7 +9,6 @@ interface InfoPageProps {
 }
 
 export default function InfoPage({ selectedDevice }: InfoPageProps) {
-  // Instead of just `devices`, now we get both
   const { devices } = useDeviceContext();
 
   function createInfo(device_id: string) {
@@ -18,13 +17,9 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
     if (device != null) {
       return (
         <div id="DeviceInfoCard" className="flex-col min-w-0 max-w-full h-full overflow-y-auto">
-          {//<TestAddress fireAddress={fireGroup} selectedDevice={device}></TestAddress>
-          }
           <DeviceOffset selectedDevice={device}></DeviceOffset>
           <DisplayHapticNodes selectedDevice={device}></DisplayHapticNodes>
           <DeviceJsonUpload device={device}></DeviceJsonUpload>
-          {//<div className="flex-grow"></div>
-          }
           <RawDeviceInfo device={device} />
         </div>
       );

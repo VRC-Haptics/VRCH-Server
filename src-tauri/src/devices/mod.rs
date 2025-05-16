@@ -49,8 +49,6 @@ pub struct OutputFactors {
     pub sens_mult: f32,
     /// the lowest value that produces feedback
     pub start_offset: f32,
-    /// sensitivity set by user
-    pub user_sense: f32,
     /// Interpolation algorithm
     pub interp_algo: InterpAlgo,
 }
@@ -68,7 +66,6 @@ impl Device {
             factors: OutputFactors {
                 sens_mult: 1.0,
                 start_offset: 0.0,
-                user_sense: 1.0,
                 interp_algo: InterpAlgo::Gaussian(init_interp),
             },
             device_type: DeviceType::Wifi(wifi_device),
@@ -80,7 +77,6 @@ impl Device {
         {
             new_device.factors.sens_mult = old_offset;
         }
-        // Recall last user_sense
 
         return new_device;
     }

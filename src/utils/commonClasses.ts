@@ -13,8 +13,9 @@ export type InterpAlgo = {
 
 // Represents the factors that modulate device output.
 export interface OutputFactors {
+  /// the lowest value that produces feedback
+  start_offset: number;
   sens_mult: number;
-  user_sense: number;
   interp_algo: InterpAlgo;
 }
 
@@ -138,7 +139,7 @@ export const defaultDevice: Device = {
   is_alive: false,
   factors: {
     sens_mult: 1.0,
-    user_sense: 1.0,
+    start_offset: 0.0,
     interp_algo: {
       variant: "Gaussian",
       value: {

@@ -66,7 +66,7 @@ impl WifiDevice {
         is_alive: &mut bool,
         // output factors specific to nodes under this device only
         factors: &mut OutputFactors,
-        // All inputs that are supposed to span the entire array.
+        // The inputs that will be used to give feedback.
         inputs: &GlobalMap,
     ) -> Option<Packet> {
         if !self.been_pinged {
@@ -93,7 +93,7 @@ impl WifiDevice {
             let global_offset = inputs.standard_menu.lock().expect("Global Lock").intensity;
             intensities
                 .iter_mut()
-                .for_each(|x| *x *= global_offset * factors.sens_mult);
+                .for_each(|x| *x = scale(*x, factors, global_offset));
             return Some(self.compile_message(&intensities));
         } else {
             // If no mapping configuration found
@@ -212,6 +212,21 @@ impl WifiDevice {
             return Err("no_map".to_string());
         }
     }
+}
+
+const EPSILON: f32 = 0.001;
+
+/// scales a float value according to the output factors.
+fn scale(val: f32, factors: &OutputFactors, global_offset: f32) -> f32 {
+    if val <= EPSILON {
+        return 0.0;
+    }
+    if 1.0 - val <= EPSILON {
+        return factors.sens_mult;
+    }
+    
+    let range = factors.sens_mult - factors.start_offset;
+    (val*global_offset) * range + factors.start_offset
 }
 
 /// Manipulates the given flags according to the heartbeat timings.
