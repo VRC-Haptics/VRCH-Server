@@ -26,13 +26,11 @@ use serde_json::json;
 use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Instant, Duration};
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
-use tauri_plugin_store::StoreExt;
-
-use tokio::time::{Instant, Interval};
+use tauri_plugin_store::{StoreExt, JsonValue};
 
 /// Helper to set persistant store values
 fn set_device_store_field<T: serde::Serialize>(
@@ -93,24 +91,31 @@ fn get_device_store_field<T: serde::de::DeserializeOwned>(
     }
 }
 
-/// Waits until the next tick and logs an error if an overrun occurs.
-async fn wait_for_tick(
-    timer: &mut Interval,
-    prev_tick: &mut Instant,
-    period: &Duration,
-) -> Instant {
-    let tick_instant = timer.tick().await;
-    let schedule_slip = tick_instant.duration_since(*prev_tick);
+fn get_store_field<T: serde::de::DeserializeOwned>(
+    app_handle: &tauri::AppHandle,
+    field: &str,
+) -> Option<T> {
+    let store = app_handle
+        .store("context_store.json")
+        .expect("couldn't access context_store.json");
 
-    if schedule_slip > *period {
-        let missed = schedule_slip.as_micros() / period.as_micros();
-        log::error!(
-            "Device loop timer slipped by {:?} ({} missed tick(s)). High CPU Usage Likely.",
-            schedule_slip,
-            missed
-        );
+    if let Some(data) = store.get(field) {
+        serde_json::from_value(data).ok()
+    } else {
+        None
     }
-    tick_instant
+}
+
+fn set_store_field<T>(
+    app_handle: &tauri::AppHandle,
+    field: &str,
+    value: T,
+) where JsonValue: From<T> {
+    let store = app_handle
+        .store("context_store.json")
+        .expect("couldn't access context_store.json");
+
+    store.set(field, value)
 }
 
 fn tick_devices(
@@ -122,16 +127,26 @@ fn tick_devices(
     io::stdout().flush().unwrap();
 
     tauri::async_runtime::spawn(async move {
-        let period = Duration::from_millis(10); // 100 Hz
-        let mut timer = tokio::time::interval(period);
-        timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip); // don't ever call too fast.
+
+        let mut interval = spin_sleep_util::interval(Duration::from_secs(1) / 100);
+
         let device_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
         let mut prev_tick = Instant::now();
 
         loop {
-            prev_tick = wait_for_tick(&mut timer, &mut prev_tick, &period).await;
-            {
+            // handle wait times
+            let tick_time = interval.tick();
+            let schedule_slip = tick_time.duration_since(prev_tick);
+            if schedule_slip > Duration::from_millis(11) {
+                log::warn!(
+                    "Device loop timer slipped by {:?}. High CPU Usage Likely.",
+                    schedule_slip,
+                );
+            }
+            prev_tick = tick_time;
+
+            { // handle actual device ticks 
                 let mut device_list_guard = device_list.lock().unwrap();
 
                 // Remove devices that need to be killed.
@@ -237,17 +252,18 @@ fn main() {
         .manage(Arc::clone(&device_list))
         .manage(Arc::clone(&api_manager))
         .setup(move |app| {
+            let app_handle = app.handle();
+            
             // Managers for game integrations; each handling connectivity and communications
             // Global VRC State; connection management and GlobalMap interaction
             let vrc_info: Arc<Mutex<VrcInfo>> =
-                VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager));
+                VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager), app_handle);
             // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
             let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&input_list));
 
             app.manage(Arc::clone(&vrc_info));
             app.manage(Arc::clone(&bhaptics));
 
-            let app_handle = app.handle();
             // Initialize stuff that needs the app handle. (interacts directly with GUI)
             tick_devices(device_list.clone(), input_list.clone(), app_handle);
             start_wifi_listener(app_handle.clone(), app.state());
@@ -263,6 +279,7 @@ fn main() {
             commands::upload_device_map,
             commands::update_device_multiplier,
             commands::update_device_offset,
+            commands::update_vrc_distance_weight,
             bhaptics_launch_default,
             bhaptics_launch_vrch,
             commands::play_point,

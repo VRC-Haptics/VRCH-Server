@@ -18,8 +18,7 @@ pub struct CacheNode {
     max_len: usize,
     /// The state of haptics returned from this node.
     smoothing_time: Duration,
-    position_weight: f32,
-    velocity_weight: f32,
+    pub position_weight: f32,
 }
 
 impl CacheNode {
@@ -41,8 +40,11 @@ impl CacheNode {
             max_len: max_entries,
             smoothing_time: smoothing_time,
             position_weight: position_weight.clone(),
-            velocity_weight: 1.0 - position_weight,
         }
+    }
+
+    pub fn set_position_weight(&mut self, val: f32) {
+        self.position_weight = val;
     }
 
     pub fn raw_last(&self) -> f32 {
@@ -148,9 +150,7 @@ impl CacheNode {
         return Ok(());
     }
 
-    /// Returns  (velocity_weight * avg |velocity| over `smoothing_time`)
-    ///       + (position_weight * current_position)
-    /// all clamped into [0,1].
+    /// Returns the velocity of the
     pub fn latest(&self) -> f32 {
         let now = SystemTime::now();
         let limit = now.checked_sub(self.smoothing_time).unwrap_or(UNIX_EPOCH);
@@ -167,7 +167,7 @@ impl CacheNode {
         let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
 
         // 3) blend and clamp
-        (self.velocity_weight * vel + self.position_weight * pos).clamp(0.0, 1.0)
+        ((1.0 - self.position_weight) * vel + self.position_weight * pos).clamp(0.0, 1.0)
     }
 
     /// Trys to parse OscType into a delta value in f32

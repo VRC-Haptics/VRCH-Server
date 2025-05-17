@@ -154,6 +154,8 @@ export interface VrcInfo {
   parameter_cache: Record<OscPath, CacheNode>;
   /** Number of value entries to keep around for each parameter_cache entry */
   cache_length: number;
+  //** How much weight distance has, 1-`dist_weight` = the velocity weight */
+  dist_weight: number;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -168,4 +170,5 @@ export const defaultVrcInfo: VrcInfo = {
   available_parameters: {},
   parameter_cache: {},
   cache_length: 0,
+  dist_weight: 0,
 };

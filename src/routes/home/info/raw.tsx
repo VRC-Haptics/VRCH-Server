@@ -42,15 +42,12 @@ export default function RawDeviceInfo({ device }: RawDeviceInfoProps) {
           <h2>Output Factors</h2>
           <div className="ml-4">
             <p><strong>Sensitivity Multiplier:</strong> {device.factors.sens_mult}</p>
-            <p><strong>User Sensitivity:</strong> {device.factors.user_sense}</p>
+            <p><strong>Start Offset:</strong> {device.factors.start_offset}</p>
           </div>
 
           <h2>Haptic Map</h2>
           <div className="ml-4">
             <p><strong>Interpolation Algorithm:</strong> {device.factors.interp_algo.variant}</p>
-            <p>
-              <strong>Game Intensity:</strong> {device.factors.user_sense}
-            </p>
           </div>
 
           <h2>Device Type</h2>

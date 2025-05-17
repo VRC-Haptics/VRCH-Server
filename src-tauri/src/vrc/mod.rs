@@ -8,7 +8,7 @@ use crate::api::ApiManager;
 use crate::mapping::{global_map::StandardMenu, input_node::InputNode, Id};
 use crate::osc::server::OscServer;
 use crate::vrc::parsing::OscInfo;
-use crate::GlobalMap;
+use crate::{get_store_field, GlobalMap};
 
 // module dependencies
 use cache_node::CacheNode;
@@ -51,6 +51,8 @@ pub struct VrcInfo {
     ///
     /// VRC Refreshes at 10hz max, so 10*seconds should work just fine.
     pub cache_length: usize,
+    /// How much weight distance has, 1-`dist_weight` = the velocity weight
+    pub dist_weight: f32,
     /// The OSC server we recieve updates from
     #[serde(skip)]
     #[allow(
@@ -71,9 +73,12 @@ impl VrcInfo {
     pub fn new(
         global_map: Arc<Mutex<GlobalMap>>,
         api: Arc<Mutex<ApiManager>>,
+        app_handle: &tauri::AppHandle,
     ) -> Arc<Mutex<VrcInfo>> {
         let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
         let value_cache_size = 100;
+        
+        let dist_weight = get_store_field(app_handle, "vrc_dist_weight").or(Some(0.20));
 
         // Instantiate
         let vrc = VrcInfo {
@@ -86,6 +91,7 @@ impl VrcInfo {
             available_parameters: Arc::new(DashMap::new()),
             parameter_cache: Arc::new(DashMap::new()),
             cache_length: value_cache_size,
+            dist_weight: dist_weight.unwrap(),
         };
         let vrc = Arc::new(Mutex::new(vrc));
 
@@ -93,9 +99,10 @@ impl VrcInfo {
         start_filling_available_parameters(Arc::clone(&vrc), api);
 
         // create clone for closure
-        let mut vrc_lock = vrc.lock().unwrap();
+        let vrc_lock = vrc.lock().unwrap();
         let cached_parameters_rcve = Arc::clone(&vrc_lock.parameter_cache);
         let default_clone = vrc_lock.cache_length.clone();
+        drop(vrc_lock);
         // Our closure that gets called whenever an OSC message is recieved
         let on_receive = move |msg: OscMessage| {
             // remove VRC Fury tagging if needed
@@ -126,6 +133,7 @@ impl VrcInfo {
         let recieving_port = 9001;
         let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
         let port_used = vrc_server.start();
+        let mut vrc_lock = vrc.lock().unwrap();
         vrc_lock.in_port = Some(port_used);
 
         // if the server wasn't able to capture the port start advertising the port it was bound to.
@@ -139,8 +147,10 @@ impl VrcInfo {
         // the callback called when each device tick starts
         let avi_refresh = Arc::clone(&avi);
         let params_refresh = Arc::clone(&vrc_lock.parameter_cache);
+        let vrc_refresh = Arc::clone(&vrc);
         let on_refresh = move |inputs: &DashMap<Id, InputNode>, menu: &Mutex<StandardMenu>| {
-            // If we have an avi in use, and haptics are on the avatar we can use haptics
+            // If we have an avi in use, and haptics are on the avatar, 
+            // we can use haptics
             let avi_option = avi_refresh.read().expect("Unable to lock avi");
             if let Some(avi_read) = &*avi_option {
                 if let Some(conf) = &avi_read.conf {
@@ -160,12 +170,19 @@ impl VrcInfo {
                     }
 
                     // for each node in our config, see if we have received a value.
+                    let vrc_lock = vrc_refresh.lock().unwrap();
                     for node in &conf.nodes {
-                        if let Some(cache_node) = params_refresh.get(&OscPath(node.address.clone()))
+                        if let Some(mut cache_node) = params_refresh.get_mut(&OscPath(node.address.clone()))
                         {
                             if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
-                                // insert the value into our hashmap
-                                old_node.set_intensity(cache_node.raw_last());
+                                // don't do velocity for external addresses
+                                if node.is_external_address {
+                                    old_node.set_intensity(cache_node.raw_last());
+                                    continue;
+                                }
+                                // insert the value into the game map
+                                cache_node.position_weight = vrc_lock.dist_weight;
+                                old_node.set_intensity(cache_node.latest());
                                 continue;
                             }
 

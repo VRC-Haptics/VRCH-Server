@@ -3,10 +3,11 @@ use crate::devices::{Device, DeviceType};
 use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::NodeGroup;
-use crate::set_device_store_field;
+use crate::{set_device_store_field, set_store_field};
 use crate::vrc::{config::GameMap, VrcInfo};
 //standard imports
 use runas::Command;
+use tauri::Manager;
 use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
 
@@ -145,6 +146,17 @@ pub async fn update_device_offset(
         set_device_store_field(&window, &device_id, "start_offset", offset);
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn update_vrc_distance_weight(
+    distance_weight: f32,
+    window: tauri::Window,
+) {
+    let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
+    let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
+    vrc_lock.dist_weight = distance_weight;
+    set_store_field(window.app_handle(), "distance_weight", distance_weight);
 }
 
 

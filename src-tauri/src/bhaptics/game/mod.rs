@@ -15,7 +15,6 @@ use std::{
     io::{self, BufReader},
     net::SocketAddr,
     sync::{Arc, Mutex},
-    thread,
 };
 
 use futures_util::{SinkExt, StreamExt};
@@ -241,6 +240,8 @@ async fn handle_connection(
             }
         }
     });
+
+    log::trace!("Connected to a bhaptics v3 game.");
 
     // Process incoming messages.
     while let Some(result) = ws_receiver.next().await {
