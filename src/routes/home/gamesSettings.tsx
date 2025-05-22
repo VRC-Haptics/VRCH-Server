@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useVrcContext } from "../../context/VrcContext";
 import clsx from "clsx";
-import { trace } from "@tauri-apps/plugin-log";
 
 export default function VrcInfoCard({}) {
   const {vrcInfo} = useVrcContext();
@@ -10,9 +9,6 @@ export default function VrcInfoCard({}) {
   const [distancePct, setDistancePct] = useState<number>(
     vrcInfo.dist_weight * 100
   );
-
-  trace("distancePct: " + distancePct);
-  trace("Weight: "+ vrcInfo.dist_weight);
 
   useEffect(() => {
     setDistancePct(vrcInfo.dist_weight * 100);

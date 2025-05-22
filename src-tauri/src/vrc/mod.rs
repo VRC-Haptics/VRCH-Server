@@ -78,7 +78,7 @@ impl VrcInfo {
         let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
         let value_cache_size = 100;
         
-        let dist_weight = get_store_field(app_handle, "vrc_dist_weight").or(Some(0.20));
+        let dist_weight = get_store_field(app_handle, "distance_weight").or(Some(0.20));
 
         // Instantiate
         let vrc = VrcInfo {
@@ -119,7 +119,7 @@ impl VrcInfo {
                         CacheNode::new(
                             arg.to_owned(),
                             default_clone,
-                            Duration::from_secs_f32(0.4),
+                            Duration::from_secs_f32(0.12),
                             0.2,
                         ),
                     );

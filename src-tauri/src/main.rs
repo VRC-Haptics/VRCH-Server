@@ -223,6 +223,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            println!("Instance already open, shutting down.");
             let _ = app.get_webview_window("main")
                        .expect("no main window")
                        .set_focus();
