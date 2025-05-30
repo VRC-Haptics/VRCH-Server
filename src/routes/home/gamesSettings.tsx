@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useVrcContext } from "../../context/VrcContext";
 import clsx from "clsx";
+import OscSummary from "./gamesSettings/CacheSummary";
+import { HapticNodesSummary } from "./gamesSettings/HapticNodes";
 
 export default function VrcInfoCard({}) {
   const {vrcInfo} = useVrcContext();
@@ -10,9 +12,29 @@ export default function VrcInfoCard({}) {
     vrcInfo.dist_weight * 100
   );
 
+  const [velocityMult, setVelocityMult] = useState<number>(
+    vrcInfo.vel_multiplier
+  );
+
   useEffect(() => {
     setDistancePct(vrcInfo.dist_weight * 100);
   }, [vrcInfo.dist_weight]);
+
+  useEffect(() => {
+    setVelocityMult(vrcInfo.vel_multiplier);
+  }, [vrcInfo.vel_multiplier]);
+
+  const SNAP_VALUE     = 1;
+  const SNAP_THRESHOLD = 0.05;
+
+  const handleVelMultChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = parseFloat(e.target.value);
+    const snapped =
+    Math.abs(raw - SNAP_VALUE) < SNAP_THRESHOLD ? SNAP_VALUE : raw;
+    setVelocityMult(snapped);
+    invoke("update_vrc_velocity_multiplier", { velMultiplier: snapped });
+  };
+
 
   const handleDistChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const pct = parseFloat(e.target.value); // 0-100
@@ -88,6 +110,29 @@ export default function VrcInfoCard({}) {
         <p className="label-text-alt mt-4">
           What percentage of feedback should be from distance or velocity.
         </p>
+        <div className="h-3"></div>
+
+        <label className="form-control">
+          <span>Velocity scaling</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.01"
+              value={velocityMult}
+              onChange={handleVelMultChange}
+              className="range range-sm flex-1"
+            />
+            <span className="w-12 text-right tabular-nums">
+              {velocityMult.toFixed(1)}%
+            </span>
+          </div>
+        </label>
+
+        <p className="label-text-alt mt-4"> 
+          How much feedback is given for an in-game speed. Higher values reach max feeback at lower speeds.
+        </p>
       </fieldset>
 
       {/* Connection details */}
@@ -106,7 +151,7 @@ export default function VrcInfoCard({}) {
           <h3 className="text-lg font-semibold">Avatar</h3>
           <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm md:text-base">
             <span className="font-medium">ID:</span>
-            <span>{vrcInfo.avatar.id}</span>
+            <span>{vrcInfo.avatar.id ?? "None"}</span>
             {vrcInfo.avatar.prefab_name && (
               <>
                 <span className="font-medium">Prefab:</span>
@@ -115,14 +160,17 @@ export default function VrcInfoCard({}) {
             )}
             {vrcInfo.avatar.conf && (
               <>
-                <span className="font-medium">Map&nbsp;Name:</span>
+                <>
+                <span className="font-medium">Map Name:</span>
                 <span>{vrcInfo.avatar.conf.meta.map_name}</span>
                 <span className="font-medium">Version:</span>
                 <span>{vrcInfo.avatar.conf.meta.map_version}</span>
                 <span className="font-medium">Author:</span>
                 <span>{vrcInfo.avatar.conf.meta.map_author}</span>
-                <span className="font-medium">Haptic&nbsp;Nodes:</span>
-                <span>{vrcInfo.avatar.conf.nodes.length}</span>
+                </>
+                <div>
+                <HapticNodesSummary nodes={vrcInfo.avatar.conf.nodes}></HapticNodesSummary>
+                </div>
               </>
             )}
           </div>
@@ -131,16 +179,8 @@ export default function VrcInfoCard({}) {
 
       {/* OSC summary */}
       <div className="mt-6">
-        <h3 className="text-lg font-semibold">OSC</h3>
         <div className="mt-2 text-sm md:text-base">
-          <p>
-            <span className="font-medium">Available&nbsp;Parameters:</span>{" "}
-            {Object.keys(vrcInfo.available_parameters).length}
-          </p>
-          <p>
-            <span className="font-medium">Cached&nbsp;Parameters:</span>{" "}
-            {Object.keys(vrcInfo.parameter_cache).length}
-          </p>
+          <OscSummary vrcInfo={vrcInfo} />
         </div>
       </div>
     </div>

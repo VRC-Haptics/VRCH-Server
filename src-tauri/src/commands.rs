@@ -149,6 +149,17 @@ pub async fn update_device_offset(
 }
 
 #[tauri::command]
+pub async fn update_vrc_velocity_multiplier(
+    vel_multiplier: f32,
+    window: tauri::Window,
+) {
+    let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
+    let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
+    vrc_lock.vel_multiplier = vel_multiplier;
+    set_store_field(window.app_handle(), "velocity_multiplier", vel_multiplier);
+} 
+
+#[tauri::command]
 pub async fn update_vrc_distance_weight(
     distance_weight: f32,
     window: tauri::Window,

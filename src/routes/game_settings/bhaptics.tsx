@@ -27,7 +27,8 @@ function AssociateUs() {
     return (
         <div className="outline outline-black rounded-md p-1">
             <h1 title="Associate This app instead of bhaptics player" className="font-semibold text-md">Register as Player</h1>
-            <h2 className="text-info text-sm p-0 gap-y-3">Whether VRCH should launch from games instead of the bHapticsPlayer</h2> 
+            <h2 className="text-info text-sm p-0 gap-y-3">Whether VRCH should launch from games instead of the bHapticsPlayer.</h2> 
+            <h2 className="text-info text-sm p-0 gap-y-3">Requests Admin Privledges.</h2> 
             <div className="flex flex-row p-0 gap-x-1">
                 <button onClick={handleAssociate} className="btn btn-sm">Use VRCH</button>
                 <button onClick={handleRemoveAssociate} className="btn btn-sm">Use bHapticsPlayer</button>

@@ -3,8 +3,6 @@ use std::collections::VecDeque;
 use std::mem::discriminant;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
 
-/// IMPORTANT: DO NOT FORGET SPECIAL CASE INTENSITY = 0. just set raw to zero.
-
 /// A node cached by vrc, allows for historically informed cache manipulation.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct CacheNode {
@@ -19,6 +17,7 @@ pub struct CacheNode {
     /// The state of haptics returned from this node.
     smoothing_time: Duration,
     pub position_weight: f32,
+    pub vel_mult: f32,
 }
 
 impl CacheNode {
@@ -31,6 +30,7 @@ impl CacheNode {
         max_entries: usize,
         smoothing_time: Duration,
         position_weight: f32,
+        velocity_multiplier: f32,
     ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
         values.push_front((value_type.clone(), UNIX_EPOCH));
@@ -39,8 +39,13 @@ impl CacheNode {
             osc_type: value_type,
             max_len: max_entries,
             smoothing_time: smoothing_time,
-            position_weight: position_weight.clone(),
+            position_weight: position_weight,
+            vel_mult: velocity_multiplier,
         }
+    }
+
+    pub fn set_velocity_mult(&mut self, val: f32) {
+        self.vel_mult = val;
     }
 
     pub fn set_position_weight(&mut self, val: f32) {
@@ -150,12 +155,12 @@ impl CacheNode {
         return Ok(());
     }
 
-    /// Returns the velocity of the
+    /// Returns the velocity based on `smoothing_time`
     pub fn latest(&self) -> f32 {
         let now = SystemTime::now();
         let limit = now.checked_sub(self.smoothing_time).unwrap_or(UNIX_EPOCH);
 
-        // 1) pull current position
+        // pull current position
         let pos = self
             .values
             .front()
@@ -163,11 +168,11 @@ impl CacheNode {
             .unwrap_or(0.0)
             .clamp(0.0, 1.0);
 
-        // 2) compute smoothed absolute velocity
+        // compute smoothed absolute velocity
         let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
 
-        // 3) blend and clamp
-        ((1.0 - self.position_weight) * vel + self.position_weight * pos).clamp(0.0, 1.0)
+        // blend and clamp
+        ((1.0 - self.position_weight) * (vel * self.vel_mult) + self.position_weight * pos).clamp(0.0, 1.0)
     }
 
     /// Trys to parse OscType into a delta value in f32

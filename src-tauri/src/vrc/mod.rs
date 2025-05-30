@@ -2,6 +2,7 @@ pub mod cache_node;
 pub mod config;
 pub mod discovery;
 pub mod parsing;
+pub mod osc_query;
 
 // crate dependencies
 use crate::api::ApiManager;
@@ -14,7 +15,8 @@ use crate::{get_store_field, GlobalMap};
 use cache_node::CacheNode;
 use config::GameMap;
 use dashmap::DashMap;
-use discovery::{start_filling_available_parameters, OscQueryServer};
+use discovery::start_filling_available_parameters;
+use osc_query::OscQueryServer;
 use parsing::remove_version;
 
 use rosc::OscMessage;
@@ -53,6 +55,8 @@ pub struct VrcInfo {
     pub cache_length: usize,
     /// How much weight distance has, 1-`dist_weight` = the velocity weight
     pub dist_weight: f32,
+    /// the magic velocity multiplier. 1 is reasonable, if fast.
+    pub vel_multiplier: f32,
     /// The OSC server we recieve updates from
     #[serde(skip)]
     #[allow(
@@ -79,6 +83,7 @@ impl VrcInfo {
         let value_cache_size = 100;
         
         let dist_weight = get_store_field(app_handle, "distance_weight").or(Some(0.20));
+        let vel_multiplier = get_store_field(app_handle, "velocity_multiplier").or(Some(1.0));
 
         // Instantiate
         let vrc = VrcInfo {
@@ -92,6 +97,7 @@ impl VrcInfo {
             parameter_cache: Arc::new(DashMap::new()),
             cache_length: value_cache_size,
             dist_weight: dist_weight.unwrap(),
+            vel_multiplier: vel_multiplier.unwrap(),
         };
         let vrc = Arc::new(Mutex::new(vrc));
 
@@ -121,6 +127,7 @@ impl VrcInfo {
                             default_clone,
                             Duration::from_secs_f32(0.12),
                             0.2,
+                            1.0,
                         ),
                     );
                 }
@@ -137,10 +144,9 @@ impl VrcInfo {
         vrc_lock.in_port = Some(port_used);
 
         // if the server wasn't able to capture the port start advertising the port it was bound to.
-        let mut osc_server = None;
         if port_used != recieving_port {
-            osc_server = Some(OscQueryServer::new(recieving_port));
-            osc_server.unwrap().start();
+            let mut osc_server = OscQueryServer::new(recieving_port);
+            osc_server.start();
             log::warn!("Not using VRC dedicated ports, expect slower operations.");
         }
 
@@ -181,12 +187,13 @@ impl VrcInfo {
                                     continue;
                                 }
                                 // insert the value into the game map
-                                cache_node.position_weight = vrc_lock.dist_weight;
+                                cache_node.set_position_weight(vrc_lock.dist_weight);
+                                cache_node.set_velocity_mult(vrc_lock.vel_multiplier);
                                 old_node.set_intensity(cache_node.latest());
                                 continue;
                             }
 
-                            //copy haptic node from data.
+                            //if not already created, create a cache node for this config.
                             let mut haptic_node = node.node_data.clone();
                             // if external address apply all tag.
                             // (since it doesn't have an associated node it is garunteed to not be mergeable.)

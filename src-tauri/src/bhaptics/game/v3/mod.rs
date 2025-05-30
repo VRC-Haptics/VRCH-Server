@@ -1,18 +1,3 @@
-/// A mess of serialization crap that sorta works to deserialize the weirdly formatted AuthenticationInit Message
-mod auth_message;
-mod device_maps;
-pub mod network;
-mod v1;
-mod v2;
-//mod v3;
-mod player_messages;
-
-use crate::mapping::{event::Event, global_map::GlobalMap, haptic_node::HapticNode, NodeGroup};
-use auth_message::handle_auth_init;
-use network::event_map::PatternLocation;
-use serde;
-
-//use v3::BhapticsApiV3;
 
 use std::{
     collections::HashMap,
@@ -21,6 +6,12 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+
+use crate::mapping::{event::Event, global_map::GlobalMap, haptic_node::HapticNode, NodeGroup};
+use super::auth_message::handle_auth_init;
+use super::network::event_map::PatternLocation;
+use super::BhapticsGame;
+use serde;
 
 use futures_util::{SinkExt, StreamExt};
 use rustls_pemfile::{certs, pkcs8_private_keys};
@@ -32,33 +23,8 @@ use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_util::sync::CancellationToken;
 use tokio_websockets::Message;
 
-pub enum BhapticsConnection {
-    V3,
-}
-
-/* 
-pub struct BhapticsMaster {
-    pub active_connection: Option<BhapticsConnection>,
-    pub game_name: Option<String>,
-    v3: BhapticsApiV3,
-}*/
-
-const PATH_TO_CERT: &str = "security/localhost.crt";
-const PATH_TO_KEY: &str = "security/localhost.key";
-
-fn load_certs(path: &str) -> io::Result<Vec<CertificateDer<'static>>> {
-    certs(&mut BufReader::new(File::open(path)?)).collect()
-}
-
-fn load_key(path: &str) -> io::Result<PrivateKeyDer<'static>> {
-    pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
-        .next()
-        .unwrap()
-        .map(Into::into)
-}
-
-/// Holds information for the bhaptics game server.
-pub struct BhapticsGame {
+/// Holds information for the bhaptics v3 api.
+pub struct BhapticsApiV3 {
     // if a game has been connected, keyed by event key, list of events to enact
     pub game_mapping: Option<HashMap<String, Vec<Event>>>,
     // info for bHaptics API
@@ -317,6 +283,20 @@ fn handle_sdk_play(input: &str, game: &Arc<Mutex<BhapticsGame>>) {
         }
         Err(err) => log::error!("Error decoding bhaptics play message: {}", err),
     }
+}
+
+const PATH_TO_CERT: &str = "security/localhost.crt";
+const PATH_TO_KEY: &str = "security/localhost.key";
+
+fn load_certs(path: &str) -> io::Result<Vec<CertificateDer<'static>>> {
+    certs(&mut BufReader::new(File::open(path)?)).collect()
+}
+
+fn load_key(path: &str) -> io::Result<PrivateKeyDer<'static>> {
+    pkcs8_private_keys(&mut BufReader::new(File::open(path)?))
+        .next()
+        .unwrap()
+        .map(Into::into)
 }
 
 fn handle_sdk_stop(game: &Arc<Mutex<BhapticsGame>>) {

@@ -156,6 +156,8 @@ export interface VrcInfo {
   cache_length: number;
   //** How much weight distance has, 1-`dist_weight` = the velocity weight */
   dist_weight: number;
+  /** Multiplies all velocity by this number. */
+  vel_multiplier: number;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -171,4 +173,5 @@ export const defaultVrcInfo: VrcInfo = {
   parameter_cache: {},
   cache_length: 0,
   dist_weight: 0,
+  vel_multiplier: 1.0,
 };

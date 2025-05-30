@@ -281,6 +281,7 @@ fn main() {
             commands::update_device_multiplier,
             commands::update_device_offset,
             commands::update_vrc_distance_weight,
+            commands::update_vrc_velocity_multiplier,
             bhaptics_launch_default,
             bhaptics_launch_vrch,
             commands::play_point,
