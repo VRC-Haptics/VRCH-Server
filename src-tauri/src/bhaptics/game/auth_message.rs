@@ -1,12 +1,6 @@
 use crate::util::deserialization::skip_outer_quotes;
 
-use super::{
-    create_init_response, 
-    ApiInfo, 
-    BhapticsGame, 
-    network,
-    device_maps::pattern_to_events,
-};
+use super::{create_init_response, device_maps::pattern_to_events, network, ApiInfo, BhapticsGame};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::task;
@@ -65,10 +59,8 @@ pub fn handle_auth_init(contents: &str, game: Arc<Mutex<BhapticsGame>>) {
 
                 let game_clone = Arc::clone(&game);
                 tokio::spawn(async move {
-                    match task::spawn_blocking(move || {
-                        network::fetch_mappings(api_key, app_id, -1)
-                    })
-                    .await
+                    match task::spawn_blocking(move || network::fetch_mappings(api_key, app_id, -1))
+                        .await
                     {
                         Ok(Ok(mapping)) => {
                             if let Ok(mut game) = game_clone.lock() {
@@ -84,7 +76,7 @@ pub fn handle_auth_init(contents: &str, game: Arc<Mutex<BhapticsGame>>) {
                             }
                         }
                         Ok(Err(e)) => log::error!("fetch_mappings error: {e:?}"),
-                        Err(join)   => log::error!("blocking task panicked: {join:?}"),
+                        Err(join) => log::error!("blocking task panicked: {join:?}"),
                     }
                 });
             }

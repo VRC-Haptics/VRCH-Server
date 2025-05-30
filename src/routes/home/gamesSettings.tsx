@@ -1,11 +1,188 @@
-export default function GameSettings() {
-  //const vrcInfo = useContext(VrcContext);
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useVrcContext } from "../../context/VrcContext";
+import clsx from "clsx";
+import OscSummary from "./gamesSettings/CacheSummary";
+import { HapticNodesSummary } from "./gamesSettings/HapticNodes";
+
+export default function VrcInfoCard({}) {
+  const {vrcInfo} = useVrcContext();
+
+  const [distancePct, setDistancePct] = useState<number>(
+    vrcInfo.dist_weight * 100
+  );
+
+  const [velocityMult, setVelocityMult] = useState<number>(
+    vrcInfo.vel_multiplier
+  );
+
+  useEffect(() => {
+    setDistancePct(vrcInfo.dist_weight * 100);
+  }, [vrcInfo.dist_weight]);
+
+  useEffect(() => {
+    setVelocityMult(vrcInfo.vel_multiplier);
+  }, [vrcInfo.vel_multiplier]);
+
+  const SNAP_VALUE     = 1;
+  const SNAP_THRESHOLD = 0.05;
+
+  const handleVelMultChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = parseFloat(e.target.value);
+    const snapped =
+    Math.abs(raw - SNAP_VALUE) < SNAP_THRESHOLD ? SNAP_VALUE : raw;
+    setVelocityMult(snapped);
+    invoke("update_vrc_velocity_multiplier", { velMultiplier: snapped });
+  };
+
+
+  const handleDistChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const pct = parseFloat(e.target.value); // 0-100
+    setDistancePct(pct);
+    invoke("update_vrc_distance_weight", { distanceWeight: pct / 100 });
+  };
+
+  const handleVelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const velPct = parseFloat(e.target.value);   // 0-100
+    const distPct = 100 - velPct;               // keep sum = 100
+    setDistancePct(distPct);
+    invoke("update_vrc_distance_weight", { distanceWeight: distPct / 100 });
+  };
+
+  const velocityPct = 100 - distancePct;
 
   return (
-    <div
-      id="GameSettingsContainer"
-      className="flex flex-col min-w-fit h-full bg-base-200 rounded-md p-2"
-    >  </div>
+    <div className="flex-shrink-0 flex-col min-w-0 bg-base-200 rounded-md p-2 space-y-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">VRC</h2>
+        <div className="w-2"></div>
+        <span
+          className={clsx(
+            "h-3 w-3 rounded-full",
+            vrcInfo.vrc_connected ? "bg-emerald-500" : "bg-rose-500"
+          )}
+          title={vrcInfo.vrc_connected ? "Connected" : "Disconnected"}
+        />
+      </div>
+
+      <fieldset className="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
+        <legend className="fieldset-legend">Feedback Type</legend>
+
+        {/* Distance weight slider */}
+        <label className="form-control">
+          <span className="label-text mb-1">Distance&nbsp;Weight</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="0.5"
+              value={distancePct.toFixed(1)}
+              onChange={handleDistChange}
+              className="range range-sm flex-1"
+            />
+            <span className="w-12 text-right tabular-nums">
+              {distancePct.toFixed(1)}%
+            </span>
+          </div>
+        </label>
+
+        {/* Velocity weight slider */}
+        <label className="form-control mt-4">
+          <span className="label-text mb-1">Velocity&nbsp;Weight</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="0.5"
+              value={velocityPct.toFixed(1)}
+              onChange={handleVelChange}
+              className="range range-sm flex-1"
+            />
+            <span className="w-12 text-right tabular-nums">
+              {velocityPct.toFixed(1)}%
+            </span>
+          </div>
+        </label>
+
+        <p className="label-text-alt mt-4">
+          What percentage of feedback should be from distance or velocity.
+        </p>
+        <div className="h-3"></div>
+
+        <label className="form-control">
+          <span>Velocity scaling</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.01"
+              value={velocityMult}
+              onChange={handleVelMultChange}
+              className="range range-sm flex-1"
+            />
+            <span className="w-12 text-right tabular-nums">
+              {velocityMult.toFixed(1)}%
+            </span>
+          </div>
+        </label>
+
+        <p className="label-text-alt mt-4"> 
+          How much feedback is given for an in-game speed. Higher values reach max feeback at lower speeds.
+        </p>
+      </fieldset>
+
+      {/* Connection details */}
+      <div className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm md:text-base">
+        <span className="font-medium">In&nbsp;Port:</span>
+        <span>{vrcInfo.in_port ?? "—"}</span>
+        <span className="font-medium">Out&nbsp;Port:</span>
+        <span>{vrcInfo.out_port ?? "—"}</span>
+        <span className="font-medium">Cache&nbsp;Length:</span>
+        <span>{vrcInfo.cache_length}</span>
+      </div>
+
+      {/* Avatar section */}
+      {vrcInfo.avatar && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold">Avatar</h3>
+          <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm md:text-base">
+            <span className="font-medium">ID:</span>
+            <span>{vrcInfo.avatar.id ?? "None"}</span>
+            {vrcInfo.avatar.prefab_name && (
+              <>
+                <span className="font-medium">Prefab:</span>
+                <span>{vrcInfo.avatar.prefab_name}</span>
+              </>
+            )}
+            {vrcInfo.avatar.conf && (
+              <>
+                <>
+                <span className="font-medium">Map Name:</span>
+                <span>{vrcInfo.avatar.conf.meta.map_name}</span>
+                <span className="font-medium">Version:</span>
+                <span>{vrcInfo.avatar.conf.meta.map_version}</span>
+                <span className="font-medium">Author:</span>
+                <span>{vrcInfo.avatar.conf.meta.map_author}</span>
+                </>
+                <div>
+                <HapticNodesSummary nodes={vrcInfo.avatar.conf.nodes}></HapticNodesSummary>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* OSC summary */}
+      <div className="mt-6">
+        <div className="mt-2 text-sm md:text-base">
+          <OscSummary vrcInfo={vrcInfo} />
+        </div>
+      </div>
+    </div>
   );
 }
-

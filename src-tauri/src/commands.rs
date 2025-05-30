@@ -3,10 +3,11 @@ use crate::devices::{Device, DeviceType};
 use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::NodeGroup;
-use crate::set_device_store_field;
+use crate::{set_device_store_field, set_store_field};
 use crate::vrc::{config::GameMap, VrcInfo};
 //standard imports
 use runas::Command;
+use tauri::Manager;
 use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
 
@@ -26,7 +27,7 @@ pub fn swap_conf_nodes(
             let DeviceType::Wifi(wifi_cfg) = &mut dev.device_type;
             wifi_cfg.swap_nodes(index_1 as usize, index_2 as usize)?;
             let _ = wifi_cfg;
-            
+
             drop(device_lock);
             log::trace!("Finished Command");
             return Ok(());
@@ -131,6 +132,44 @@ pub async fn update_device_multiplier(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn update_device_offset(
+    device_id: String,
+    offset: f32,
+    devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+    window: tauri::Window,
+) -> Result<(), ()> {
+    let mut devices_lock = devices_store.lock().unwrap();
+    if let Some(dev) = devices_lock.iter_mut().find(|d| d.id == device_id) {
+        dev.factors.start_offset = offset;
+        set_device_store_field(&window, &device_id, "start_offset", offset);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_vrc_velocity_multiplier(
+    vel_multiplier: f32,
+    window: tauri::Window,
+) {
+    let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
+    let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
+    vrc_lock.vel_multiplier = vel_multiplier;
+    set_store_field(window.app_handle(), "velocity_multiplier", vel_multiplier);
+} 
+
+#[tauri::command]
+pub async fn update_vrc_distance_weight(
+    distance_weight: f32,
+    window: tauri::Window,
+) {
+    let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
+    let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
+    vrc_lock.dist_weight = distance_weight;
+    set_store_field(window.app_handle(), "distance_weight", distance_weight);
+}
+
 
 /// Handles setting our app to launch instead of the bHapticsPlayer
 #[tauri::command]

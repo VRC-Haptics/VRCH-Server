@@ -1,0 +1,37 @@
+{
+    "nodes": [
+        {
+            "node_data": {
+                "x": -0.07270000129938126,
+                "y": 1.6500999927520753,
+                "z": 0.02250000089406967,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/PhysBone/Ear_L_Stretch",
+            "is_external_address": true,
+            "radius": 0.05000000074505806,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.07270000129938126,
+                "y": 1.6500999927520753,
+                "z": 0.02250000089406967,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/PhysBone/Ear_R_Stretch",
+            "is_external_address": true,
+            "radius": 0.05000000074505806,
+            "target_bone": "Head"
+        }
+    ],
+    "meta": {
+        "map_name": "Ear-Pull-Levi",
+        "map_author": "Average",
+        "map_version": 1
+    }
+}

@@ -1,8 +1,8 @@
+pub mod event;
 pub mod global_map;
 pub mod haptic_node;
 pub mod input_node;
 pub mod interp;
-pub mod event;
 
 use global_map::GlobalMap;
 use haptic_node::HapticNode;
@@ -34,7 +34,7 @@ pub enum NodeGroup {
     LowerLegLeft,
     FootRight,
     FootLeft,
-    /// A meta tag reserved for in-server use only. 
+    /// A meta tag reserved for in-server use only.
     /// Should not be exported to devices or imported from games.
     All,
 }
@@ -45,7 +45,9 @@ pub enum NodeGroup {
 pub struct Id(pub String);
 
 impl Id {
-    pub fn new() -> Self {Id(Uuid::new_v4().to_string())}
+    pub fn new() -> Self {
+        Id(Uuid::new_v4().to_string())
+    }
 }
 
 impl NodeGroup {
@@ -55,37 +57,48 @@ impl NodeGroup {
         // helper: flip the sign of the X component for both points
         fn mirror_x(p: (Vec3, Vec3)) -> (Vec3, Vec3) {
             let (a, b) = p;
-            (
-                Vec3::new(-a.x, a.y, a.z),
-                Vec3::new(-b.x, b.y, b.z),
-            )
+            (Vec3::new(-a.x, a.y, a.z), Vec3::new(-b.x, b.y, b.z))
         }
 
         return match self {
             NodeGroup::TorsoRight
             | NodeGroup::TorsoLeft
             | NodeGroup::TorsoFront
-            | NodeGroup::TorsoBack => (Vec3::new(0.,0.735000014,-0.00800000038), 
-                Vec3::new(0.,1.43400002,-0.0130000003)),
-            NodeGroup::Head => (Vec3::new(0.,1.70700002,0.0529999994), 
-                Vec3::new(0.,1.43400002,-0.0130000003)),
-            NodeGroup::UpperArmRight => (Vec3::new(0.172999993,1.35599995,-0.0260000005), 
-                Vec3::new(0.336199999,1.15139997,-0.0151000004)),
-            NodeGroup::LowerArmRight => (Vec3::new(0.336199999,1.14470005,-0.0244999994), 
-                Vec3::new(0.4736,0.944899976,0.0469000004)),
-            NodeGroup::UpperLegRight => (Vec3::new(0.0689999983,0.921999991,0.00100000005), 
-                Vec3::new(0.134000003,0.479000002,-0.0280000009)),
-            NodeGroup::LowerLegRight => (Vec3::new(0.134000003,0.479000002,-0.0280000009), 
-                Vec3::new(0.173999995,0.0879999995,-0.0729999989)),
-            NodeGroup::FootRight => (Vec3::new(0.173999995,0.0879999995,-0.0729999989), 
-                Vec3::new(0.226300001,0.0199999996,0.0320000015)),
-            NodeGroup::UpperArmLeft  => mirror_x(NodeGroup::UpperArmRight.to_points()),
-            NodeGroup::LowerArmLeft  => mirror_x(NodeGroup::LowerArmRight.to_points()),
-            NodeGroup::UpperLegLeft  => mirror_x(NodeGroup::UpperLegRight.to_points()),
-            NodeGroup::LowerLegLeft  => mirror_x(NodeGroup::LowerLegRight.to_points()),
-            NodeGroup::FootLeft      => mirror_x(NodeGroup::FootRight.to_points()),
-            NodeGroup::All           => (Vec3::new(0., 0., 0.), Vec3::new(0., 0., 0.))
-        }
+            | NodeGroup::TorsoBack => (
+                Vec3::new(0., 0.735000014, -0.00800000038),
+                Vec3::new(0., 1.43400002, -0.0130000003),
+            ),
+            NodeGroup::Head => (
+                Vec3::new(0., 1.70700002, 0.0529999994),
+                Vec3::new(0., 1.43400002, -0.0130000003),
+            ),
+            NodeGroup::UpperArmRight => (
+                Vec3::new(0.172999993, 1.35599995, -0.0260000005),
+                Vec3::new(0.336199999, 1.15139997, -0.0151000004),
+            ),
+            NodeGroup::LowerArmRight => (
+                Vec3::new(0.336199999, 1.14470005, -0.0244999994),
+                Vec3::new(0.4736, 0.944899976, 0.0469000004),
+            ),
+            NodeGroup::UpperLegRight => (
+                Vec3::new(0.0689999983, 0.921999991, 0.00100000005),
+                Vec3::new(0.134000003, 0.479000002, -0.0280000009),
+            ),
+            NodeGroup::LowerLegRight => (
+                Vec3::new(0.134000003, 0.479000002, -0.0280000009),
+                Vec3::new(0.173999995, 0.0879999995, -0.0729999989),
+            ),
+            NodeGroup::FootRight => (
+                Vec3::new(0.173999995, 0.0879999995, -0.0729999989),
+                Vec3::new(0.226300001, 0.0199999996, 0.0320000015),
+            ),
+            NodeGroup::UpperArmLeft => mirror_x(NodeGroup::UpperArmRight.to_points()),
+            NodeGroup::LowerArmLeft => mirror_x(NodeGroup::LowerArmRight.to_points()),
+            NodeGroup::UpperLegLeft => mirror_x(NodeGroup::UpperLegRight.to_points()),
+            NodeGroup::LowerLegLeft => mirror_x(NodeGroup::LowerLegRight.to_points()),
+            NodeGroup::FootLeft => mirror_x(NodeGroup::FootRight.to_points()),
+            NodeGroup::All => (Vec3::new(0., 0., 0.), Vec3::new(0., 0., 0.)),
+        };
     }
 
     /// Given a string containing at least 2 raw bytes, interpret the first two bytes as

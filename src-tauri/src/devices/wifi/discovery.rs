@@ -53,11 +53,15 @@ pub fn start_wifi_listener(
                                 WifiDevice::new(mac.clone(), ip.clone(), port, name.clone());
                             let mut full_device = Device::from_wifi(new_device, &app_handle);
 
-                            //try to recall saved offset
+                            //try to recall saved multiplier
                             if let Some(old_offset) =
                                 crate::get_device_store_field(&app_handle, &mac, "sens_mult")
                             {
                                 full_device.factors.sens_mult = old_offset;
+                            }
+
+                            if let Some(old_offset) = crate::get_device_store_field(&app_handle, &mac, "start_offset") {
+                                full_device.factors.start_offset = old_offset;
                             }
 
                             if let Err(e) = app_handle.emit("device-added", full_device.clone()) {

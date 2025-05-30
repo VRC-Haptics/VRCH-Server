@@ -13,8 +13,9 @@ export type InterpAlgo = {
 
 // Represents the factors that modulate device output.
 export interface OutputFactors {
+  /// the lowest value that produces feedback
+  start_offset: number;
   sens_mult: number;
-  user_sense: number;
   interp_algo: InterpAlgo;
 }
 
@@ -138,7 +139,7 @@ export const defaultDevice: Device = {
   is_alive: false,
   factors: {
     sens_mult: 1.0,
-    user_sense: 1.0,
+    start_offset: 0.0,
     interp_algo: {
       variant: "Gaussian",
       value: {
@@ -163,32 +164,6 @@ export const defaultDevice: Device = {
       }
     },
   },
-};
-
-export interface Avatar {
-  avatar_id: string;
-  menu_parameters?: oscPair[];
-  haptic_parameters?: oscPair[];
-}
-
-export interface oscPair {
-    address: string,
-    value: string,
-}
-
-export interface VrcInfo {
-  osc_server?: any; // Assuming you don't need to use this directly
-  in_port?: number;
-  out_port?: number;
-  avatar?: Avatar;
-  raw_parameters: Record<string, string>;
-}
-
-export const defaultVrcInfo: VrcInfo = {
-  in_port: 0,
-  out_port: 0,
-  avatar: { avatar_id: "", menu_parameters: [], haptic_parameters: [] },
-  raw_parameters: {},
 };
 
 export default Titles;

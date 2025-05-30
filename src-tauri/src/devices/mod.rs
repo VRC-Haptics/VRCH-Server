@@ -47,8 +47,8 @@ pub struct Device {
 pub struct OutputFactors {
     /// sensitivity multiplier (power limiter)
     pub sens_mult: f32,
-    /// sensitivity set by user
-    pub user_sense: f32,
+    /// the lowest value that produces feedback
+    pub start_offset: f32,
     /// Interpolation algorithm
     pub interp_algo: InterpAlgo,
 }
@@ -56,7 +56,7 @@ pub struct OutputFactors {
 impl Device {
     /// Consumes wifi_device and creates a generic Device (with the wifiDevice as a child)
     pub fn from_wifi(wifi_device: WifiDevice, app_handle: &AppHandle) -> Device {
-        let init_interp = GaussianState::new(0.000002, 0.1, 0.1);
+        let init_interp = GaussianState::new(0.002, 0.10, 0.1);
 
         let mut new_device = Device {
             id: wifi_device.mac.clone(),
@@ -65,7 +65,7 @@ impl Device {
             is_alive: true,
             factors: OutputFactors {
                 sens_mult: 1.0,
-                user_sense: 1.0,
+                start_offset: 0.0,
                 interp_algo: InterpAlgo::Gaussian(init_interp),
             },
             device_type: DeviceType::Wifi(wifi_device),
@@ -77,7 +77,6 @@ impl Device {
         {
             new_device.factors.sens_mult = old_offset;
         }
-        // Recall last user_sense
 
         return new_device;
     }

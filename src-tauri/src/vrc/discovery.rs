@@ -8,14 +8,12 @@ use crate::VrcInfo;
 use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
 use std::process::{id, Command, Stdio};
-use std::sync::{mpsc, Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
+use std::collections::HashSet;
 
 use dashmap::DashMap;
-use oyasumivr_oscquery;
-use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
-use serde;
 
 pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mutex<ApiManager>>) {
     let vrc_clone = Arc::clone(&vrc);
@@ -56,6 +54,14 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mut
                                 Arc::clone(&vrc_clone),
                                 Arc::clone(&api),
                             );
+
+                            // purge connected settings.
+                            let mut vrc_lock = vrc_clone.lock().expect("COulnd't lock vrc.");
+                            vrc_lock.vrc_connected = false;
+                            vrc_lock.available_parameters.clear();
+                            vrc_lock.purge_cache();
+                            let mut avatar_lock = vrc_lock.avatar.write().expect("Couldn't get read instance");
+                            *avatar_lock = None;
                             // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
                         } else {
                             log::error!("Error: Could not parse port from message: {}", msg);
@@ -88,39 +94,52 @@ fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
 ///
 /// * `text` - The HTTP response text to parse.
 /// * `params` - The DashMap containing OSC parameter information.
-fn update_params_from_text(text: &str, params: &DashMap<OscPath, OscInfo>) {
+/// 
+/// # Returns
+/// 
+/// * (List of entries recieved, whether id has changed.)
+fn update_params_from_text(text: &str, params: &DashMap<OscPath, OscInfo>) -> (HashSet<OscPath>, bool) {
+    let mut changed = HashSet::new();
+    let mut new_avi = false;
+    
     let node_info = parse_incoming(text);
     for node in node_info {
-        let path = remove_version(&node.full_path.0);
-        match params.get(&OscPath(path.clone())) {
-            // If the path exists and the data has changed, update it.
+        let raw = remove_version(&node.full_path.0);
+        let path = OscPath(raw);
+
+        changed.insert(path.clone());
+        match params.get(&path) {
             Some(old_node) => {
-                // Do the comparison and store the result.
                 let should_update = *old_node != node;
-                // Explicitly drop the guard before calling insert.
                 drop(old_node);
                 if should_update {
-                    //log::trace!("Params: {:?}", &path);
-                    params.insert(OscPath(path), node);
+                    if path.0 == AVATAR_ID_PATH {
+                        new_avi = true;        // value changed
+                    }
+                    params.insert(path, node);
                 }
             }
             None => {
-                params.insert(OscPath(path), node);
+                if path.0 == AVATAR_ID_PATH {
+                    new_avi = true;            // first time we see the ID
+                }
+                params.insert(path, node);
             }
         }
     }
+
+    (changed, new_avi)
 }
 
-/// Checks for an already active avatar and updates it if its ID does not match the OSC parameter.
+/// Creates new avatar from available parameters.
 ///
 /// # Arguments
 ///
-/// * `params` - The OSC parameters.
+/// * `params` - The available OSC parameters.
 /// * `avatar` - The shared avatar configuration.
-fn update_existing_avatar(
+fn update_avatar(
     params: &DashMap<OscPath, OscInfo>,
     avatar: &Arc<RwLock<Option<Avatar>>>,
-    vrc: &Mutex<VrcInfo>,
     api: Arc<Mutex<ApiManager>>,
 ) {
     // First, retrieve the current avatar ID (if any) using a read lock.
@@ -138,16 +157,8 @@ fn update_existing_avatar(
             // Compare the new id with the current avatar's id.
             if current_id.as_deref() != Some(&new_id) {
                 log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
-                let lock = vrc.lock().expect("couldn't lock vrc");
-                lock.purge_cache();
-                drop(lock);
                 // Attempt to load the new configuration using OSC parameters.
                 if let Some(new_config) = load_and_merge_configs(params, api) {
-                    /*let addresses = new_config.nodes
-                            .iter() // &Node
-                            .map(|n| n.address.clone())
-                            .collect::<Vec<String>>();
-                    log::trace!("Addresses: {:?}", addresses);*/
                     let mut avi_write = avatar.write().expect("unable to get write lock");
                     if let Some(avi_mut) = avi_write.as_mut() {
                         avi_mut.id = new_id;
@@ -176,9 +187,6 @@ fn update_existing_avatar(
                 }
             }
         }
-    } else {
-        log::error!("Unable to find ID parameter");
-        log::info!("PARAMS: \n{:?}", params);
     }
 }
 
@@ -250,13 +258,19 @@ fn run_vrc_http_polling(
         match fetch_http_response(&url) {
             Ok(text) => {
                 // Update OSC parameters based on the incoming HTTP response.
-                update_params_from_text(&text, params);
+                let (present_parameters, new_avi) = update_params_from_text(&text, params);
 
-                // Check for updates if an avatar is already active.
-                update_existing_avatar(params, &avatar, &vrc, Arc::clone(&api));
+                // remove all old parameters (not present)
+                if new_avi {
+                    params.retain(|key, _| present_parameters.contains(key));
 
-                // Initialize the avatar if it hasn't been set yet.
-                //initialize_avatar(params, &avatar);
+                    {
+                        let mut vrc_lock = vrc.lock().expect("couldn't lock vrc");
+                        vrc_lock.purge_cache();
+                    }
+
+                    update_avatar(params, &avatar, Arc::clone(&api));
+                }
             }
             Err(err) => {
                 if err.is_connect() {
@@ -308,72 +322,5 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
         None
     } else {
         Some(results)
-    }
-}
-
-/// Handles advertising our server for vrc to send values to if we need it.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct OscQueryServer {
-    recv_port: u16,
-    #[serde(skip)]
-    stop_sender: Option<mpsc::Sender<()>>,
-}
-
-impl OscQueryServer {
-    pub fn new(recieving_port: u16) -> Self {
-        OscQueryServer {
-            recv_port: recieving_port,
-            stop_sender: None,
-        }
-    }
-
-    pub fn start(&mut self) {
-        let (tx, rx) = mpsc::channel();
-        let in_port = self.recv_port.clone();
-        self.stop_sender = Some(tx);
-
-        thread::spawn(move || {
-            log::debug!("Spawned VRC Advertising on port:{}", in_port);
-            let tk_rt = tokio::runtime::Runtime::new().unwrap();
-            tk_rt.block_on(async {
-                // Initialize the OSCQuery server
-                log::debug!("In port: {}", in_port);
-                let (host, port) = oyasumivr_oscquery::server::init(
-                    "VRC Haptics", // The name of your application (Shows in VRChat's UI)
-                    in_port,
-                    "./sidecars/vrc-sidecar.exe", // The (relative) path to the MDNS sidecar executable
-                )
-                .await
-                .unwrap();
-                let addr = format!("{}:{}", host, port);
-                log::debug!("OscQuery on: {}", addr);
-                oyasumivr_oscquery::server::add_osc_method(OSCMethod {
-                    description: Some("Haptics Specific Parameters".to_string()),
-                    address: "/avatar/parameters/*".to_string(),
-                    ad_type: OSCMethodAccessType::Write,
-                    value_type: None,
-                    value: None,
-                })
-                .await; // /avatar/*, /avatar/parameters/*, etc.
-                oyasumivr_oscquery::server::advertise().await.unwrap();
-            });
-
-            loop {
-                // Check for stop signal
-                if let Ok(_) = rx.try_recv() {
-                    tk_rt.block_on(async {
-                        let _ = oyasumivr_oscquery::server::deinit().await;
-                    });
-                    break;
-                }
-            }
-        });
-    }
-
-    #[allow(dead_code)] // TODO: send deinit
-    pub fn stop(&mut self) {
-        if let Some(sender) = self.stop_sender.take() {
-            let _ = sender.send(());
-        }
     }
 }

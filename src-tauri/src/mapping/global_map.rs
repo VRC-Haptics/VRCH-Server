@@ -1,5 +1,5 @@
-use super::Id;
 use super::event::Event;
+use super::Id;
 use super::{
     input_node::InputNode,
     interp::{InterpAlgo, Interpolate},
@@ -14,7 +14,7 @@ use std::{fmt, sync::Arc};
 /// Game inputs should insert values that will be used in device calculations here.
 pub struct StandardMenu {
     pub intensity: f32, // multiplier set by user in-game
-    pub enable: bool, // Flat enable or disable all haptics
+    pub enable: bool,   // Flat enable or disable all haptics
 }
 
 /// Provides implementations for interpolating input haptic intensities to device nodes
@@ -44,10 +44,8 @@ impl GlobalMap {
     }
 
     pub fn clear_events(&mut self, tag: &String) {
-        self.active_events
-            .retain(|event| !event.tags.contains(tag));
+        self.active_events.retain(|event| !event.tags.contains(tag));
     }
-    
 
     /// registers a function to be called on a refresh event before every device update.
     pub fn register_refresh<F>(&mut self, fun: F)

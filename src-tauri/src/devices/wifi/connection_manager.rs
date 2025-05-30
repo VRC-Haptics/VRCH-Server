@@ -72,7 +72,11 @@ impl WifiConnManager {
                     }
                 }
             } else {
-                log::error!("Message with unknown address recieved: {}\tArgs: {:?}", msg.addr, msg.args);
+                log::error!(
+                    "Message with unknown address recieved: {}\tArgs: {:?}",
+                    msg.addr,
+                    msg.args
+                );
             }
         };
 

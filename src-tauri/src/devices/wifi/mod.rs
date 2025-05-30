@@ -66,7 +66,7 @@ impl WifiDevice {
         is_alive: &mut bool,
         // output factors specific to nodes under this device only
         factors: &mut OutputFactors,
-        // All inputs that are supposed to span the entire array.
+        // The inputs that will be used to give feedback.
         inputs: &GlobalMap,
     ) -> Option<Packet> {
         if !self.been_pinged {
@@ -87,12 +87,13 @@ impl WifiDevice {
                 return Some(set_map);
             }
 
-
             // Collect haptic values and scale to output.
             let mut intensities =
                 inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
             let global_offset = inputs.standard_menu.lock().expect("Global Lock").intensity;
-            intensities.iter_mut().for_each(|x| *x *= global_offset * factors.sens_mult);
+            intensities
+                .iter_mut()
+                .for_each(|x| *x = scale(*x, factors, global_offset));
             return Some(self.compile_message(&intensities));
         } else {
             // If no mapping configuration found
@@ -213,7 +214,23 @@ impl WifiDevice {
     }
 }
 
+const EPSILON: f32 = 0.001;
+
+/// scales a float value according to the output factors.
+fn scale(val: f32, factors: &OutputFactors, global_offset: f32) -> f32 {
+    if val <= EPSILON {
+        return 0.0;
+    }
+    if 1.0 - val <= EPSILON {
+        return factors.sens_mult;
+    }
+    
+    let range = factors.sens_mult - factors.start_offset;
+    (val*global_offset) * range + factors.start_offset
+}
+
 /// Manipulates the given flags according to the heartbeat timings.
+/// If is_alive is set to false, device will be removed from being tracked immediatly.
 /// If is_alive is set to false, device will be removed from being tracked immediatly.
 fn manage_hrtbt(
     is_alive: &mut bool,
@@ -234,10 +251,14 @@ fn manage_hrtbt(
 
     let ttl = Duration::from_secs(3);
     // if outlived time to live and we are currently set as alive
+    let ttl = Duration::from_secs(3);
+    // if outlived time to live and we are currently set as alive
     if diff > ttl && is_alive.to_owned() {
         *is_alive = false;
         *_been_pinged = false;
         log::trace!("Set to false");
+    // if the not ttl has passed.
+    } else if diff <= ttl {
     // if the not ttl has passed.
     } else if diff <= ttl {
         *is_alive = true;
