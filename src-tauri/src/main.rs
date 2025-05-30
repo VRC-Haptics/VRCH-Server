@@ -115,7 +115,7 @@ fn set_store_field<T>(
         .store("context_store.json")
         .expect("couldn't access context_store.json");
 
-    store.set(field, value)
+    store.set(field, value);
 }
 
 fn tick_devices(
