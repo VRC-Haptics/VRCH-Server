@@ -231,6 +231,7 @@ fn scale(val: f32, factors: &OutputFactors, global_offset: f32) -> f32 {
 
 /// Manipulates the given flags according to the heartbeat timings.
 /// If is_alive is set to false, device will be removed from being tracked immediatly.
+/// If is_alive is set to false, device will be removed from being tracked immediatly.
 fn manage_hrtbt(
     is_alive: &mut bool,
     _been_pinged: &mut bool,
@@ -250,10 +251,14 @@ fn manage_hrtbt(
 
     let ttl = Duration::from_secs(3);
     // if outlived time to live and we are currently set as alive
+    let ttl = Duration::from_secs(3);
+    // if outlived time to live and we are currently set as alive
     if diff > ttl && is_alive.to_owned() {
         *is_alive = false;
         *_been_pinged = false;
         log::trace!("Set to false");
+    // if the not ttl has passed.
+    } else if diff <= ttl {
     // if the not ttl has passed.
     } else if diff <= ttl {
         *is_alive = true;

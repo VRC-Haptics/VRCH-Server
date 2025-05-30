@@ -1,6 +1,7 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
 use crate::api::ApiManager;
+use crate::vrc::config::ConfNode;
 use crate::vrc::AVATAR_ID_PATH;
 use crate::VrcInfo;
 
