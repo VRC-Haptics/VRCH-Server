@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { AiOutlineSetting, AiOutlineHome, } from "react-icons/ai";
 import { IoGameControllerOutline } from "react-icons/io5";
+import { LiaAmbulanceSolid } from "react-icons/lia";
 import clsx from "clsx";
 
 export default function Layout() {
@@ -33,6 +34,14 @@ export default function Layout() {
         <div className="flex-grow"/>
         <div title="Pretty cool project" className="text-lg font-bold w-fit text-center">VRC Haptics Manager</div>
         <div className="flex-grow" />
+
+        <Link title="Global Map" className={linkClass} to="/global_map">
+          <LiaAmbulanceSolid 
+            className={clsx(defaultClass, {
+              [selectedClass]: location.pathname === "/global_map",
+            })}
+          />
+        </Link>
 
         <Link title="Settings" className={linkClass} to="/settings">
           <AiOutlineSetting

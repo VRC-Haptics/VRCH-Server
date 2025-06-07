@@ -18,6 +18,7 @@ pub struct CacheNode {
     smoothing_time: Duration,
     pub position_weight: f32,
     pub vel_mult: f32,
+    contact_scale: f32,
 }
 
 impl CacheNode {
@@ -31,6 +32,7 @@ impl CacheNode {
         smoothing_time: Duration,
         position_weight: f32,
         velocity_multiplier: f32,
+        contact_scale: f32,
     ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
         values.push_front((value_type.clone(), UNIX_EPOCH));
@@ -41,6 +43,7 @@ impl CacheNode {
             smoothing_time: smoothing_time,
             position_weight: position_weight,
             vel_mult: velocity_multiplier,
+            contact_scale: contact_scale,
         }
     }
 
@@ -50,6 +53,10 @@ impl CacheNode {
 
     pub fn set_position_weight(&mut self, val: f32) {
         self.position_weight = val;
+    }
+
+    pub fn set_contact_scale(&mut self, val: f32) {
+        self.contact_scale = val;
     }
 
     pub fn raw_last(&self) -> f32 {
@@ -172,7 +179,7 @@ impl CacheNode {
         let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
 
         // blend and clamp
-        ((1.0 - self.position_weight) * (vel * self.vel_mult) + self.position_weight * pos).clamp(0.0, 1.0)
+        ((1.0 - self.position_weight) * (vel * self.vel_mult) + self.position_weight * pos * self.contact_scale).clamp(0.0, 1.0)
     }
 
     /// Trys to parse OscType into a delta value in f32

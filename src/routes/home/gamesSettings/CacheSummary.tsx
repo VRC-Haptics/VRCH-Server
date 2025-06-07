@@ -5,16 +5,32 @@ interface OscSummaryProps {
   vrcInfo: VrcInfo
 }
 
-// This version leverages DaisyUI's built‑in `collapse` component instead of manual state
-// management + icon toggling. DaisyUI automatically adds a rotating arrow for the
-// expanded/collapsed state and handles the open/close animation.
+type TimestampPair = { secs_since_epoch: number; nanos_since_epoch: number };
 
 const OscSummary: FC<OscSummaryProps> = ({ vrcInfo: vrcInfo }) => {
   const availableCount = Object.keys(vrcInfo.available_parameters).length;
-  const cachedCount = Object.keys(vrcInfo.parameter_cache).length;
+  const cachedEntries = Object.entries(vrcInfo.parameter_cache);
+
+  const tsPairToMs = (t: TimestampPair) => t.secs_since_epoch * 1000 + t.nanos_since_epoch / 1e6;
+
+  /** Build array with age (ms) already calculated, then sort newest-first */
+  const cached = Object.entries(vrcInfo.parameter_cache).map(([path, node]) => {
+    // Each ring-buffer entry is [ oscValue, protobufTimestamp ]
+    const entry = node.values[0];                       // may be undefined
+    let ageMs = Number.POSITIVE_INFINITY;
+
+    if (Array.isArray(entry) && entry.length === 2) {
+      const ts = entry[1] as TimestampPair;             // index 1 holds the timestamp
+      ageMs = Date.now() - tsPairToMs(ts);
+    }
+
+    return { path, ageMs };
+  });
+
+  cached.sort((a, b) => a.ageMs - b.ageMs);  
 
   return (
-    <div className="mt-6">
+    <div>
       <h3 className="text-lg font-semibold">OSC</h3>
 
       <div className="mt-2 text-sm md:text-base">
@@ -29,14 +45,17 @@ const OscSummary: FC<OscSummaryProps> = ({ vrcInfo: vrcInfo }) => {
           <input type="checkbox" className="peer" />
 
           <div className="collapse-title font-medium">
-            Cached Parameters: {cachedCount}
+            Cached Parameters: {cachedEntries.length}
           </div>
 
           <div className="collapse-content">
             <ul className="list-disc ml-4 mt-1 space-y-1 text-xs md:text-sm max-h-40 overflow-y-auto pr-2">
-              {Object.entries(vrcInfo.parameter_cache).map(([key]) => (
-                <li key={key} className="break-words">
-                  <span className="font-medium">{key}</span>
+              {cached.map(({ path, ageMs }) => (
+                <li key={path} className="break-words">
+                  {path}:{" "}
+                  {ageMs !== Number.POSITIVE_INFINITY
+                    ? (ageMs / 1000).toFixed(2) + "s"
+                    : "- -"}
                 </li>
               ))}
             </ul>

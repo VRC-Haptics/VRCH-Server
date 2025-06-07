@@ -12,18 +12,34 @@ use std::{fmt, sync::Arc};
 
 /// The common factors that will be used across all devices to modify output.
 /// Game inputs should insert values that will be used in device calculations here.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct StandardMenu {
     pub intensity: f32, // multiplier set by user in-game
     pub enable: bool,   // Flat enable or disable all haptics
 }
 
 /// Provides implementations for interpolating input haptic intensities to device nodes
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct GlobalMap {
     active_events: Vec<Event>,
     input_nodes: Arc<DashMap<Id, InputNode>>,
     pub standard_menu: Arc<Mutex<StandardMenu>>,
+    #[serde(skip)]
     refresh_callbacks:
         Vec<Box<dyn Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static>>,
+}
+
+impl Clone for GlobalMap {
+    /// THIS DOES NOT CLONE THE REFRESH_CALLBACKS
+    fn clone(&self) -> Self {
+        Self {
+            active_events: self.active_events.clone(),
+            input_nodes: Arc::clone(&self.input_nodes),
+            standard_menu: Arc::clone(&self.standard_menu),
+            // callbacks are intentionally *not* cloned
+            refresh_callbacks: Vec::new(),
+        }
+    }
 }
 
 impl GlobalMap {

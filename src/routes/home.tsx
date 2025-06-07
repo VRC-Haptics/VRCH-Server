@@ -21,7 +21,6 @@ export default function Home() {
       <VrcProvider>
         <GameSettings/>
       </VrcProvider>
-      
     </div>
   );
 }

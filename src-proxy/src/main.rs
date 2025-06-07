@@ -17,7 +17,8 @@ fn main() {
     // if our haptics setup isn't running
     println!("Checking if Haptics server is already running...");
     let mut system = System::new_all();
-    if find_process("vr-haptics-player.exe", &mut system).is_none() {
+    if find_process("vr-haptics-player.exe", &mut system).is_none() &&
+        find_process("Haptics.exe", &mut system).is_none() {
         println!("Haptics Server is not running. Launching new process...");
         
         let _status = process::Command::new(main_program)

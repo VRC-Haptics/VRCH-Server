@@ -275,8 +275,9 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_device_list,
+            commands::get_device_list, 
             commands::get_vrc_info,
+            commands::get_core_map,
             commands::upload_device_map,
             commands::update_device_multiplier,
             commands::update_device_offset,

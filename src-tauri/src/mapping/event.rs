@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 /// Describes what effect an event should have.
-#[derive(Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum EventEffectType {
     /// Will try to set this node id to this value,
     /// Does not remove node after finished.
@@ -21,7 +21,7 @@ pub enum EventEffectType {
 }
 
 /// Represents a haptic event that takes place over time.
-#[derive(Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Event {
     /// user facing name
     pub name: String,

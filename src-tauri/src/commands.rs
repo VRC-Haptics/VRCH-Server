@@ -86,6 +86,13 @@ pub fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
     vrc_info.clone()
 }
 
+/// Gets the core haptics map that is used to drive feedback.
+#[tauri::command]
+pub fn get_core_map(state: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> GlobalMap {
+    let map = state.lock().expect("Unable to lock global map");
+    map.clone() 
+}
+
 #[tauri::command]
 pub async fn upload_device_map(
     id: String,

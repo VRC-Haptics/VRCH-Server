@@ -9,6 +9,7 @@ import { TauriProvider } from "./context/TauriProvider";
 import "./styles.css";
 import { SettingsProvider } from "./context/SettingsProvider";
 import GameSettings from "./routes/game_settings/game_settings";
+import GlobalMapContainer from "./routes/haptic_map";
 
 const router = createBrowserRouter([
   {
@@ -28,6 +29,10 @@ const router = createBrowserRouter([
         path: "/game_settings",
         element: <GameSettings />,
       },
+      {
+        path: "/global_map",
+        element: <GlobalMapContainer />,
+      }
     ],
   },
 ]);

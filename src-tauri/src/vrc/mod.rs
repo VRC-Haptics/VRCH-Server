@@ -65,7 +65,6 @@ pub struct VrcInfo {
     )]
     osc_server: Option<OscServer>,
     /// Spawns our own OSCQuery advertising
-    #[allow(dead_code)]
     #[allow(
         dead_code,
         reason = "Keeps The threads in scope, and might be needed later"
@@ -80,7 +79,7 @@ impl VrcInfo {
         app_handle: &tauri::AppHandle,
     ) -> Arc<Mutex<VrcInfo>> {
         let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
-        let value_cache_size = 100;
+        let value_cache_size = 10;
         
         let dist_weight = get_store_field(app_handle, "distance_weight").or(Some(0.20));
         let vel_multiplier = get_store_field(app_handle, "velocity_multiplier").or(Some(1.0));
@@ -127,6 +126,7 @@ impl VrcInfo {
                             default_clone,
                             Duration::from_secs_f32(0.12),
                             0.2,
+                            1.0,
                             1.0,
                         ),
                     );
@@ -180,6 +180,7 @@ impl VrcInfo {
                     for node in &conf.nodes {
                         if let Some(mut cache_node) = params_refresh.get_mut(&OscPath(node.address.clone()))
                         {
+                            // update node if already created
                             if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
                                 // don't do velocity for external addresses
                                 if node.is_external_address {
@@ -189,6 +190,7 @@ impl VrcInfo {
                                 // insert the value into the game map
                                 cache_node.set_position_weight(vrc_lock.dist_weight);
                                 cache_node.set_velocity_mult(vrc_lock.vel_multiplier);
+                                cache_node.set_contact_scale(1.0);
                                 old_node.set_intensity(cache_node.latest());
                                 continue;
                             }

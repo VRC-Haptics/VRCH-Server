@@ -83,11 +83,16 @@ export interface OscInfo {
   description?: string | null;
 }
 
+export interface ProtoTimestamp {
+  secs_since_epoch: number;
+  nanos_since_epoch: number;
+}
+
 export interface CacheValue {
   /** The actual OSC payload value */
   value: OscType;
   /** Epoch‑milliseconds when we received the value */
-  timestamp: number;
+  timestamp: ProtoTimestamp;
 }
 
 export interface CacheNode {
