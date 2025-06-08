@@ -102,67 +102,10 @@ impl GaussianState {
 impl Interpolate for GaussianState {
     /// Takes in the list of output nodes on a device, and the input nodes that should influence it.
     fn interp(&self, node_list: &Vec<HapticNode>, in_nodes: Vec<&InputNode>) -> Vec<f32> {
-        let mut out_list: Vec<f32> = vec![0.0; node_list.len()];
-
-        // calimed inputs share an index for the referenced claimed value
-        // (node, index in respective input list)
-        let mut claimed_inputs: Vec<(&InputNode, usize)> = vec![];
-        let mut claimed_outputs: Vec<(&HapticNode, usize)> = vec![];
-
-        // nodes marked with the NodeGroup::All flag.
-        let external_inputs: Vec<&InputNode> = in_nodes
+        // For each output node, evaluate the Gaussian kernel against the full set of inputs.
+        node_list
             .iter()
-            .copied()
-            .filter(|n| n.always_apply())
-            .collect();
-
-        // gather all perfect pairing's first.
-        for (out_idx, out_node) in node_list.iter().enumerate() {
-            for (in_idx, in_node) in in_nodes.iter().enumerate() {
-                if out_node.dist(&in_node.haptic_node) <= self.merge {
-                    claimed_inputs.push((*in_node, in_idx));
-                    claimed_outputs.push((out_node, out_idx));
-
-                    // calculate only the claimed node + external inputs.
-                    let mut external_cpy = external_inputs.clone();
-                    external_cpy.push(in_node);
-                    out_list[out_idx] = self.single_node(out_node, &external_cpy); // direct copy
-                    break; // stop searching inputs at the first perfect pairing
-                }
-            }
-        }
-
-        // need to setup these...
-        // all nodes that haven't been claimed
-        let unique_inputs: Vec<&InputNode> = in_nodes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, input)| {
-                if !claimed_inputs.iter().any(|&(_, ci)| ci == i) {
-                    Some(*input)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let unique_outputs: Vec<(&HapticNode, usize)> = node_list
-            .iter()
-            .enumerate()
-            .filter_map(|(i, node)| {
-                if !claimed_outputs.iter().any(|&(_, co)| co == i) {
-                    Some((node, i))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        // fill in the rest of the out_list (all indices should be convered at some point.)
-        for (output, main_index) in unique_outputs.iter() {
-            out_list[*main_index] = self.single_node(output, &unique_inputs);
-        }
-
-        return out_list;
+            .map(|out_node| self.single_node(out_node, &in_nodes))
+            .collect()
     }
 }

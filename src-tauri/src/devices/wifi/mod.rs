@@ -249,7 +249,6 @@ fn manage_hrtbt(
         }
     };
 
-    let ttl = Duration::from_secs(3);
     // if outlived time to live and we are currently set as alive
     let ttl = Duration::from_secs(3);
     // if outlived time to live and we are currently set as alive

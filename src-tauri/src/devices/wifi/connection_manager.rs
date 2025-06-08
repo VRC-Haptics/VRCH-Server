@@ -71,6 +71,8 @@ impl WifiConnManager {
                         }
                     }
                 }
+            } else if msg.addr == "/ping" {
+                log::trace!("Recieved ping with: {:?}", msg.args);
             } else {
                 log::error!(
                     "Message with unknown address recieved: {}\tArgs: {:?}",
