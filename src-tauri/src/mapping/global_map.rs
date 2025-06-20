@@ -55,10 +55,17 @@ impl GlobalMap {
         };
     }
 
+    /// Start a singular input event.
     pub fn start_event(&mut self, event: Event) {
         self.active_events.push(event);
     }
 
+    /// Start a list of events, consumes the events vector.
+    pub fn start_events(&mut self, events: &mut Vec<Event>) {
+        self.active_events.append(events);
+    }
+
+    /// Clear all playing events.
     pub fn clear_events(&mut self, tag: &String) {
         self.active_events.retain(|event| !event.tags.contains(tag));
     }
@@ -81,7 +88,6 @@ impl GlobalMap {
             let menu = Arc::clone(&self.standard_menu);
             callback(&clone, &menu);
         }
-
         // Tick every event and keep only those that should continue running.
         self.active_events.retain_mut(|event| {
             let finished = event.tick(Arc::clone(&self.input_nodes));

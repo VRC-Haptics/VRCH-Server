@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use base64::{engine::general_purpose, Engine};
 use strum::EnumIter;
 
-use crate::bhaptics::game::device_maps::{
-    x40_vest::x40_vest_back, x40_vest::x40_vest_front, x6_head::x6_headset,
+use crate::bhaptics::maps::{
+    x40_vest::x40_vest_back, 
+    x40_vest::x40_vest_front, 
+    x6_head::x6_headset,
 };
 use crate::{mapping::Id, util::math::Vec3};
 

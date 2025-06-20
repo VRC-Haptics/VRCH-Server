@@ -35,7 +35,6 @@ rosc = { git = "https://github.com/virtuallyaverage/rosc-serde.git" }
 regex = "1.11.1"
 uuid = { version = "1.14", features = ["v7"] }
 if-addrs = "0.13.3"
-btleplug = "0.11.7"
 dunce = "1.0.5"
 log = "0.4.27"
 runas = "1.2.0"
@@ -58,6 +57,7 @@ tauri-plugin-log = "2"
 base64 = "0.22.1"
 async-spin-sleep = "0.5.1"
 spin_sleep_util = "0.1.1"
+tauri-plugin-blec = "0.5.3"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"

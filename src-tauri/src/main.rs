@@ -16,6 +16,7 @@ mod vrc;
 use api::ApiManager;
 use bhaptics::game::BhapticsGame;
 use devices::wifi::discovery::start_wifi_listener;
+use bhaptics::devices::start_bt;
 use devices::{Device, DeviceType};
 use mapping::global_map::GlobalMap;
 use vrc::VrcInfo;
@@ -121,6 +122,7 @@ fn set_store_field<T>(
 fn tick_devices(
     device_list: Arc<Mutex<Vec<Device>>>,
     input_list: Arc<Mutex<GlobalMap>>,
+    bhaptics: Arc<Mutex<BhapticsGame>>,
     _: &tauri::AppHandle,
 ) {
     log::info!("starting tick");
@@ -160,8 +162,14 @@ fn tick_devices(
                     }
                 });
 
-                let mut inputs_guard = input_list.lock().expect("couldn't find inputs guard");
-                inputs_guard.refresh_inputs();
+                // get updated input state
+                let mut map_guard = input_list.lock().expect("couldn't find inputs guard");
+                map_guard.refresh_inputs();
+                let mut bh = bhaptics.lock().expect("Couldn't lock bhaptics");
+                map_guard.start_events(&mut bh.tick());
+
+
+                // push updated input state to devices
                 for device in device_list_guard.iter_mut() {
                     // handle device specific tick functions
                     match &mut device.device_type {
@@ -170,7 +178,7 @@ fn tick_devices(
                             if let Some(packet) = wifi_device.tick(
                                 &mut device.is_alive,
                                 &mut device.factors,
-                                &inputs_guard,
+                                &map_guard,
                             ) {
                                 let addr = format!("{}:{}", wifi_device.ip, wifi_device.send_port);
                                 // TODO: Actually error handle
@@ -213,9 +221,10 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 }
 
 fn main() {
+
     // Core state machines that interface devices and the haptics providers
     // The GlobalMap; provides interpolated feedback values.
-    let input_list: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
+    let global_map: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
     // Global device list; contains all active devices.
     let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new()));
     // Provides a unified interface for interacting with external api's
@@ -235,6 +244,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_blec::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(Target::new(TargetKind::Webview))
@@ -249,7 +259,7 @@ fn main() {
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
                 .build(),
         )
-        .manage(Arc::clone(&input_list))
+        .manage(Arc::clone(&global_map))
         .manage(Arc::clone(&device_list))
         .manage(Arc::clone(&api_manager))
         .setup(move |app| {
@@ -258,20 +268,27 @@ fn main() {
             // Managers for game integrations; each handling connectivity and communications
             // Global VRC State; connection management and GlobalMap interaction
             let vrc_info: Arc<Mutex<VrcInfo>> =
-                VrcInfo::new(Arc::clone(&input_list), Arc::clone(&api_manager), app_handle);
+                VrcInfo::new(Arc::clone(&global_map), Arc::clone(&api_manager), app_handle);
             // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
-            let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&input_list));
+            let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&global_map));
 
             app.manage(Arc::clone(&vrc_info));
             app.manage(Arc::clone(&bhaptics));
 
             // Initialize stuff that needs the app handle. (interacts directly with GUI)
-            tick_devices(device_list.clone(), input_list.clone(), app_handle);
+            tick_devices(device_list.clone(), global_map.clone(), bhaptics.clone(), app_handle);
             start_wifi_listener(app_handle.clone(), app.state());
             throw_vrc_notif(app_handle, vrc_info.clone());
             let mut lock = api_manager.lock().unwrap();
             lock.refresh_caches();
             drop(lock);
+
+            /*let rt = tokio::runtime::Runtime::new()?;
+
+            // block_on drives the future to completion and returns its result
+            rt.block_on(async {
+                let _ = start_bt().await;
+            });*/;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
