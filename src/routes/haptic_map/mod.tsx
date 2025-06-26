@@ -3,6 +3,7 @@ import { Html, OrbitControls } from "@react-three/drei";
 import { useState, useRef } from "react";
 import { useMapContext } from "../../context/mapContext";
 import { useDeviceContext } from "../../context/DevicesContext";
+import StandardModel from "./standard";
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
@@ -60,6 +61,9 @@ export default function InputNodesViewer() {
         <axesHelper args={[0.2]} />
         <ambientLight intensity={1} />
         <OrbitControls ref={controlsRef} enablePan enableZoom enableRotate />
+
+        {/* The human standard model */}
+        <StandardModel/>
 
         {/* Input nodes */}
         {inputNodes.map((node) => {
