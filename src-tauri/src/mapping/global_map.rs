@@ -103,6 +103,7 @@ impl GlobalMap {
         new_node: HapticNode,
         tags: Vec<String>,
         id: String,
+        radius: f32,
     ) -> Result<(), DuplicateNodeIDError> {
         if let Some(existing) = self.input_nodes.get(&Id(id.clone())) {
             return Err(DuplicateNodeIDError {
@@ -111,7 +112,7 @@ impl GlobalMap {
         }
 
         self.input_nodes
-            .insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id)));
+            .insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id), radius));
 
         Ok(())
     }

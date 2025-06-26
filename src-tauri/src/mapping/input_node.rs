@@ -12,6 +12,8 @@ pub struct InputNode {
     pub haptic_node: HapticNode,
     /// The feedback strength at this location
     intensity: f32,
+    /// The radius that this node will impact
+    radius: f32,
     /// used to identify/modify/remove groups of InputNodes. (tags are not NodeGroups)  
     pub tags: Vec<String>,
 }
@@ -26,11 +28,12 @@ impl InputNode {
     /// tags: Use these to find groups of InputNodes
     ///
     /// **NOTE:** Initializes intensity to 0.0, set the intensity using class functions
-    pub fn new(node: HapticNode, tags: Vec<String>, id: Id) -> InputNode {
+    pub fn new(node: HapticNode, tags: Vec<String>, id: Id, radius: f32) -> InputNode {
         return InputNode {
             id: id,
             haptic_node: node,
             intensity: 0.0,
+            radius: radius,
             tags: tags,
         };
     }
@@ -43,6 +46,14 @@ impl InputNode {
         self.haptic_node.x = pos.x;
         self.haptic_node.y = pos.y;
         self.haptic_node.z = pos.z;
+    }
+
+    pub fn set_radius(&mut self, radius: f32) {
+        self.radius = radius;
+    }
+
+    pub fn get_radius(&self) -> f32 {
+        self.radius
     }
 
     /// sets the intensity of this node

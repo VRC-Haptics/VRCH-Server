@@ -133,7 +133,7 @@ fn insert_bhaptics_maps(map: Arc<Mutex<GlobalMap>>) {
             ];
             if let Some(id) = loc.to_id(index) {
                 // doesn't really matter if it is already there, we want to keep only one instance.
-                let _ = input_lock.add_input_node(node, tags, id.0);
+                let _ = input_lock.add_input_node(node, tags, id.0, 0.1);
             }
         }
     }

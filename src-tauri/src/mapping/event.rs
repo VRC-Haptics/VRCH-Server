@@ -144,7 +144,7 @@ impl Event {
                 };
                 input_nodes.insert(
                     id.clone(),
-                    InputNode::new(haptic_node, self.tags.clone(), id.clone()),
+                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), 0.2),
                 );
                 self.managed_nodes.push(id);
             }
@@ -159,7 +159,7 @@ impl Event {
                 };
                 input_nodes.insert(
                     id.clone(),
-                    InputNode::new(haptic_node, self.tags.clone(), id.clone()),
+                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), 0.2),
                 );
                 self.managed_nodes.push(id);
             }

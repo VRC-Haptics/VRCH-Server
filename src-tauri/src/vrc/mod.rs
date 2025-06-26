@@ -210,6 +210,7 @@ impl VrcInfo {
                                     "vrc_config_node".to_string(),
                                 ],
                                 Id(node.address.clone()),
+                                node.radius,
                             );
 
                             // set intensity and push to map.

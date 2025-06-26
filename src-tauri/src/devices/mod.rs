@@ -56,7 +56,7 @@ pub struct OutputFactors {
 impl Device {
     /// Consumes wifi_device and creates a generic Device (with the wifiDevice as a child)
     pub fn from_wifi(wifi_device: WifiDevice, app_handle: &AppHandle) -> Device {
-        let init_interp = GaussianState::new(0.002, 0.10, 0.1);
+        let init_interp = GaussianState::new(0.002, 0.05);
 
         let mut new_device = Device {
             id: wifi_device.mac.clone(),

@@ -60,6 +60,7 @@ pub fn play_point(
         temp_node,
         vec!["Testing".to_string()],
         node_name.to_string(),
+        0.01,
     ) {
         let _ = global_map.set_intensity(&node_name, power);
     }

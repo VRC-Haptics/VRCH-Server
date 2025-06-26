@@ -31,35 +31,28 @@ impl Interpolate for InterpAlgo {
 ///
 /// Provides `Interpolate` Implementation  
 pub struct GaussianState {
-    sigma: f32,
-    cutoff: f32,
     merge: f32, // TODO: Maybe look at caching interacted values?
-    sigma_const: f32,
+    at_edge: f32,
 }
 
 impl GaussianState {
     /// Creates a new Gaussian interpolation instance
     /// Initializes parameters
-    pub fn new(merge: f32, falloff: f32, cutoff: f32) -> GaussianState {
-        let mut g = GaussianState {
-            sigma: 0.0,
-            cutoff: cutoff,
+    pub fn new(merge: f32, at_edge: f32) -> GaussianState {
+        GaussianState {
             merge: merge,
-            sigma_const: 100.,
-        };
-        g.set_fallof(falloff);
-        return g;
+            at_edge: at_edge,
+        }
     }
 
-    /// Sets the devices falloff in meters to reach 5% of input value.
-    pub fn set_fallof(&mut self, falloff: f32) {
-        self.sigma = falloff / (-2.0 * 0.05_f32.ln());
-        self.sigma_const = 2.0 * self.sigma.powi(2);
-    }
+    /// used in interp function to get a weight between zero and one for the distance between two points.
+    #[inline]
+    fn gaussian_kernel(&self, distance: f32, max_radius: f32) -> f32 {
+        debug_assert!(distance >= 0.0 && max_radius > 0.0 && self.at_edge > 0.0 && self.at_edge < 1.0);
 
-    /// used in interp function
-    fn gaussian_kernel(&self, distance: f32) -> f32 {
-        (-distance.powi(2) / self.sigma_const).exp()
+        let sigma = max_radius / (-2.0 * self.at_edge.ln()).sqrt();
+
+        (-0.5 * (distance / sigma).powi(2)).exp()
     }
 
     /// returns the straight interpolation for the node.
@@ -71,9 +64,10 @@ impl GaussianState {
             // if the game node should influence the device node
             if node.interacts(&in_node.haptic_node) {
                 let distance = node.dist(&in_node.haptic_node);
-                // if below our threshold, return early with that nodes intensity
-                if !distance.is_nan() && distance < self.cutoff {
-                    let weight = self.gaussian_kernel(distance);
+                let max_radius = in_node.get_radius();
+                // if below our threshold, add influence
+                if !distance.is_nan() && distance < max_radius {
+                    let weight = self.gaussian_kernel(distance, max_radius);
                     numerator += weight * in_node.get_intensity();
                     denominator += weight;
                 }
