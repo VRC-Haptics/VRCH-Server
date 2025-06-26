@@ -5707,6 +5707,7 @@ dependencies = [
  "futures-util",
  "if-addrs",
  "log",
+ "once_cell",
  "oyasumivr_oscquery",
  "regex",
  "reqwest",

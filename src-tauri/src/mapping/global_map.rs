@@ -71,6 +71,8 @@ impl GlobalMap {
     }
 
     /// registers a function to be called on a refresh event before every device update.
+    /// 
+    /// DO NOT OPEN A REFERENCE TO THE GLOBAL MAP WITHIN THESE. WILL CAUSE A DEADLOCK
     pub fn register_refresh<F>(&mut self, fun: F)
     where
         F: Fn(&DashMap<Id, InputNode>, &Mutex<StandardMenu>) + Send + Sync + 'static,

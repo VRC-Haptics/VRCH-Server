@@ -20,6 +20,11 @@ pub struct HapticNode {
 }
 
 impl HapticNode {
+    /// Creates a new haptic node
+    pub fn new(pos: Vec3, groups: Vec<NodeGroup>) -> HapticNode {
+        HapticNode { x: pos.x, y: pos.y, z: pos.z, groups: groups }
+    }
+
     /// Returns Euclidean distance in meters between this and the other HapticNode.
     /// Possibly NaN, needs to be checked
     pub fn dist(&self, other: &HapticNode) -> f32 {

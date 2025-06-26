@@ -283,12 +283,14 @@ fn main() {
             lock.refresh_caches();
             drop(lock);
 
-            /*let rt = tokio::runtime::Runtime::new()?;
-
+            let rt = tokio::runtime::Runtime::new()?;
             // block_on drives the future to completion and returns its result
             rt.block_on(async {
-                let _ = start_bt().await;
-            });*/;
+                if let Err(e)  = start_bt(Arc::clone(&device_list)).await {
+                    log::error!("Error starting Bluetooth: {}", e);
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
