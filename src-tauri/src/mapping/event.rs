@@ -35,6 +35,8 @@ pub struct Event {
     pub duration: Duration,
     /// Tags that will be inserted to each node created by this event.
     pub tags: Vec<String>,
+    /// radius of effect this event will have
+    pub radius: f32,
     managed_nodes: Vec<Id>, // nodes we have control over.
     time_step: Duration,
     steps_completed: usize,
@@ -81,6 +83,7 @@ impl Event {
             steps: steps.clone(),
             duration: duration,
             tags: tags,
+            radius: 0.001,
             managed_nodes: Vec::new(),
             time_step: time_step,
             steps_completed: 0,
@@ -144,7 +147,7 @@ impl Event {
                 };
                 input_nodes.insert(
                     id.clone(),
-                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), 0.2),
+                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), self.radius),
                 );
                 self.managed_nodes.push(id);
             }
@@ -159,7 +162,7 @@ impl Event {
                 };
                 input_nodes.insert(
                     id.clone(),
-                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), 0.2),
+                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), self.radius),
                 );
                 self.managed_nodes.push(id);
             }
@@ -228,6 +231,7 @@ impl Event {
     }
 }
 
+#[derive(Debug)]
 pub enum CreateEventError {
     /// must contain atleast one step to execute.
     NotEnoughSteps,

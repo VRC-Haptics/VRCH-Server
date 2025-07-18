@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import { Device, HapticNode } from '../../../utils/commonClasses';
+import { Vec3 } from '../../../utils/global_map';
 
 interface DisplayHapticNodesProps {
   selectedDevice: Device;
@@ -30,9 +31,9 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
     if (selectedIndices.length < 1) return;
     const node = nodes[selectedIndices[0]];
     invoke('play_point', {
-      feedbackLocation: [node.x, node.y, node.z] as [number, number, number],
+      feedbackLocation: [-node.x, node.y, node.z] as [number, number, number],
       power: 1.0 * selectedDevice.factors.sens_mult,
-      duration: 1.0,
+      duration: 0.2,
     }).catch(err => console.error('play_point invoke failed:', err));
   };
 
@@ -40,10 +41,14 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
   const handleRecenter = () => controlsRef.current?.reset();
   const handleSwap = () => {
     if (selectedIndices.length !== 2) return;
+    // create vec3
+    const node_1: Vec3 = { x: -nodes[selectedIndices[0]].x, y: nodes[selectedIndices[0]].y, z: nodes[selectedIndices[0]].z };
+    const node_2: Vec3 = { x: -nodes[selectedIndices[1]].x, y: nodes[selectedIndices[1]].y, z: nodes[selectedIndices[1]].z };
+
     invoke('swap_conf_nodes', {
       deviceId: selectedDevice.id,
-      index1: selectedIndices[0],
-      index2: selectedIndices[1],
+      pos1: node_1,
+      pos2: node_2,
     }).catch(err => console.error('swap_conf_nodes invoke failed:', err));
   };
 
@@ -87,7 +92,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
                         borderRadius: '4px',
                       }}
                     >
-                      {node.groups.join(', ')}
+                      {node.groups.join(', ')}:{idx}
                     </Html>
                   )}
                 </mesh>

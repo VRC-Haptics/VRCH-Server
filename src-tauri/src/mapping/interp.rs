@@ -97,9 +97,11 @@ impl Interpolate for GaussianState {
     /// Takes in the list of output nodes on a device, and the input nodes that should influence it.
     fn interp(&self, node_list: &Vec<HapticNode>, in_nodes: Vec<&InputNode>) -> Vec<f32> {
         // For each output node, evaluate the Gaussian kernel against the full set of inputs.
-        node_list
-            .iter()
-            .map(|out_node| self.single_node(out_node, &in_nodes))
-            .collect()
+        let mut out_list = vec![0.0; node_list.len()];
+        for (index, node) in node_list.iter().enumerate() {
+            out_list[index] = self.single_node(node, &in_nodes);
+        }
+
+        out_list
     }
 }

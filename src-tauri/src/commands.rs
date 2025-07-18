@@ -2,7 +2,9 @@
 use crate::devices::{Device, DeviceType};
 use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
-use crate::mapping::NodeGroup;
+use crate::mapping::event::Event;
+
+use crate::util::math::Vec3;
 use crate::{set_device_store_field, set_store_field};
 use crate::vrc::{config::GameMap, VrcInfo};
 //standard imports
@@ -15,17 +17,17 @@ use tokio::time::Duration;
 #[tauri::command]
 pub fn swap_conf_nodes(
     device_id: String,
-    index_1: u32,
-    index_2: u32,
+    pos1: Vec3,
+    pos2: Vec3,
     device_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
 ) -> Result<(), String> {
     let mut device_lock = device_state.lock().expect("Couldn't lock device list");
 
-    log::trace!("Into command");
     for dev in device_lock.iter_mut() {
         if dev.id == device_id {
             let DeviceType::Wifi(wifi_cfg) = &mut dev.device_type;
-            wifi_cfg.swap_nodes(index_1 as usize, index_2 as usize)?;
+            log::debug!("swapping nodes with positions: {:?}, {:?}", pos1, pos2);
+            wifi_cfg.swap_nodes(pos1, pos2)?;
             let _ = wifi_cfg;
 
             drop(device_lock);
@@ -45,32 +47,20 @@ pub fn play_point(
     duration: f32,                      // When should this point be removed.
     global_map_state: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
 ) -> Result<(), ()> {
-    use strum::IntoEnumIterator;
-    let all_bones: Vec<NodeGroup> = NodeGroup::iter().collect();
-    let temp_node = HapticNode {
-        x: -feedback_location.0, // TODO: Actually find out why these are swapped
-        y: feedback_location.1,
-        z: feedback_location.2,
-        groups: all_bones,
-    };
+    let event = Event::new("Play Point".to_string(), 
+        crate::mapping::event::EventEffectType::Location(Vec3 { 
+            x: feedback_location.0, 
+            y: feedback_location.1, 
+            z: feedback_location.2 
+        }), 
+        vec![power], 
+        Duration::from_secs_f32(duration), 
+        vec!["UI".to_string()]
+    ).expect("unable to create play point event");
 
     let mut global_map = global_map_state.lock().expect("couldn't lock global map");
-    let node_name = "Manual Play Node".to_string();
-    if let Ok(_) = global_map.add_input_node(
-        temp_node,
-        vec!["Testing".to_string()],
-        node_name.to_string(),
-        0.01,
-    ) {
-        let _ = global_map.set_intensity(&node_name, power);
-    }
-
-    drop(global_map); // explicitly yeild our lock.
-
-    std::thread::sleep(Duration::from_secs_f32(duration));
-
-    let mut global_map = global_map_state.lock().expect("couldn't lock global map");
-    let _ = global_map.pop_input_node(node_name);
+    
+    global_map.start_event(event);
 
     return Ok(());
 }

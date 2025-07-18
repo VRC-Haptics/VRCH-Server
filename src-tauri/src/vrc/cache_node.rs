@@ -162,10 +162,19 @@ impl CacheNode {
         return Ok(());
     }
 
-    /// Returns the velocity based on `smoothing_time`
+    /// Returns the velocity and position mixed values
     pub fn latest(&self) -> f32 {
         let now = SystemTime::now();
         let limit = now.checked_sub(self.smoothing_time).unwrap_or(UNIX_EPOCH);
+
+        // detect when we havent recieved the "closing zero value"
+        // should stop buzzing after and having to reset.
+        if let Some((latest, time)) = self.values.front() {
+            let age_ms = now.duration_since(*time).unwrap_or(Duration::new(0, 0)).as_millis();
+            if latest.clone().float().unwrap() > 0.001 && age_ms > 200 {
+                return 0.0;
+            }
+        }
 
         // pull current position
         let pos = self
@@ -182,8 +191,8 @@ impl CacheNode {
         ((1.0 - self.position_weight) * (vel * self.vel_mult) + self.position_weight * pos * self.contact_scale).clamp(0.0, 1.0)
     }
 
-    /// Trys to parse OscType into a delta value in f32
-    /// value is left hand, val_late is right hand.
+    /// Trys to parse OscType into a delta value in f32.
+    /// uses the order: `value-val_late`.
     fn value_delta(&self, value: &OscType, val_late: &OscType) -> f32 {
         match value {
             OscType::Float(float) => float - val_late.clone().float().unwrap(),

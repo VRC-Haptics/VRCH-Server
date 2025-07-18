@@ -11,6 +11,7 @@ use std::vec;
 use crate::devices::OutputFactors;
 use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
+use crate::util::math::Vec3;
 use crate::util::next_free_port;
 use connection_manager::WifiConnManager;
 
@@ -199,22 +200,41 @@ impl WifiDevice {
         }
     }
 
-    /// Swaps the configured nodes at indices
-    pub fn swap_nodes(&mut self, i1: usize, i2: usize) -> Result<(), String> {
+    /// Swaps the configured nodes at locations
+    pub fn swap_nodes(&mut self, pos_1: Vec3, pos_2: Vec3) -> Result<(), String> {
         let mut lock = self.connection_manager.config.write().unwrap();
         if let Some(wifi_con) = lock.as_mut() {
-            let first = wifi_con.node_map[i1].clone();
-            wifi_con.node_map[i1] = wifi_con.node_map[i2].clone();
-            wifi_con.node_map[i2] = first;
-            self.push_map = true;
-            return Ok(());
+            // get index of nodes
+            let mut index1:Option<usize> = None;
+            let mut index2:Option<usize> = None;
+            for (index, node) in wifi_con.node_map.iter().enumerate() {
+                if node.to_vec3().close_to(&pos_1, EPSILON) {
+                    index1 = Some(index);
+                    log::debug!("Found node 1 at index: {:?}", index1);
+                } else if node.to_vec3().close_to(&pos_2, EPSILON) {
+                    index2 = Some(index);
+                    log::debug!("Found node 2 at index: {:?}", index2);
+                }
+            }
+
+            // swap them
+            if let (Some(i1), Some(i2)) = (index1, index2) {
+                let first = wifi_con.node_map[i1].clone();
+                wifi_con.node_map[i1] = wifi_con.node_map[i2].clone();
+                wifi_con.node_map[i2] = first;
+                self.push_map = true;
+                return Ok(());
+            } else {
+                return Err("Couldn't find both nodes to swap".to_string());
+            }
+
         } else {
             return Err("no_map".to_string());
         }
     }
 }
 
-const EPSILON: f32 = 0.001;
+const EPSILON: f32 = 0.0001;
 
 /// scales a float value according to the output factors.
 fn scale(val: f32, factors: &OutputFactors, global_offset: f32) -> f32 {

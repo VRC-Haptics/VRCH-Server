@@ -42,6 +42,11 @@ impl Vec3 {
     pub fn norm(self) -> f32 {
         self.dot(self).sqrt()
     }
+
+    /// Returns true if each component is within `tol` of the corresponding component of `other`.
+    pub fn close_to(&self, other: &Vec3, tol: f32) -> bool {
+        (self.x - other.x).abs() < tol && (self.y - other.y).abs() < tol && (self.z - other.z).abs() < tol
+    }
 }
 
 /// Compute the angle in radians around a center axis two points are. Axis is defined by two points.
