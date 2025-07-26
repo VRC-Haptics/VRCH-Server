@@ -29,14 +29,14 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   return (
     <div
       id="infoPageContainer"
-      className="flex flex-col flex-1 max-w-full bg-base-200 rounded-md p-2 space-y-2"
+      className="flex flex-col min-w-56 max-w-full h-full bg-base-200 rounded-md p-2 space-y-2"
     >
       <div className="flex font-bold bg-base-300 rounded-md px-2 py-1 min-w-3 w-full h-min">
         <h1>Device Info</h1>
       </div>
       <div
         id="infoElements"
-        className="flex-1 overflow-y-auto border-4 min-w-0 border-dotted rounded-md border-base-300"
+        className="flex-1 overflow-y-scroll max-h-fit border-4 min-w-0 border-dotted rounded-md border-base-300"
       >
         {selectedDevice ? (
           createInfo(selectedDevice)

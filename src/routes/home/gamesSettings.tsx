@@ -52,7 +52,7 @@ export default function VrcInfoCard({}) {
   const velocityPct = 100 - distancePct;
 
   return (
-    <div className="flex-shrink-0 flex-col min-w-0 bg-base-200 rounded-md p-2 space-y-2">
+    <div id="vrcInfo" className=" flex-col min-w-48 bg-base-200 rounded-md p-2 space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">VRC</h2>

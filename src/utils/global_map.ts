@@ -77,6 +77,9 @@ export interface InputNode {
   /** Feedback strength at this location */
   intensity: number;
 
+  /** radius of influence this input node ahs */
+  radius: number;
+
   /** Arbitrary user‑supplied labels */
   tags: string[];
 }

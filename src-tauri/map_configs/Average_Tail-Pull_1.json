@@ -11,7 +11,7 @@
             },
             "address": "/avatar/parameters/tail_Stretch",
             "is_external_address": true,
-            "radius": 0.03750000149011612,
+            "radius": 0.10750000149011612,
             "target_bone": "Hips"
         }
     ],

@@ -44,7 +44,7 @@ impl HapticNode {
 
     /// Returns true if self and other share any common NodeGroup.
     pub fn interacts(&self, other: &HapticNode) -> bool {
-        if other.groups.contains(&NodeGroup::All) {
+        if other.groups.contains(&NodeGroup::All) || self.groups.contains(&NodeGroup::All){
             return true;
         }
 

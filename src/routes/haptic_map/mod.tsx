@@ -63,20 +63,36 @@ export default function InputNodesViewer() {
         <OrbitControls ref={controlsRef} enablePan enableZoom enableRotate />
 
         {/* The human standard model */}
-        <StandardModel/>
+        <StandardModel />
 
         {/* Input nodes */}
         {inputNodes.map((node) => {
           const key = `input-${node.id}`; // unique per input node
           return (
-            <mesh
+            <group
               key={key}
-              position={[node.haptic_node.x, node.haptic_node.y, node.haptic_node.z]}
+              position={[-node.haptic_node.x, node.haptic_node.y, node.haptic_node.z]}
               onPointerOver={() => setHoveredKey(key)}
               onPointerOut={() => setHoveredKey(null)}
             >
-              <sphereGeometry args={[0.02, 16, 16]} />
-              <meshStandardMaterial color={intensityToColor(node.intensity)} />
+              {/* Small solid blue sphere */}
+              <mesh
+                onPointerOver={() => setHoveredKey(key)}
+                onPointerOut={() => setHoveredKey(null)}
+              >
+                <sphereGeometry args={[0.02, 16, 16]} />
+                <meshStandardMaterial color="blue" />
+              </mesh>
+
+              {/* Larger semi-transparent sphere */}
+              <mesh>
+                <sphereGeometry args={[node.radius, 16, 16]} />
+                <meshStandardMaterial
+                  color={intensityToColor(node.intensity)}
+                  transparent
+                  opacity={0.5}
+                />
+              </mesh>
 
               {hoveredKey === key && (
                 <Html
@@ -92,25 +108,27 @@ export default function InputNodesViewer() {
                 >
                   <div>{node.tags.join(", ") || "(no tags)"}</div>
                   <span>
-                    ({node.haptic_node.x}, {node.haptic_node.y}, {node.haptic_node.z})
+                    ({node.haptic_node.x}, {node.haptic_node.y},{" "}
+                    {node.haptic_node.z})
                   </span>
                 </Html>
               )}
-            </mesh>
+            </group>
           );
         })}
 
         {/* Device nodes */}
         {devices.flatMap((device) => {
           const nodeMap =
-            device?.device_type?.value?.connection_manager?.config?.node_map ?? [];
+            device?.device_type?.value?.connection_manager?.config?.node_map ??
+            [];
 
           return nodeMap.map((node, idx) => {
             const key = `dev-${device.id}-${idx}`;
             return (
               <mesh
                 key={key}
-                position={[node.x, node.y, node.z]}
+                position={[-node.x, node.y, node.z]}
                 onPointerOver={() => setHoveredKey(key)}
                 onPointerOut={() => setHoveredKey(null)}
               >
@@ -146,7 +164,9 @@ export default function InputNodesViewer() {
         <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs text-white">
           <div>
             <b>pos&nbsp;</b>
-            {`${fmt(cam.position.x)}, ${fmt(cam.position.y)}, ${fmt(cam.position.z)}`}
+            {`${fmt(cam.position.x)}, ${fmt(cam.position.y)}, ${fmt(
+              cam.position.z
+            )}`}
           </div>
           <div>
             <b>rot&nbsp;</b>
