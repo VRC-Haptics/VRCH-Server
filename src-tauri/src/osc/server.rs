@@ -61,7 +61,8 @@ impl OscServer {
                     let addr = format!("{}:{}", self.address, free_port);
                     UdpSocket::bind(&addr).unwrap() //assume we will be able to bind to thisone
                 } else {
-                    panic!("Couldn't find free port");
+                    log::error!("Unable to connect to bhaptics port");
+                    return 0;
                 }
             }
         };

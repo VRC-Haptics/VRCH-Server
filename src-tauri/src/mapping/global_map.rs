@@ -1,3 +1,5 @@
+use crate::mapping::input_node::InputType;
+
 use super::event::Event;
 use super::Id;
 use super::{
@@ -97,13 +99,14 @@ impl GlobalMap {
         });
     }
 
-    /// checks for duplicates and registers input node for writing to
+    /// checks for duplicates and registers input node to the map
     pub fn add_input_node(
         &self,
         new_node: HapticNode,
         tags: Vec<String>,
         id: String,
         radius: f32,
+        input_type: Option<InputType>,
     ) -> Result<(), DuplicateNodeIDError> {
         if let Some(existing) = self.input_nodes.get(&Id(id.clone())) {
             return Err(DuplicateNodeIDError {
@@ -112,7 +115,7 @@ impl GlobalMap {
         }
 
         self.input_nodes
-            .insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id), radius));
+            .insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id), radius, input_type.unwrap_or_else(|| InputType::INTERP)));
 
         Ok(())
     }

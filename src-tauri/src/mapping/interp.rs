@@ -1,3 +1,5 @@
+use crate::mapping::input_node::InputType;
+
 use super::{haptic_node::HapticNode, input_node::InputNode};
 
 pub trait Interpolate {
@@ -57,38 +59,65 @@ impl GaussianState {
 
     /// returns the straight interpolation for the node.
     fn single_node(&self, node: &HapticNode, in_nodes: &Vec<&InputNode>) -> f32 {
-        let mut numerator = 0.0;
-        let mut denominator = 0.0;
+        let mut interp_numerator = 0.0;
+        let mut interp_denominator = 0.0;
+        let mut add_numerator = 0.0;
+        let mut add_denominator = 0.0;
 
         for in_node in in_nodes.iter() {
             // if the game node should influence the device node
             if node.interacts(&in_node.haptic_node) {
                 let distance = node.dist(&in_node.haptic_node);
-                let max_radius = in_node.get_radius();
                 // if below our threshold, add influence
-                if !distance.is_nan() && distance < max_radius {
-                    let weight = self.gaussian_kernel(distance, max_radius);
-                    numerator += weight * in_node.get_intensity();
-                    denominator += weight;
+                if !distance.is_nan() && distance < in_node.get_radius() {
+                    // handle different interpolation layers
+                    match in_node.input_type {
+                        InputType::INTERP => {
+                            let weight = self.gaussian_kernel(distance, in_node.get_radius());
+                            interp_numerator += weight * in_node.get_intensity();
+                            interp_denominator += weight;
+                        }, 
+                        InputType::ADDITIVE => {
+                            let weight = distance / in_node.get_radius();
+                            add_numerator += weight * in_node.get_intensity();
+                            add_denominator += weight;
+                        }, 
+                        InputType::SUBTRACTIVE => {
+                            let weight = distance / in_node.get_radius();
+                            add_numerator += weight * (-in_node.get_intensity());
+                            add_denominator += weight;
+                        },
+                        
+                    }
+                    
                 }
             }
         }
 
-        if denominator > 0.0 {
-            let result = numerator / denominator;
-            if result > 1.0 {
-                log::error!(
-                    "Strength greater than one on device node: x:{} y:{} z:{}",
-                    node.x,
-                    node.y,
-                    node.z
-                );
-                return 1.0;
+        // process if any input nodes have influence over this one
+        if interp_denominator > 0.0 || add_denominator > 0.0 {
+            let interp_result = if interp_denominator != 0.0 {
+                log::debug!("greater than zero in thiis");
+                interp_numerator / interp_denominator
             } else {
-                return result;
+                0.0
+            };
+
+            let add_result = if add_denominator != 0.0 {
+                (add_numerator / add_denominator) + interp_result
+            } else {
+                interp_result
+            };
+
+            if add_result > 1.0 {
+                1.0
+            } else if add_result > 0.02 {
+                add_result
+            } else {
+                0.0
             }
         } else {
-            return 0.0;
+            0.0
         }
     }
 }

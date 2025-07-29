@@ -6,6 +6,7 @@ pub mod osc_query;
 
 // crate dependencies
 use crate::api::ApiManager;
+use crate::mapping::input_node::InputType;
 use crate::mapping::{global_map::StandardMenu, input_node::InputNode, Id};
 use crate::osc::server::OscServer;
 use crate::vrc::parsing::OscInfo;
@@ -184,6 +185,10 @@ impl VrcInfo {
                             if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
                                 // don't do velocity for external addresses
                                 if node.is_external_address {
+                                    let value = cache_node.raw_last();
+                                    if value > 0.0 {
+                                        log::debug!("non-zero: {}", value);
+                                    }
                                     old_node.set_intensity(cache_node.raw_last());
                                     continue;
                                 }
@@ -198,9 +203,13 @@ impl VrcInfo {
                             //if not already created, create a cache node for this config.
                             let mut haptic_node = node.node_data.clone();
                             // if external address apply all tag.
-                            // (since it doesn't have an associated node it is garunteed to not be mergeable.)
                             if node.is_external_address {
                                 haptic_node.groups.push(crate::mapping::NodeGroup::All);
+                            }
+
+                            let mut input_type = InputType::INTERP;
+                            if node.is_external_address {
+                                input_type = InputType::ADDITIVE
                             }
                             // create input node
                             let mut in_node = InputNode::new(
@@ -211,6 +220,7 @@ impl VrcInfo {
                                 ],
                                 Id(node.address.clone()),
                                 node.radius,
+                                input_type,
                             );
 
                             // set intensity and push to map.

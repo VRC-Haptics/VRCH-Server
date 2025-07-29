@@ -16,7 +16,6 @@ mod vrc;
 use api::ApiManager;
 use bhaptics::game::BhapticsGame;
 use devices::wifi::discovery::start_wifi_listener;
-use bhaptics::devices::start_bt;
 use devices::{Device, DeviceType};
 use mapping::global_map::GlobalMap;
 use vrc::VrcInfo;
@@ -32,6 +31,8 @@ use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::{StoreExt, JsonValue};
+
+use crate::bhaptics::devices::start_bt_nonblocking;
 
 /// Helper to set persistant store values
 fn set_device_store_field<T: serde::Serialize>(
@@ -282,15 +283,14 @@ fn main() {
             let mut lock = api_manager.lock().unwrap();
             lock.refresh_caches();
             drop(lock);
+            log::trace!("past cache refreshes");
 
-            let rt = tokio::runtime::Runtime::new()?;
-            // block_on drives the future to completion and returns its result
-            rt.block_on(async {
-                if let Err(e)  = start_bt(Arc::clone(&device_list)).await {
-                    log::error!("Error starting Bluetooth: {}", e);
-                }
-            });
+            // This returns immediately and runs in background
+            if let Err(e) = start_bt_nonblocking(Arc::clone(&device_list)) {
+                log::error!("Error starting Bluetooth: {}", e);
+            }
 
+            log::trace!("done with tauri setup");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

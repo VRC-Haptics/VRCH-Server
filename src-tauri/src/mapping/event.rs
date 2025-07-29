@@ -1,5 +1,6 @@
 use super::{haptic_node::HapticNode, input_node::InputNode, Id, NodeGroup};
 use crate::util::math::Vec3;
+use crate::mapping::input_node::InputType;
 use dashmap::DashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -147,7 +148,7 @@ impl Event {
                 };
                 input_nodes.insert(
                     id.clone(),
-                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), self.radius),
+                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), self.radius, InputType::INTERP),
                 );
                 self.managed_nodes.push(id);
             }
@@ -162,7 +163,7 @@ impl Event {
                 };
                 input_nodes.insert(
                     id.clone(),
-                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), self.radius),
+                    InputNode::new(haptic_node, self.tags.clone(), id.clone(), self.radius, InputType::INTERP),
                 );
                 self.managed_nodes.push(id);
             }
