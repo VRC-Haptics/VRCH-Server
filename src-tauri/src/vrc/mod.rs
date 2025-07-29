@@ -185,10 +185,6 @@ impl VrcInfo {
                             if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
                                 // don't do velocity for external addresses
                                 if node.is_external_address {
-                                    let value = cache_node.raw_last();
-                                    if value > 0.0 {
-                                        log::debug!("non-zero: {}", value);
-                                    }
                                     old_node.set_intensity(cache_node.raw_last());
                                     continue;
                                 }

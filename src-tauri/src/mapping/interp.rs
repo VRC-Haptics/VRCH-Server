@@ -97,7 +97,6 @@ impl GaussianState {
         // process if any input nodes have influence over this one
         if interp_denominator > 0.0 || add_denominator > 0.0 {
             let interp_result = if interp_denominator != 0.0 {
-                log::debug!("greater than zero in thiis");
                 interp_numerator / interp_denominator
             } else {
                 0.0
