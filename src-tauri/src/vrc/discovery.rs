@@ -66,6 +66,8 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mut
                         } else {
                             log::error!("Error: Could not parse port from message: {}", msg);
                         }
+                    } else if msg.starts_with("Attached to PID") {
+                        log::trace!("sidecar process started: {}", msg);
                     } else {
                         log::error!("Received non-matching message: {}", msg);
                     }
