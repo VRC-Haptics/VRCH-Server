@@ -7,6 +7,8 @@ use tauri::{AppHandle, Emitter};
 
 use crate::devices::{Device, DeviceType, WifiDevice};
 
+pub const DISCOVERY_PORT:u32 = 6868;
+
 /// Listen for wifi based device advertisements
 pub fn start_wifi_listener(
     app_handle: AppHandle,
@@ -20,10 +22,11 @@ pub fn start_wifi_listener(
 
     std::thread::spawn(move || {
         // Bind to all interfaces on port 8888 and register for multicast.
-        let socket = UdpSocket::bind("0.0.0.0:8888").unwrap();
+
+        let socket = UdpSocket::bind(format!("0.0.0.0:{DISCOVERY_PORT}")).unwrap();
         let multicast_addr = Ipv4Addr::new(239, 0, 0, 1);
         multicast_all_interfaces(&socket, &multicast_addr).ok();
-        log::trace!("Listening for Devices on {}:8888", multicast_addr);
+        log::trace!("Listening for Devices on {}:{}", multicast_addr, DISCOVERY_PORT.to_string());
 
         // Buffer to store incoming data.
         let mut buf = [0u8; 1024];

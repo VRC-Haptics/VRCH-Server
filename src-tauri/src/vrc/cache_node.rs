@@ -101,14 +101,16 @@ impl CacheNode {
         // itterate from newest to oldest.
         for (index, (val, time)) in self.values.iter().enumerate() {
             if *time > *limit {
-                // Shouldn't be necessary?
-                // get next step into past
-                let (older_val, older_time) = &self.values[index + 1];
-                if older_time > limit {
-                    count += 1.;
-                    sum += self.value_delta(val, &older_val)
-                        / time.duration_since(*older_time).unwrap().as_secs_f32();
+                if let Some((older_val, older_time)) = self.values.get(index + 1) {
+                    if *older_time > *limit {
+                        count += 1.;
+                        sum += self.value_delta(val, older_val)
+                            / time.duration_since(*older_time).unwrap().as_secs_f32();
+                    } else {
+                        break;
+                    }
                 } else {
+                    // No older value, stop
                     break;
                 }
             } else {
@@ -170,7 +172,10 @@ impl CacheNode {
         // detect when we havent recieved the "closing zero value"
         // should stop buzzing after and having to reset.
         if let Some((latest, time)) = self.values.front() {
-            let age_ms = now.duration_since(*time).unwrap_or(Duration::new(0, 0)).as_millis();
+            let age_ms = now
+                .duration_since(*time)
+                .unwrap_or(Duration::new(0, 0))
+                .as_millis();
             if latest.clone().float().unwrap() > 0.001 && age_ms > 200 {
                 return 0.0;
             }
@@ -188,7 +193,9 @@ impl CacheNode {
         let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
 
         // blend and clamp
-        ((1.0 - self.position_weight) * (vel * self.vel_mult) + self.position_weight * pos * self.contact_scale).clamp(0.0, 1.0)
+        ((1.0 - self.position_weight) * (vel * self.vel_mult)
+            + self.position_weight * pos * self.contact_scale)
+            .clamp(0.0, 1.0)
     }
 
     /// Trys to parse OscType into a delta value in f32.
