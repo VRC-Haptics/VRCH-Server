@@ -1,0 +1,7 @@
+﻿[workspace]
+members = [
+    "src-tauri",
+    "src-elevated-register",
+    "src-proxy",
+]
+resolver = "2"

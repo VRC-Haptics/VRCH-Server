@@ -134,6 +134,7 @@ impl OscInfo {
                 for (i, tag) in type_tags.chars().enumerate() {
                     // if more type tags then contents
                     if contents.len() <= i {
+                        log::error!("More type tags than contents: {}, tags: {}, contents: {:?}", node.full_path, type_tags, contents);
                         break;
                     }
                     // if we don't have read access
@@ -142,7 +143,11 @@ impl OscInfo {
                         break;
                     }
 
-                    things.push(match_tag(tag, &contents[i]));
+                    if let Ok(content) = match_tag(tag, &contents[i]) {
+                        things.push(content);
+                    } else {
+                        log::error!("Error parsing type for: {}, contents: {:?}", node.full_path, contents);
+                    }
                 }
                 things.reverse();
                 types = Some(things);
@@ -158,50 +163,44 @@ impl OscInfo {
     }
 }
 
-fn match_tag(tag: char, content: &Value) -> OscType {
+fn match_tag(tag: char, content: &Value) -> Result<OscType, (OscType, String)> {
     match tag {
         's' | 'S' => {
             if let Some(s) = content.as_str() {
-                OscType::String(s.to_string())
+                Ok(OscType::String(s.to_string()))
             } else if let Some(obj) = content.as_object() {
-                handle_obj(obj)
+                Ok(handle_obj(obj))
             } else {
-                log::error!("Couldn't coerce string: {:?}", content);
-                OscType::Nil
+                Err((OscType::Nil, format!("Couldn't coerce string: {:?}", content)))
             }
         }
         'i' => {
             if let Some(num) = content.as_i64() {
-                OscType::Int(num as i32)
+                Ok(OscType::Int(num as i32))
             } else if let Some(obj) = content.as_object() {
-                handle_obj(obj)
+                Ok(handle_obj(obj))
             } else {
-                log::error!("Couldn't coerce integer: {:?}", content);
-                OscType::Nil
+                Err((OscType::Nil, format!("Couldn't coerce integer: {:?}", content)))
             }
         }
         'f' => {
             if let Some(num) = content.as_f64() {
-                OscType::Float(num as f32)
+                Ok(OscType::Float(num as f32))
             } else if let Some(obj) = content.as_object() {
-                handle_obj(obj)
+                Ok(handle_obj(obj))
             } else {
-                log::error!("Couldn't coerce float: {:?}", content);
-                OscType::Nil
+                Err((OscType::Nil, format!("Couldn't coerce float: {:?}", content)))
             }
         }
-        'T' => OscType::Bool(true),
-        'F' => OscType::Bool(false),
-        'I' => OscType::Inf,
-        'N' => OscType::Nil,
+        'T' => Ok(OscType::Bool(true)),
+        'F' => Ok(OscType::Bool(false)),
+        'I' => Ok(OscType::Inf),
+        'N' => Ok(OscType::Nil),
         't' => {
-            log::error!("time tag types are unsupported");
-            OscType::Nil
+            Err((OscType::Nil, format!("time tag types are unsupported")))
         }
         tag => {
-            log::error!("Unsupported OSC Type tag: {}", tag);
-            log::error!("Contents: {:?}", content);
-            OscType::Nil
+            Err((OscType::Nil, format!("Unsupported OSC Type tag: {}, With Contents: {:?}", tag, content)))
         }
     }
 }
