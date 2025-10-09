@@ -8,7 +8,7 @@ use super::{
     HapticNode,
 };
 
-use dashmap::DashMap;
+use dashmap::{DashMap, mapref::one::RefMut};
 use std::sync::Mutex;
 use std::{fmt, sync::Arc};
 
@@ -55,6 +55,19 @@ impl GlobalMap {
             })),
             refresh_callbacks: vec![],
         };
+    }
+
+    /// sets all input nodes with a given tag to the radius.
+    pub fn set_radius_by_tag(&self, target_tag: &str, new_radius: f32) {
+        self.input_nodes.iter_mut()
+            .filter(|entry| entry.tags.contains(&target_tag.to_string()))
+            .for_each(|mut entry| {
+                entry.set_radius(new_radius);
+            });
+    }
+ 
+    pub fn get_mut_node(&mut self, id: &Id) -> Option<RefMut<'_, Id, InputNode>>{
+        self.input_nodes.get_mut(id)
     }
 
     /// Start a singular input event.

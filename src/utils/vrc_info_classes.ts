@@ -130,18 +130,28 @@ export interface ConfMetadata {
   map_author: string;
 }
 
+
+/**
+ * Filled with values from a config json file.
+ * Provides all information needed to fully define the avatar prefab.
+ */
 export interface GameMap {
   nodes: ConfNode[];
   meta: ConfMetadata;
 }
 
+
+/**
+ * The avatar referred to by the VRC API.
+ * Rust: id: String, prefab_names: Vec<String>, configs: Vec<GameMap>
+ */
 export interface Avatar {
   /** Avatar ID from the VRC API */
   id: string;
-  /** Name of the prefab referenced by the parameter on the avatar */
-  prefab_name?: string;
-  /** Mapping information for OSC parameters */
-  conf?: GameMap;
+  /** Names of the prefabs from the avatar parameter */
+  prefab_names: string[];
+  /** All information mapping OSC Parameters to their needed formats */
+  configs: GameMap[];
 }
 
 export interface VrcInfo {

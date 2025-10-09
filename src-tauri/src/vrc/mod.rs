@@ -103,7 +103,6 @@ impl VrcInfo {
 
         // Start the thread that handles finding available vrc parameters
     start_filling_available_parameters(Arc::clone(&vrc), api, Arc::clone(&global_map));
-
         // create clone for closure
         let vrc_lock = vrc.lock().unwrap();
         let cached_parameters_rcve = Arc::clone(&vrc_lock.parameter_cache);
@@ -196,34 +195,6 @@ impl VrcInfo {
                                     old_node.set_intensity(cache_node.latest());
                                     continue;
                                 }
-
-                                //if not already created, create a cache node for this config.
-                                let mut haptic_node = node.node_data.clone();
-                                // if external address apply all tag.
-                                if node.is_external_address {
-                                    haptic_node.groups.push(crate::mapping::NodeGroup::All);
-                                }
-
-                                let mut input_type = InputType::INTERP;
-                                if node.is_external_address {
-                                    input_type = InputType::ADDITIVE
-                                }
-                                // create input node
-                                let mut in_node = InputNode::new(
-                                    haptic_node,
-                                    vec![
-                                        node.target_bone.to_string(),
-                                        "vrc_config_node".to_string(),
-                                    ],
-                                    Id(node.address.clone()),
-                                    node.radius,
-                                    input_type,
-                                );
-
-                                // set intensity and push to map.
-                                let intensity = cache_node.raw_last();
-                                in_node.set_intensity(intensity);
-                                inputs.insert(Id(node.address.clone()), in_node);
                             }
                         } // for loop
                     }

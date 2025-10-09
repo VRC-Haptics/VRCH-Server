@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useMapContext } from "../../context/mapContext";
 import { useDeviceContext } from "../../context/DevicesContext";
 import StandardModel from "./standard";
+import VrcConfigRadiusEditor from "./VrcConfigRadiusEditor";
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
@@ -33,15 +34,12 @@ export default function InputNodesViewer() {
 
   const inputNodes = Object.values(globalMap.input_nodes);
 
+  // camera tracking
   const [cam, setCam] = useState<Camera | null>(null);
-  const fmt = (n: number) => n.toFixed(2);
-
-  /** Reset camera + OrbitControls to their initial state */
+  const fmt = (v: number) => v.toFixed(2);
   const handleReset = () => {
-    // OrbitControls remembers its initial state, reset() will restore camera & target
-    controlsRef.current?.reset();
-
-    // Snap the camera transform explicitly so our HUD updates instantly
+    if (!controlsRef.current) return;
+    controlsRef.current.reset();
     if (cam) {
       cam.position.set(...DEFAULT_POS);
       cam.rotation.set(...DEFAULT_ROT);
@@ -50,24 +48,22 @@ export default function InputNodesViewer() {
 
   return (
     <div className="relative w-full h-full">
+      <VrcConfigRadiusEditor />
       <Canvas
         className="w-full h-full"
         camera={{ position: DEFAULT_POS, rotation: DEFAULT_ROT, fov: 90 }}
       >
         <CameraTracker onUpdate={setCam} />
-
         {/* helpers */}
         <gridHelper args={[2, 5, "gray", "lightgray"]} />
         <axesHelper args={[0.2]} />
         <ambientLight intensity={1} />
         <OrbitControls ref={controlsRef} enablePan enableZoom enableRotate />
-
         {/* The human standard model */}
         <StandardModel />
-
         {/* Input nodes */}
         {inputNodes.map((node) => {
-          const key = `input-${node.id}`; // unique per input node
+          const key = `input-${node.id}`;
           return (
             <group
               key={key}
@@ -75,7 +71,6 @@ export default function InputNodesViewer() {
               onPointerOver={() => setHoveredKey(key)}
               onPointerOut={() => setHoveredKey(null)}
             >
-              {/* Small solid blue sphere */}
               <mesh
                 onPointerOver={() => setHoveredKey(key)}
                 onPointerOut={() => setHoveredKey(null)}
@@ -83,8 +78,6 @@ export default function InputNodesViewer() {
                 <sphereGeometry args={[0.02, 16, 16]} />
                 <meshStandardMaterial color="blue" />
               </mesh>
-
-              {/* Larger semi-transparent sphere */}
               <mesh>
                 <sphereGeometry args={[node.radius, 16, 16]} />
                 <meshStandardMaterial
@@ -93,7 +86,6 @@ export default function InputNodesViewer() {
                   opacity={0.5}
                 />
               </mesh>
-
               {hoveredKey === key && (
                 <Html
                   style={{
@@ -108,21 +100,16 @@ export default function InputNodesViewer() {
                 >
                   <div>{node.tags.join(", ") || "(no tags)"}</div>
                   <span>
-                    ({node.haptic_node.x}, {node.haptic_node.y},{" "}
-                    {node.haptic_node.z})
+                    ({node.haptic_node.x}, {node.haptic_node.y}, {node.haptic_node.z})
                   </span>
                 </Html>
               )}
             </group>
           );
         })}
-
         {/* Device nodes */}
         {devices.flatMap((device) => {
-          const nodeMap =
-            device?.device_type?.value?.connection_manager?.config?.node_map ??
-            [];
-
+          const nodeMap = device?.device_type?.value?.connection_manager?.config?.node_map ?? [];
           return nodeMap.map((node, idx) => {
             const key = `dev-${device.id}-${idx}`;
             return (
@@ -134,7 +121,6 @@ export default function InputNodesViewer() {
               >
                 <sphereGeometry args={[0.02, 16, 16]} />
                 <meshStandardMaterial />
-
                 {hoveredKey === key && (
                   <Html
                     style={{
@@ -158,25 +144,19 @@ export default function InputNodesViewer() {
           });
         })}
       </Canvas>
-
       {/* HUD: Camera position & rotation */}
       {cam && (
         <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs text-white">
           <div>
             <b>pos&nbsp;</b>
-            {`${fmt(cam.position.x)}, ${fmt(cam.position.y)}, ${fmt(
-              cam.position.z
-            )}`}
+            {`${fmt(cam.position.x)}, ${fmt(cam.position.y)}, ${fmt(cam.position.z)}`}
           </div>
           <div>
             <b>rot&nbsp;</b>
-            {`${radToDeg(cam.rotation.x).toFixed(1)}°, ${radToDeg(
-              cam.rotation.y
-            ).toFixed(1)}°, ${radToDeg(cam.rotation.z).toFixed(1)}°`}
+            {`${radToDeg(cam.rotation.x).toFixed(1)}°, ${radToDeg(cam.rotation.y).toFixed(1)}°, ${radToDeg(cam.rotation.z).toFixed(1)}°`}
           </div>
         </div>
       )}
-
       {/* Reset camera button */}
       <button
         onClick={handleReset}

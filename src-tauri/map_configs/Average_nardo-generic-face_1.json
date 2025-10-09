@@ -1,0 +1,177 @@
+{
+    "nodes": [
+        {
+            "node_data": {
+                "x": 0.0,
+                "y": 1.54830002784729,
+                "z": 0.14329999685287476,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/KYBu3jmg2I",
+            "is_external_address": false,
+            "radius": 0.1599999964237213,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.0,
+                "y": 1.6806999444961548,
+                "z": 0.07649999856948853,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/hauZQbtyi5",
+            "is_external_address": false,
+            "radius": 0.1599999964237213,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.02019999921321869,
+                "y": 1.5571000576019288,
+                "z": 0.11190000176429749,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/bcBuxLkwLY",
+            "is_external_address": false,
+            "radius": 0.10000000149011612,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.019200000911951066,
+                "y": 1.5997999906539918,
+                "z": 0.11490000039339066,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/NESpSyyvXE",
+            "is_external_address": false,
+            "radius": 0.10000000149011612,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.06199999898672104,
+                "y": 1.5808000564575196,
+                "z": 0.0860000029206276,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/DaP9RI2cbS",
+            "is_external_address": false,
+            "radius": 0.10000000149011612,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.06390000134706497,
+                "y": 1.5098999738693238,
+                "z": 0.061799999326467517,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/u2UFEQYKUI",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.03449999913573265,
+                "y": 1.4782999753952027,
+                "z": 0.1096000000834465,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/4L5MutQHB1",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": -0.02019999921321869,
+                "y": 1.5571000576019288,
+                "z": 0.11190000176429749,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/mDlBPmdu1e",
+            "is_external_address": false,
+            "radius": 0.10000000149011612,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": -0.019200000911951066,
+                "y": 1.5997999906539918,
+                "z": 0.11490000039339066,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/8BCOtKv4Ai",
+            "is_external_address": false,
+            "radius": 0.10000000149011612,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": -0.06199999898672104,
+                "y": 1.5808000564575196,
+                "z": 0.0860000029206276,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/pndBPK9vdS",
+            "is_external_address": false,
+            "radius": 0.10000000149011612,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": -0.06390000134706497,
+                "y": 1.5098999738693238,
+                "z": 0.061799999326467517,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/fZhnk7i9Hd",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": -0.03449999913573265,
+                "y": 1.4782999753952027,
+                "z": 0.1096000000834465,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/bfIzrvPKvQ",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Head"
+        }
+    ],
+    "meta": {
+        "map_name": "nardo-generic-face",
+        "map_author": "Average",
+        "map_version": 1
+    }
+}

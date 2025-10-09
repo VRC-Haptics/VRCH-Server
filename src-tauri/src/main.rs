@@ -306,6 +306,8 @@ fn main() {
             bhaptics_launch_vrch,
             commands::play_point,
             commands::swap_conf_nodes,
+            commands::set_tags_radius,
+            commands::set_node_radius,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {

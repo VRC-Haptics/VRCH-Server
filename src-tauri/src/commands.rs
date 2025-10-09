@@ -1,6 +1,6 @@
 // local modules
 use crate::devices::{Device, DeviceType};
-use crate::mapping::global_map::GlobalMap;
+use crate::mapping::{global_map::GlobalMap, Id};
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::event::Event;
 
@@ -12,6 +12,25 @@ use runas::Command;
 use tauri::Manager;
 use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
+
+#[tauri::command]
+pub fn set_tags_radius(tag: String, radius: f32, global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> Result<(), ()> {
+    let lock = global_map.lock().expect("this is wrong");
+    lock.set_radius_by_tag(&tag, radius);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_node_radius(id: String, radius: f32, global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> Result<(), String> {
+  let mut lock = global_map.lock().unwrap();
+  let node = lock.get_mut_node(&Id(id));
+  if let Some(mut node) = node {
+    node.set_radius(radius);
+    Ok(())
+  } else {
+    Err("Can't find node".to_string())
+  }
+}
 
 /// Swaps the haptic node indices on the given device id
 #[tauri::command]

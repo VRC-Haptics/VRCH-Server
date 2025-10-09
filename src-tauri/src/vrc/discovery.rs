@@ -2,19 +2,23 @@ use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
 use crate::api::ApiManager;
 use crate::vrc::AVATAR_ID_PATH;
-use crate::{VrcInfo, GlobalMap};
+use crate::{mapping::input_node::InputType, GlobalMap, VrcInfo};
 
+use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
 use std::process::{id, Command, Stdio};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
-use std::collections::HashSet;
 
 use dashmap::DashMap;
 
-pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mutex<ApiManager>>, global_map: Arc<Mutex<GlobalMap>>) {
+pub fn start_filling_available_parameters(
+    vrc: Arc<Mutex<VrcInfo>>,
+    api: Arc<Mutex<ApiManager>>,
+    global_map: Arc<Mutex<GlobalMap>>,
+) {
     let vrc_clone = Arc::clone(&vrc);
     thread::spawn(move || {
         // Launch the sidecar process.
@@ -60,7 +64,8 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mut
                             vrc_lock.vrc_connected = false;
                             vrc_lock.available_parameters.clear();
                             vrc_lock.purge_cache();
-                            let mut avatar_lock = vrc_lock.avatar.write().expect("Couldn't get read instance");
+                            let mut avatar_lock =
+                                vrc_lock.avatar.write().expect("Couldn't get read instance");
                             *avatar_lock = None;
                             // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
                         } else {
@@ -96,14 +101,17 @@ fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
 ///
 /// * `text` - The HTTP response text to parse.
 /// * `params` - The DashMap containing OSC parameter information.
-/// 
+///
 /// # Returns
-/// 
+///
 /// * (List of entries recieved, whether id has changed.)
-fn update_params_from_text(text: &str, params: &DashMap<OscPath, OscInfo>) -> (HashSet<OscPath>, bool) {
+fn update_params_from_text(
+    text: &str,
+    params: &DashMap<OscPath, OscInfo>,
+) -> (HashSet<OscPath>, bool) {
     let mut changed = HashSet::new();
     let mut new_avi = false;
-    
+
     let node_info = parse_incoming(text);
     for node in node_info {
         let raw = remove_version(&node.full_path.0);
@@ -116,14 +124,14 @@ fn update_params_from_text(text: &str, params: &DashMap<OscPath, OscInfo>) -> (H
                 drop(old_node);
                 if should_update {
                     if path.0 == AVATAR_ID_PATH {
-                        new_avi = true;        // value changed
+                        new_avi = true; // value changed
                     }
                     params.insert(path, node);
                 }
             }
             None => {
                 if path.0 == AVATAR_ID_PATH {
-                    new_avi = true;            // first time we see the ID
+                    new_avi = true; // first time we see the ID
                 }
                 params.insert(path, node);
             }
@@ -152,38 +160,92 @@ fn update_avatar(
     };
 
     // Extract the new avatar ID from the OSC parameters.
-    if let Some(new_contents) = params.get(&OscPath(AVATAR_ID_PATH.to_string())) {
-        if let Some(new_values) = &new_contents.value {
-            // Unwrap the new id from the OSC data.
-            let new_id = new_values.first().unwrap().clone().string().unwrap();
+    if let Some(new_avi_param) = params.get(&OscPath(AVATAR_ID_PATH.to_string())) {
+        let new_id = &new_avi_param
+            .value
+            .first()
+            .unwrap()
+            .clone()
+            .string()
+            .unwrap();
 
-            // Compare the new id with the current avatar's id.
-            if current_id.as_deref() != Some(&new_id) {
-                log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
-                // Clear all InputNodes with the tag "vrc_config_node"
-                if let Ok(map) = global_map.lock() {
-                    map.remove_all_with_tag(&"vrc_config_node".to_string());
-                } else {
-                    log::error!("Failed to lock global_map for clearing vrc_config_node nodes");
-                }
-                // Attempt to load the new configuration using OSC parameters.
-                let configs = load_configs(params, api);
-                log::info!("Updated avatar with new configuration {configs:?}");
-                let mut avi_write = avatar.write().expect("unable to get write lock");
-                if let Some(avi_mut) = avi_write.as_mut() {
-                    let names = configs.iter().map(|conf| { conf.meta.map_name.clone()}).collect();
-                    avi_mut.id = new_id;
-                    avi_mut.configs = configs;
-                    avi_mut.prefab_names = names;
-                } else {
-                    let names = configs.iter().map(|conf| { conf.meta.map_name.clone()}).collect();
-                    let new_avi = Avatar {
-                        id: new_id,
-                        configs: configs,
-                        prefab_names: names,
-                    };
-                    *avi_write = Some(new_avi);
+        // Compare the new id with the current avatar's id.
+        if current_id.as_deref() != Some(&new_id) {
+            log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
+            // Clear all InputNodes with the tag "vrc_config_node"
+            if let Ok(map) = global_map.lock() {
+                map.remove_all_with_tag(&"vrc_config_node".to_string());
+            } else {
+                log::error!("Failed to lock global_map for clearing vrc_config_node nodes");
+            }
+
+            // Attempt to load the new configuration using OSC parameters.
+            let configs = load_configs(params, api);
+            log::info!("Updated avatar with new configuration {configs:?}");
+
+            push_to_global_map(&configs, global_map);
+            let mut avi_write = avatar.write().expect("unable to get write lock");
+            if let Some(avi_mut) = avi_write.as_mut() {
+                let names = configs
+                    .iter()
+                    .map(|conf| conf.meta.map_name.clone())
+                    .collect();
+                avi_mut.id = new_id.to_string();
+                avi_mut.configs = configs;
+                avi_mut.prefab_names = names;
+            } else {
+                let names = configs
+                    .iter()
+                    .map(|conf| conf.meta.map_name.clone())
+                    .collect();
+                let new_avi = Avatar {
+                    id: new_id.to_string(),
+                    configs: configs,
+                    prefab_names: names,
                 };
+                *avi_write = Some(new_avi);
+            };
+        }
+    }
+}
+
+fn push_to_global_map(configs: &Vec<GameMap>, global_map: Arc<Mutex<GlobalMap>>) {
+    let lock = global_map.lock().unwrap();
+    for conf in configs {
+        for node in &conf.nodes {
+            let mut haptic_node = node.node_data.clone();
+            // if external address apply all tag.
+            if node.is_external_address {
+                haptic_node.groups.push(crate::mapping::NodeGroup::All);
+            }
+
+            let mut input_type = InputType::INTERP;
+            if node.is_external_address {
+                input_type = InputType::ADDITIVE
+            }
+
+            // set intensity and push to map.
+            let err = lock.add_input_node(
+                haptic_node,
+                vec![
+                    format!(
+                        "{}_{}_{}",
+                        conf.meta.map_author, conf.meta.map_name, conf.meta.map_version
+                    ),
+                    node.target_bone.to_string(),
+                    "vrc_config_node".to_string(),
+                ],
+                node.address.clone(),
+                node.radius,
+                Some(input_type),
+            );
+            if err.is_err() {
+                log::error!(
+                    "Error: {:?} inserting Config: {} node: {}",
+                    err,
+                    conf.meta.map_name,
+                    node.address
+                );
             }
         }
     }
@@ -199,10 +261,7 @@ fn update_avatar(
 ///
 /// * `Some(GameMap)` if configurations were successfully loaded and merged.
 /// * `None` if no configs were found or loaded.
-fn load_configs(
-    params: &DashMap<OscPath, OscInfo>,
-    api: Arc<Mutex<ApiManager>>,
-) -> Vec<GameMap> {
+fn load_configs(params: &DashMap<OscPath, OscInfo>, api: Arc<Mutex<ApiManager>>) -> Vec<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {

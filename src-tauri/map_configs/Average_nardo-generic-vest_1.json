@@ -1,0 +1,793 @@
+{
+    "nodes": [
+        {
+            "node_data": {
+                "x": 0.12790000438690186,
+                "y": 1.3513000011444092,
+                "z": 0.05119999870657921,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/KYBu3jmg2I",
+            "is_external_address": false,
+            "radius": 0.1599999964237213,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.04479999840259552,
+                "y": 1.357300043106079,
+                "z": 0.05660000070929527,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/2R58xgRSBU",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.13429999351501466,
+                "y": 1.2687000036239625,
+                "z": 0.10980000346899033,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/2oKUC63vTR",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.04639999940991402,
+                "y": 1.2687000036239625,
+                "z": 0.10980000346899033,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/wwrjycJrku",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.10890000313520432,
+                "y": 1.1649999618530274,
+                "z": 0.06989999860525131,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/6H78fvIuAp",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.04149999842047691,
+                "y": 1.1649999618530274,
+                "z": 0.1145000010728836,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/Jh9DCSJFGR",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.09769999980926514,
+                "y": 1.110200047492981,
+                "z": 0.08630000054836273,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/Hg65VqTT0E",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.03449999913573265,
+                "y": 1.110200047492981,
+                "z": 0.10750000178813935,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/dri7hSNvMC",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.09769999980926514,
+                "y": 1.0210000276565552,
+                "z": 0.08630000054836273,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/GQU3V3HiBb",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.032999999821186069,
+                "y": 1.0210000276565552,
+                "z": 0.10360000282526016,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/1ImPxI6flZ",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.09769999980926514,
+                "y": 0.9359999895095825,
+                "z": 0.08630000054836273,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/pLvk9UK3Vh",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": 0.029899999499320985,
+                "y": 0.9359999895095825,
+                "z": 0.10949999839067459,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/Y7v2eiAwME",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": 0.14800000190734864,
+                "y": 1.25,
+                "z": -0.013000000268220902,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/uMOZRth0Hn",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.14800000190734864,
+                "y": 1.125599980354309,
+                "z": 0.014000000432133675,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/0tqihE0KIi",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.14800000190734864,
+                "y": 1.0255000591278077,
+                "z": 0.014000000432133675,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/dgZsxyWcmo",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.14800000190734864,
+                "y": 0.9334999918937683,
+                "z": -0.013000000268220902,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/wPevch0cHy",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": 0.050700001418590549,
+                "y": 1.4112999439239503,
+                "z": -0.05400000140070915,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/c4cjQphERU",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.15600000321865083,
+                "y": 1.3955999612808228,
+                "z": -0.0560000017285347,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/3PYKJK8aLB",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.050700001418590549,
+                "y": 1.313599944114685,
+                "z": -0.11060000211000443,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/nBFIaduE80",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.12200000137090683,
+                "y": 1.313599944114685,
+                "z": -0.11060000211000443,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/ITFUaInkS6",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": 0.050700001418590549,
+                "y": 1.2200000286102296,
+                "z": -0.11060000211000443,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/i1ozTZvDjt",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Head"
+        },
+        {
+            "node_data": {
+                "x": 0.14229999482631684,
+                "y": 1.2200000286102296,
+                "z": -0.08879999816417694,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/sYdPlxD19x",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.050700001418590549,
+                "y": 1.1089999675750733,
+                "z": -0.10000000149011612,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/4vsA3kDAKY",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.12250000238418579,
+                "y": 1.1089999675750733,
+                "z": -0.07959999889135361,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/f5ga0TSELI",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.050700001418590549,
+                "y": 1.030400037765503,
+                "z": -0.08060000091791153,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/deqi4xXg1X",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.09480000287294388,
+                "y": 1.030400037765503,
+                "z": -0.07069999724626541,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/0c3CLSalIC",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": 0.050700001418590549,
+                "y": 0.9672999978065491,
+                "z": -0.09030000120401383,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/ihYNFrts23",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": 0.13179999589920045,
+                "y": 0.9672999978065491,
+                "z": -0.05790000036358833,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/mTH0OkZXQF",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": -0.12790000438690186,
+                "y": 1.3513000011444092,
+                "z": 0.05119999870657921,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/J9OXHe98vo",
+            "is_external_address": false,
+            "radius": 0.1599999964237213,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.04479999840259552,
+                "y": 1.357300043106079,
+                "z": 0.05660000070929527,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/FYNr7IMdj2",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.13429999351501466,
+                "y": 1.2687000036239625,
+                "z": 0.10980000346899033,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/MSx2iBxuKS",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.04639999940991402,
+                "y": 1.2687000036239625,
+                "z": 0.10980000346899033,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/ktgZ55yVbE",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.10890000313520432,
+                "y": 1.1649999618530274,
+                "z": 0.06989999860525131,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/IW0Z6MpvUs",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.04149999842047691,
+                "y": 1.1649999618530274,
+                "z": 0.1145000010728836,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/N97qG7WFqF",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.09769999980926514,
+                "y": 1.110200047492981,
+                "z": 0.08630000054836273,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/FRsbX9rc1O",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.03449999913573265,
+                "y": 1.110200047492981,
+                "z": 0.10750000178813935,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/BHoxYFIV3w",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.09769999980926514,
+                "y": 1.0210000276565552,
+                "z": 0.08630000054836273,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/nq3hFnYwhx",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.032999999821186069,
+                "y": 1.0210000276565552,
+                "z": 0.10360000282526016,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/pFKdsF7Xwq",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.09769999980926514,
+                "y": 0.9359999895095825,
+                "z": 0.08630000054836273,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/pUTy9PJvaZ",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": -0.029899999499320985,
+                "y": 0.9359999895095825,
+                "z": 0.10949999839067459,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/9GsTTWeUPS",
+            "is_external_address": false,
+            "radius": 0.12999999523162843,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": -0.14800000190734864,
+                "y": 1.25,
+                "z": -0.013000000268220902,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/QxePZfXr5i",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.14800000190734864,
+                "y": 1.125599980354309,
+                "z": 0.014000000432133675,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/C7NF6sNycb",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.14800000190734864,
+                "y": 1.0255000591278077,
+                "z": 0.014000000432133675,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/fdHVws8L8L",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.14800000190734864,
+                "y": 0.9334999918937683,
+                "z": -0.013000000268220902,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/7tj4ZvSo8d",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": -0.050700001418590549,
+                "y": 1.4112999439239503,
+                "z": -0.05400000140070915,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/hC2aZvrulg",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.15600000321865083,
+                "y": 1.3955999612808228,
+                "z": -0.0560000017285347,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/qYH03GxEDC",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.050700001418590549,
+                "y": 1.313599944114685,
+                "z": -0.11060000211000443,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/4J2MOYm9HL",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.12200000137090683,
+                "y": 1.313599944114685,
+                "z": -0.11060000211000443,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/xmhHBrVNNq",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Chest"
+        },
+        {
+            "node_data": {
+                "x": -0.050700001418590549,
+                "y": 1.2200000286102296,
+                "z": -0.11060000211000443,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/xLDDCV7KNz",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.14229999482631684,
+                "y": 1.2200000286102296,
+                "z": -0.08879999816417694,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/oruwX3ViYb",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.050700001418590549,
+                "y": 1.1089999675750733,
+                "z": -0.10000000149011612,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/28eDd9Pzu2",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.12250000238418579,
+                "y": 1.1089999675750733,
+                "z": -0.07959999889135361,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/nANx59yOxp",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.050700001418590549,
+                "y": 1.030400037765503,
+                "z": -0.08060000091791153,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/Idhx0ahPZq",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.09480000287294388,
+                "y": 1.030400037765503,
+                "z": -0.07069999724626541,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/h1xvsiHk3o",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Spine"
+        },
+        {
+            "node_data": {
+                "x": -0.050700001418590549,
+                "y": 0.9672999978065491,
+                "z": -0.09030000120401383,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/xAUiPZygEg",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Hips"
+        },
+        {
+            "node_data": {
+                "x": -0.13179999589920045,
+                "y": 0.9672999978065491,
+                "z": -0.05790000036358833,
+                "groups": [
+                    "Head"
+                ]
+            },
+            "address": "/avatar/parameters/Haptics/Nodes/ZQLMUf5f4V",
+            "is_external_address": false,
+            "radius": 0.1899999976158142,
+            "target_bone": "Hips"
+        }
+    ],
+    "meta": {
+        "map_name": "nardo-generic-vest",
+        "map_author": "Average",
+        "map_version": 1
+    }
+}

@@ -114,11 +114,12 @@ impl From<u8> for OscAccessLevel {
 pub struct OscInfo {
     pub full_path: OscPath,
     pub access: OscAccessLevel,
-    pub value: Option<Vec<OscType>>,
+    pub value: Vec<OscType>,
     pub description: Option<String>,
 }
 
 impl OscInfo {
+    /// Creates a singular parameter (path + contents)
     pub fn from_node(node: &OscQueryNode) -> OscInfo {
         let mut access = OscAccessLevel::Full;
         if let Some(acc) = node.access {
@@ -126,31 +127,32 @@ impl OscInfo {
         }
 
         // create OSCType
-        let mut types: Option<Vec<OscType>> = Option::None;
+        let mut types: Vec<OscType> = vec![];
         if let Some(type_tags) = &node.osc_type {
             if let Some(contents) = &node.value {
-                let mut things = vec![];
-                // Iterate over each tag for the types
-                for (i, tag) in type_tags.chars().enumerate() {
-                    // if more type tags then contents
-                    if contents.len() <= i {
-                        log::error!("More type tags than contents: {}, tags: {}, contents: {:?}", node.full_path, type_tags, contents);
-                        break;
-                    }
-                    // if we don't have read access
-                    if !access.is_readable() {
-                        things.push(OscType::Nil);
-                        break;
+                let values_to_parse = if contents.len() == 1 && contents[0].is_array() {
+                    // Unwrap single nested array
+                    contents[0].as_array().unwrap_or(contents)
+                } else {
+                    contents
+                };
+
+                // create array 
+                for (tag, value) in type_tags.chars().zip(values_to_parse) {
+                    if !access.is_readable() && *value == Value::Null {
+                        types.push(OscType::Nil);
+                        continue;
                     }
 
-                    if let Ok(content) = match_tag(tag, &contents[i]) {
-                        things.push(content);
-                    } else {
-                        log::error!("Error parsing type for: {}, contents: {:?}", node.full_path, contents);
+                    match match_tag(tag, value) {
+                        Ok(content) => types.push(content),
+                        Err((fallback, msg)) => {
+                            log::error!("Error parsing {}: {}", node.full_path, msg);
+                            log::error!("Full Node: {node:?}");
+                            types.push(fallback);
+                        }
                     }
                 }
-                things.reverse();
-                types = Some(things);
             }
         }
 
@@ -164,6 +166,11 @@ impl OscInfo {
 }
 
 fn match_tag(tag: char, content: &Value) -> Result<OscType, (OscType, String)> {
+    // Handle Null values first for all types
+    if content.is_null() {
+        return Ok(OscType::Nil);
+    }
+
     match tag {
         's' | 'S' => {
             if let Some(s) = content.as_str() {
