@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from '@tauri-apps/api/core';
+import { useMapContext } from "../../context/mapContext";
 import { useVrcContext } from "../../context/VrcContext";
 
 /**
@@ -8,21 +9,33 @@ import { useVrcContext } from "../../context/VrcContext";
  */
 export default function VrcConfigRadiusEditor() {
   const { vrcInfo } = useVrcContext();
+  const { globalMap } = useMapContext();
   const [selectedConfigIdx, setSelectedConfigIdx] = useState<number>(0);
   const [radii, setRadii] = useState<number[]>([]);
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [multiplier, setMultiplier] = useState<number>(1);
   const applyTimerRef = useRef<number | null>(null);
+  const [baselineAvg, setBaselineAvg] = useState<number>(0);
 
   // Get configs from avatar
   const configs = vrcInfo?.avatar?.configs ?? [];
   const configNames = configs.map((c: any, i: number) => c?.meta?.map_name || `Config ${i + 1}`);
   const nodes = configs[selectedConfigIdx]?.nodes ?? [];
 
-  // Sync radii state when config changes
+  // Hoisted helper to avoid TDZ when the component early-returns.
+  function averageRadius(list: number[]) {
+    if (!list.length) return 0;
+    return list.reduce((a, b) => a + b, 0) / list.length;
+  }
+
+  // When switching configs or VRC info changes, recompute baseline from VRC data,
+  // clear local overrides and reset multiplier. Baseline stays fixed while sliding
+  // to avoid feedback loops.
   useEffect(() => {
-    setRadii(nodes.map((n: any) => n.radius));
+    const base = averageRadius(nodes.map((n: any) => n.radius));
+    setBaselineAvg(base);
+    setRadii([]);
     setMultiplier(1);
   }, [selectedConfigIdx, vrcInfo]);
 
@@ -46,11 +59,6 @@ export default function VrcConfigRadiusEditor() {
   };
 
   if (!configs.length) return null;
-
-  const averageRadius = (list: number[]) => {
-    if (!list.length) return 0;
-    return list.reduce((a, b) => a + b, 0) / list.length;
-  };
 
   const handleApplyAllDebounced = (tag: string, radius: number) => {
     // clear any existing timer
@@ -76,11 +84,10 @@ export default function VrcConfigRadiusEditor() {
     setMultiplier(m);
     const meta = configs[selectedConfigIdx]?.meta ?? {};
     const tag = `${meta.map_author ?? ""}_${meta.map_name ?? ""}_${meta.map_version ?? ""}`;
-    // Base on current UI radii so single-node tweaks are respected
-    const avg = averageRadius(radii.length ? radii : nodes.map((n: any) => n.radius));
-    const newRadius = Number((avg * m).toFixed(6));
+    // Use fixed baseline derived from VRC config radii to avoid feedback
+    const newRadius = Number((baselineAvg * m).toFixed(6));
     // Update UI immediately
-    setRadii(prev => prev.map(() => newRadius));
+    setRadii(Array(nodes.length).fill(newRadius) as number[]);
     // Apply to backend after debounce
     if (tag && isFinite(newRadius)) handleApplyAllDebounced(tag, newRadius);
   };
@@ -90,7 +97,7 @@ export default function VrcConfigRadiusEditor() {
       {/* Global multiplier based on average radius */}
       <div className="mb-2">
         <div className="mb-1 flex items-center justify-between text-xs">
-          <span>Scale by average</span>
+          <span>Scale Entire Prefab</span>
           <span className="tabular-nums">×{multiplier.toFixed(2)}</span>
         </div>
         <input
@@ -103,11 +110,7 @@ export default function VrcConfigRadiusEditor() {
           className="w-full"
         />
         <div className="mt-1 text-[10px] text-gray-300">
-          avg: {averageRadius(radii.length ? radii : nodes.map((n: any) => n.radius)).toFixed(3)}
-          {" · "}
-          target: {(
-            averageRadius(radii.length ? radii : nodes.map((n: any) => n.radius)) * multiplier
-          ).toFixed(3)}
+          baseline avg: {baselineAvg.toFixed(3)} · target: {(baselineAvg * multiplier).toFixed(3)}
         </div>
       </div>
 
@@ -137,12 +140,25 @@ export default function VrcConfigRadiusEditor() {
               min={0.01}
               max={0.2}
               step={0.001}
-              value={radii[idx] ?? node.radius}
+              value={(
+                (() => {
+                  const id = node.address as string;
+                  const globalR = globalMap.input_nodes?.[id]?.radius;
+                  const base = typeof globalR === "number" ? globalR : node.radius;
+                  return radii[idx] ?? base;
+                })()
+              )}
               onChange={(e) => handleRadiusChange(idx, parseFloat(e.target.value))}
               className="flex-1"
             />
             <span className="w-10 text-right tabular-nums text-xs">
-              {(radii[idx] ?? node.radius).toFixed(3)}
+              {(() => {
+                const id = node.address as string;
+                const globalR = globalMap.input_nodes?.[id]?.radius;
+                const base = typeof globalR === "number" ? globalR : node.radius;
+                const val = radii[idx] ?? base;
+                return (typeof val === "number" ? val : 0).toFixed(3);
+              })()}
             </span>
           </div>
         ))}

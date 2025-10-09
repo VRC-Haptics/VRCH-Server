@@ -181,7 +181,7 @@ fn update_avatar(
 
             // Attempt to load the new configuration using OSC parameters.
             let configs = load_configs(params, api);
-            log::info!("Updated avatar with new configuration {configs:?}");
+            log::info!("Updated avatar with new configuration");
 
             push_to_global_map(&configs, global_map);
             let mut avi_write = avatar.write().expect("unable to get write lock");
