@@ -1,9 +1,8 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
 use crate::api::ApiManager;
-use crate::vrc::config::ConfNode;
 use crate::vrc::AVATAR_ID_PATH;
-use crate::VrcInfo;
+use crate::{VrcInfo, GlobalMap};
 
 use std::io::{BufRead, BufReader};
 use std::os::windows::process::CommandExt;
@@ -15,7 +14,7 @@ use std::collections::HashSet;
 
 use dashmap::DashMap;
 
-pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mutex<ApiManager>>) {
+pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mutex<ApiManager>>, global_map: Arc<Mutex<GlobalMap>>) {
     let vrc_clone = Arc::clone(&vrc);
     thread::spawn(move || {
         // Launch the sidecar process.
@@ -53,6 +52,7 @@ pub fn start_filling_available_parameters(vrc: Arc<Mutex<VrcInfo>>, api: Arc<Mut
                                 avatar,
                                 Arc::clone(&vrc_clone),
                                 Arc::clone(&api),
+                                Arc::clone(&global_map),
                             );
 
                             // purge connected settings.
@@ -143,6 +143,7 @@ fn update_avatar(
     params: &DashMap<OscPath, OscInfo>,
     avatar: &Arc<RwLock<Option<Avatar>>>,
     api: Arc<Mutex<ApiManager>>,
+    global_map: Arc<Mutex<GlobalMap>>,
 ) {
     // First, retrieve the current avatar ID (if any) using a read lock.
     let current_id = {
@@ -159,34 +160,30 @@ fn update_avatar(
             // Compare the new id with the current avatar's id.
             if current_id.as_deref() != Some(&new_id) {
                 log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
-                // Attempt to load the new configuration using OSC parameters.
-                if let Some(new_config) = load_and_merge_configs(params, api) {
-                    let mut avi_write = avatar.write().expect("unable to get write lock");
-                    if let Some(avi_mut) = avi_write.as_mut() {
-                        avi_mut.id = new_id;
-                        avi_mut.conf = Some(new_config.clone());
-                        avi_mut.prefab_name = Some(new_config.meta.map_name.clone());
-                    } else {
-                        let new_avi = Avatar {
-                            id: new_id,
-                            conf: Some(new_config.clone()),
-                            prefab_name: Some(new_config.meta.map_name.clone()),
-                        };
-                        *avi_write = Some(new_avi);
-                    };
-                    log::info!("Updated avatar with new configuration");
+                // Clear all InputNodes with the tag "vrc_config_node"
+                if let Ok(map) = global_map.lock() {
+                    map.remove_all_with_tag(&"vrc_config_node".to_string());
                 } else {
-                    // we don't have enough information to do haptics.
-                    // put shell avatar together.
-                    let mut avi_write = avatar.write().expect("unable to get write lock");
+                    log::error!("Failed to lock global_map for clearing vrc_config_node nodes");
+                }
+                // Attempt to load the new configuration using OSC parameters.
+                let configs = load_configs(params, api);
+                log::info!("Updated avatar with new configuration {configs:?}");
+                let mut avi_write = avatar.write().expect("unable to get write lock");
+                if let Some(avi_mut) = avi_write.as_mut() {
+                    let names = configs.iter().map(|conf| { conf.meta.map_name.clone()}).collect();
+                    avi_mut.id = new_id;
+                    avi_mut.configs = configs;
+                    avi_mut.prefab_names = names;
+                } else {
+                    let names = configs.iter().map(|conf| { conf.meta.map_name.clone()}).collect();
                     let new_avi = Avatar {
                         id: new_id,
-                        conf: None,
-                        prefab_name: None,
+                        configs: configs,
+                        prefab_names: names,
                     };
                     *avi_write = Some(new_avi);
-                    log::error!("Unable to load haptics for this avatar.");
-                }
+                };
             }
         }
     }
@@ -202,10 +199,10 @@ fn update_avatar(
 ///
 /// * `Some(GameMap)` if configurations were successfully loaded and merged.
 /// * `None` if no configs were found or loaded.
-fn load_and_merge_configs(
+fn load_configs(
     params: &DashMap<OscPath, OscInfo>,
     api: Arc<Mutex<ApiManager>>,
-) -> Option<GameMap> {
+) -> Vec<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
@@ -222,16 +219,7 @@ fn load_and_merge_configs(
     } else {
         log::trace!("No prefab info");
     }
-    if let Some((first_config, rest)) = configs.split_first_mut() {
-        for conf in rest {
-            first_config.nodes.append(&mut conf.nodes);
-            first_config.meta.map_author += &format!("+{}", conf.meta.map_author);
-            first_config.meta.map_name += &format!("+{}", conf.meta.map_name);
-        }
-        Some(first_config.to_owned())
-    } else {
-        None
-    }
+    configs
 }
 
 /// ---------------------------------------------------------------------
@@ -252,6 +240,7 @@ fn run_vrc_http_polling(
     avatar: Arc<RwLock<Option<Avatar>>>,
     vrc: Arc<Mutex<VrcInfo>>,
     api: Arc<Mutex<ApiManager>>,
+    global_map: Arc<Mutex<GlobalMap>>,
 ) {
     let url = format!("http://127.0.0.1:{}/", port);
     log::debug!("Started polling HTTP.");
@@ -271,7 +260,7 @@ fn run_vrc_http_polling(
                         vrc_lock.purge_cache();
                     }
 
-                    update_avatar(params, &avatar, Arc::clone(&api));
+                    update_avatar(params, &avatar, Arc::clone(&api), Arc::clone(&global_map));
                 }
             }
             Err(err) => {

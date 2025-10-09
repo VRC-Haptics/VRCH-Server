@@ -102,7 +102,7 @@ impl VrcInfo {
         let vrc = Arc::new(Mutex::new(vrc));
 
         // Start the thread that handles finding available vrc parameters
-        start_filling_available_parameters(Arc::clone(&vrc), api);
+    start_filling_available_parameters(Arc::clone(&vrc), api, Arc::clone(&global_map));
 
         // create clone for closure
         let vrc_lock = vrc.lock().unwrap();
@@ -160,8 +160,8 @@ impl VrcInfo {
             // we can use haptics
             let avi_option = avi_refresh.read().expect("Unable to lock avi");
             if let Some(avi_read) = &*avi_option {
-                if let Some(conf) = &avi_read.conf {
-                    // upate menu items if we have something to dupate them with
+                if !&avi_read.configs.is_empty() {
+                    // update menu items if we have something to dupate them with
                     let mut menu_l = menu.lock().expect("couldn't lock the menu");
                     if let Some(intensity) = params_refresh.get(&OscPath(INTENSITY_PATH.to_owned()))
                     {
@@ -174,57 +174,59 @@ impl VrcInfo {
                             menu_l.intensity = intensity;
                             menu_l.enable = false;
                         }
-                    }
+                    } 
 
-                    // for each node in our config, see if we have received a value.
+                    // for each node in our configs, see if we have received a value.
                     let vrc_lock = vrc_refresh.lock().unwrap();
-                    for node in &conf.nodes {
-                        if let Some(mut cache_node) = params_refresh.get_mut(&OscPath(node.address.clone()))
-                        {
-                            // update node if already created
-                            if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
-                                // don't do velocity for external addresses
-                                if node.is_external_address {
-                                    old_node.set_intensity(cache_node.raw_last());
+                    for conf in &avi_read.configs {
+                        for node in &conf.nodes {
+                            if let Some(mut cache_node) = params_refresh.get_mut(&OscPath(node.address.clone()))
+                            {
+                                // update node if already created
+                                if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
+                                    // don't do velocity for external addresses
+                                    if node.is_external_address {
+                                        old_node.set_intensity(cache_node.raw_last());
+                                        continue;
+                                    }
+                                    // insert the value into the game map
+                                    cache_node.set_position_weight(vrc_lock.dist_weight);
+                                    cache_node.set_velocity_mult(vrc_lock.vel_multiplier);
+                                    cache_node.set_contact_scale(1.0);
+                                    old_node.set_intensity(cache_node.latest());
                                     continue;
                                 }
-                                // insert the value into the game map
-                                cache_node.set_position_weight(vrc_lock.dist_weight);
-                                cache_node.set_velocity_mult(vrc_lock.vel_multiplier);
-                                cache_node.set_contact_scale(1.0);
-                                old_node.set_intensity(cache_node.latest());
-                                continue;
-                            }
 
-                            //if not already created, create a cache node for this config.
-                            let mut haptic_node = node.node_data.clone();
-                            // if external address apply all tag.
-                            if node.is_external_address {
-                                haptic_node.groups.push(crate::mapping::NodeGroup::All);
-                            }
+                                //if not already created, create a cache node for this config.
+                                let mut haptic_node = node.node_data.clone();
+                                // if external address apply all tag.
+                                if node.is_external_address {
+                                    haptic_node.groups.push(crate::mapping::NodeGroup::All);
+                                }
 
-                            let mut input_type = InputType::INTERP;
-                            if node.is_external_address {
-                                input_type = InputType::ADDITIVE
-                            }
-                            // create input node
-                            let mut in_node = InputNode::new(
-                                haptic_node,
-                                vec![
-                                    node.target_bone.to_string(),
-                                    "vrc_config_node".to_string(),
-                                ],
-                                Id(node.address.clone()),
-                                node.radius,
-                                input_type,
-                            );
+                                let mut input_type = InputType::INTERP;
+                                if node.is_external_address {
+                                    input_type = InputType::ADDITIVE
+                                }
+                                // create input node
+                                let mut in_node = InputNode::new(
+                                    haptic_node,
+                                    vec![
+                                        node.target_bone.to_string(),
+                                        "vrc_config_node".to_string(),
+                                    ],
+                                    Id(node.address.clone()),
+                                    node.radius,
+                                    input_type,
+                                );
 
-                            // set intensity and push to map.
-                            let intensity = cache_node.raw_last();
-                            in_node.set_intensity(intensity);
-                            inputs.insert(Id(node.address.clone()), in_node);
-                        }
-                    } // for loop
+                                // set intensity and push to map.
+                                let intensity = cache_node.raw_last();
+                                in_node.set_intensity(intensity);
+                                inputs.insert(Id(node.address.clone()), in_node);
+                            }
+                        } // for loop
+                    }
                 }
             }
         };
@@ -248,10 +250,10 @@ impl VrcInfo {
 pub struct Avatar {
     /// The avatar reffered to by the VRC api
     id: String,
-    /// the name of the prefab referenced by the parameter on the avatar
-    prefab_name: Option<String>,
+    /// the names of the prefabs from the avatar parameter
+    prefab_names: Vec<String>,
     /// All information mapping OSC Parameters to their needed formats
-    conf: Option<GameMap>,
+    configs: Vec<GameMap>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
