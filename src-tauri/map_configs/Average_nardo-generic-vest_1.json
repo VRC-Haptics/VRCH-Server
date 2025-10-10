@@ -6,7 +6,8 @@
                 "y": 1.3513000011444092,
                 "z": 0.05119999870657921,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/KYBu3jmg2I",
@@ -20,7 +21,8 @@
                 "y": 1.357300043106079,
                 "z": 0.05660000070929527,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/2R58xgRSBU",
@@ -34,7 +36,8 @@
                 "y": 1.2687000036239625,
                 "z": 0.10980000346899033,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/2oKUC63vTR",
@@ -48,7 +51,8 @@
                 "y": 1.2687000036239625,
                 "z": 0.10980000346899033,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/wwrjycJrku",
@@ -62,7 +66,8 @@
                 "y": 1.1649999618530274,
                 "z": 0.06989999860525131,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/6H78fvIuAp",
@@ -76,7 +81,8 @@
                 "y": 1.1649999618530274,
                 "z": 0.1145000010728836,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/Jh9DCSJFGR",
@@ -90,7 +96,8 @@
                 "y": 1.110200047492981,
                 "z": 0.08630000054836273,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/Hg65VqTT0E",
@@ -104,7 +111,8 @@
                 "y": 1.110200047492981,
                 "z": 0.10750000178813935,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/dri7hSNvMC",
@@ -118,7 +126,8 @@
                 "y": 1.0210000276565552,
                 "z": 0.08630000054836273,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/GQU3V3HiBb",
@@ -132,7 +141,8 @@
                 "y": 1.0210000276565552,
                 "z": 0.10360000282526016,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/1ImPxI6flZ",
@@ -146,7 +156,8 @@
                 "y": 0.9359999895095825,
                 "z": 0.08630000054836273,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/pLvk9UK3Vh",
@@ -160,7 +171,8 @@
                 "y": 0.9359999895095825,
                 "z": 0.10949999839067459,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/Y7v2eiAwME",
@@ -174,7 +186,7 @@
                 "y": 1.25,
                 "z": -0.013000000268220902,
                 "groups": [
-                    "Head"
+                    "TorsoRight"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/uMOZRth0Hn",
@@ -188,7 +200,7 @@
                 "y": 1.125599980354309,
                 "z": 0.014000000432133675,
                 "groups": [
-                    "Head"
+                    "TorsoRight"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/0tqihE0KIi",
@@ -202,7 +214,7 @@
                 "y": 1.0255000591278077,
                 "z": 0.014000000432133675,
                 "groups": [
-                    "Head"
+                    "TorsoRight"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/dgZsxyWcmo",
@@ -216,7 +228,7 @@
                 "y": 0.9334999918937683,
                 "z": -0.013000000268220902,
                 "groups": [
-                    "Head"
+                    "TorsoRight"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/wPevch0cHy",
@@ -230,7 +242,8 @@
                 "y": 1.4112999439239503,
                 "z": -0.05400000140070915,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/c4cjQphERU",
@@ -244,7 +257,8 @@
                 "y": 1.3955999612808228,
                 "z": -0.0560000017285347,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/3PYKJK8aLB",
@@ -258,7 +272,8 @@
                 "y": 1.313599944114685,
                 "z": -0.11060000211000443,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/nBFIaduE80",
@@ -272,7 +287,8 @@
                 "y": 1.313599944114685,
                 "z": -0.11060000211000443,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/ITFUaInkS6",
@@ -286,7 +302,8 @@
                 "y": 1.2200000286102296,
                 "z": -0.11060000211000443,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/i1ozTZvDjt",
@@ -300,7 +317,8 @@
                 "y": 1.2200000286102296,
                 "z": -0.08879999816417694,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/sYdPlxD19x",
@@ -314,7 +332,8 @@
                 "y": 1.1089999675750733,
                 "z": -0.10000000149011612,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/4vsA3kDAKY",
@@ -328,7 +347,8 @@
                 "y": 1.1089999675750733,
                 "z": -0.07959999889135361,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/f5ga0TSELI",
@@ -342,7 +362,8 @@
                 "y": 1.030400037765503,
                 "z": -0.08060000091791153,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/deqi4xXg1X",
@@ -356,7 +377,8 @@
                 "y": 1.030400037765503,
                 "z": -0.07069999724626541,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/0c3CLSalIC",
@@ -370,7 +392,8 @@
                 "y": 0.9672999978065491,
                 "z": -0.09030000120401383,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/ihYNFrts23",
@@ -384,7 +407,8 @@
                 "y": 0.9672999978065491,
                 "z": -0.05790000036358833,
                 "groups": [
-                    "Head"
+                    "TorsoRight",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/mTH0OkZXQF",
@@ -398,7 +422,8 @@
                 "y": 1.3513000011444092,
                 "z": 0.05119999870657921,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/J9OXHe98vo",
@@ -412,7 +437,8 @@
                 "y": 1.357300043106079,
                 "z": 0.05660000070929527,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/FYNr7IMdj2",
@@ -426,7 +452,8 @@
                 "y": 1.2687000036239625,
                 "z": 0.10980000346899033,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/MSx2iBxuKS",
@@ -440,7 +467,8 @@
                 "y": 1.2687000036239625,
                 "z": 0.10980000346899033,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/ktgZ55yVbE",
@@ -454,7 +482,8 @@
                 "y": 1.1649999618530274,
                 "z": 0.06989999860525131,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/IW0Z6MpvUs",
@@ -468,7 +497,8 @@
                 "y": 1.1649999618530274,
                 "z": 0.1145000010728836,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/N97qG7WFqF",
@@ -482,7 +512,8 @@
                 "y": 1.110200047492981,
                 "z": 0.08630000054836273,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/FRsbX9rc1O",
@@ -496,7 +527,8 @@
                 "y": 1.110200047492981,
                 "z": 0.10750000178813935,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/BHoxYFIV3w",
@@ -510,7 +542,8 @@
                 "y": 1.0210000276565552,
                 "z": 0.08630000054836273,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/nq3hFnYwhx",
@@ -524,7 +557,8 @@
                 "y": 1.0210000276565552,
                 "z": 0.10360000282526016,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/pFKdsF7Xwq",
@@ -538,7 +572,8 @@
                 "y": 0.9359999895095825,
                 "z": 0.08630000054836273,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/pUTy9PJvaZ",
@@ -552,7 +587,8 @@
                 "y": 0.9359999895095825,
                 "z": 0.10949999839067459,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoFront"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/9GsTTWeUPS",
@@ -566,7 +602,7 @@
                 "y": 1.25,
                 "z": -0.013000000268220902,
                 "groups": [
-                    "Head"
+                    "TorsoLeft"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/QxePZfXr5i",
@@ -580,7 +616,7 @@
                 "y": 1.125599980354309,
                 "z": 0.014000000432133675,
                 "groups": [
-                    "Head"
+                    "TorsoLeft"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/C7NF6sNycb",
@@ -594,7 +630,7 @@
                 "y": 1.0255000591278077,
                 "z": 0.014000000432133675,
                 "groups": [
-                    "Head"
+                    "TorsoLeft"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/fdHVws8L8L",
@@ -608,7 +644,7 @@
                 "y": 0.9334999918937683,
                 "z": -0.013000000268220902,
                 "groups": [
-                    "Head"
+                    "TorsoLeft"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/7tj4ZvSo8d",
@@ -622,7 +658,8 @@
                 "y": 1.4112999439239503,
                 "z": -0.05400000140070915,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/hC2aZvrulg",
@@ -636,7 +673,8 @@
                 "y": 1.3955999612808228,
                 "z": -0.0560000017285347,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/qYH03GxEDC",
@@ -650,7 +688,8 @@
                 "y": 1.313599944114685,
                 "z": -0.11060000211000443,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/4J2MOYm9HL",
@@ -664,7 +703,8 @@
                 "y": 1.313599944114685,
                 "z": -0.11060000211000443,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/xmhHBrVNNq",
@@ -678,7 +718,8 @@
                 "y": 1.2200000286102296,
                 "z": -0.11060000211000443,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/xLDDCV7KNz",
@@ -692,7 +733,8 @@
                 "y": 1.2200000286102296,
                 "z": -0.08879999816417694,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/oruwX3ViYb",
@@ -706,7 +748,8 @@
                 "y": 1.1089999675750733,
                 "z": -0.10000000149011612,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/28eDd9Pzu2",
@@ -720,7 +763,8 @@
                 "y": 1.1089999675750733,
                 "z": -0.07959999889135361,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/nANx59yOxp",
@@ -734,7 +778,8 @@
                 "y": 1.030400037765503,
                 "z": -0.08060000091791153,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/Idhx0ahPZq",
@@ -748,7 +793,8 @@
                 "y": 1.030400037765503,
                 "z": -0.07069999724626541,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/h1xvsiHk3o",
@@ -762,7 +808,8 @@
                 "y": 0.9672999978065491,
                 "z": -0.09030000120401383,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/xAUiPZygEg",
@@ -776,7 +823,8 @@
                 "y": 0.9672999978065491,
                 "z": -0.05790000036358833,
                 "groups": [
-                    "Head"
+                    "TorsoLeft",
+                    "TorsoBack"
                 ]
             },
             "address": "/avatar/parameters/Haptics/Nodes/ZQLMUf5f4V",

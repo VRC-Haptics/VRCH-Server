@@ -152,29 +152,32 @@ export default function VrcInfoCard({}) {
           <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm md:text-base">
             <span className="font-medium">ID:</span>
             <span>{vrcInfo.avatar.id ?? "None"}</span>
-            {vrcInfo.avatar.prefab_name && (
+            {vrcInfo.avatar.prefab_names && vrcInfo.avatar.prefab_names.length > 0 && (
               <>
-                <span className="font-medium">Prefab:</span>
-                <span>{vrcInfo.avatar.prefab_name}</span>
+                <span className="font-medium">Prefabs:</span>
+                <span>{vrcInfo.avatar.prefab_names.join(", ")}</span>
               </>
             )}
-            {vrcInfo.avatar.conf && (
-              <>
-                <>
-                <span className="font-medium">Map Name:</span>
-                <span>{vrcInfo.avatar.conf.meta.map_name}</span>
-                <span className="font-medium">Version:</span>
-                <span>{vrcInfo.avatar.conf.meta.map_version}</span>
-                <span className="font-medium">Author:</span>
-                <span>{vrcInfo.avatar.conf.meta.map_author}</span>
-                </>
-                <div className="text-sm md:text-base">
-                  <OscSummary vrcInfo={vrcInfo} />
-                </div>
-                <div>
-                <HapticNodesSummary nodes={vrcInfo.avatar.conf.nodes}></HapticNodesSummary>
-                </div>
-              </>
+            {vrcInfo.avatar.configs && vrcInfo.avatar.configs.length > 0 && (
+              (() => {
+                const conf = vrcInfo.avatar!.configs[0];
+                return (
+                  <>
+                    <span className="font-medium">Map Name:</span>
+                    <span>{conf.meta.map_name}</span>
+                    <span className="font-medium">Version:</span>
+                    <span>{conf.meta.map_version}</span>
+                    <span className="font-medium">Author:</span>
+                    <span>{conf.meta.map_author}</span>
+                    <div className="col-span-2 text-sm md:text-base mt-2">
+                      <OscSummary vrcInfo={vrcInfo} />
+                    </div>
+                    <div className="col-span-2 mt-2">
+                      <HapticNodesSummary nodes={conf.nodes} />
+                    </div>
+                  </>
+                );
+              })()
             )}
           </div>
         </div>

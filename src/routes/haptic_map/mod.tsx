@@ -99,6 +99,7 @@ export default function InputNodesViewer() {
                   }}
                 >
                   <div>{node.tags.join(", ") || "(no tags)"}</div>
+                  <div>{node.haptic_node.groups.join(", ") || "(No groups; will not affect anything)"}</div>
                   <span>
                     ({node.haptic_node.x}, {node.haptic_node.y}, {node.haptic_node.z})
                   </span>

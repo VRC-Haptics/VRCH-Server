@@ -29,15 +29,25 @@ export default function VrcConfigRadiusEditor() {
     return list.reduce((a, b) => a + b, 0) / list.length;
   }
 
-  // When switching configs or VRC info changes, recompute baseline from VRC data,
-  // clear local overrides and reset multiplier. Baseline stays fixed while sliding
-  // to avoid feedback loops.
+  // When switching configs: recompute baseline from VRC data, clear local overrides
+  // and reset multiplier. This avoids feedback and keeps baseline tied to VRC only
+  // on explicit config changes.
   useEffect(() => {
     const base = averageRadius(nodes.map((n: any) => n.radius));
     setBaselineAvg(base);
     setRadii([]);
     setMultiplier(1);
-  }, [selectedConfigIdx, vrcInfo]);
+  }, [selectedConfigIdx]);
+
+  // When VRC info polls/updates: refresh baseline if it actually changed but do
+  // not reset multiplier or local overrides.
+  useEffect(() => {
+    const base = averageRadius(nodes.map((n: any) => n.radius));
+    if (Math.abs(base - baselineAvg) > 1e-6) {
+      setBaselineAvg(base);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vrcInfo]);
 
   const handleRadiusChange = async (nodeIdx: number, newRadius: number) => {
     setRadii(r => r.map((val, i) => (i === nodeIdx ? newRadius : val)));
@@ -77,7 +87,7 @@ export default function VrcConfigRadiusEditor() {
       } finally {
         setSaving(false);
       }
-    }, 250);
+    }, 25);
   };
 
   const handleMultiplierChange = (m: number) => {
@@ -138,7 +148,7 @@ export default function VrcConfigRadiusEditor() {
             <input
               type="range"
               min={0.01}
-              max={0.2}
+              max={0.5}
               step={0.001}
               value={(
                 (() => {
