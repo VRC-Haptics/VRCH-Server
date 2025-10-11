@@ -6021,6 +6021,7 @@ dependencies = [
  "futures",
  "futures-util",
  "if-addrs",
+ "libloading 0.8.9",
  "log",
  "once_cell",
  "oyasumivr_oscquery",

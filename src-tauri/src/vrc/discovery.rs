@@ -5,14 +5,31 @@ use crate::vrc::AVATAR_ID_PATH;
 use crate::{mapping::input_node::InputType, GlobalMap, VrcInfo};
 
 use std::collections::HashSet;
-use std::io::{BufRead, BufReader};
-use std::os::windows::process::CommandExt;
-use std::process::{id, Command, Stdio};
+use libloading::Library;
+use std::sync::OnceLock;
+use std::path::Path;
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
 
 use dashmap::DashMap;
+
+type PortCallback = unsafe extern "C" fn(u16);
+type StartListener = unsafe extern "C" fn(PortCallback);
+type StopListener = unsafe extern "C" fn();
+
+static PORT_SENDER: OnceLock<Mutex<Option<mpsc::Sender<u16>>>> = OnceLock::new();
+
+unsafe extern "C" fn dispatch_port(port: u16) {
+    if let Some(lock) = PORT_SENDER.get() {
+        if let Ok(guard) = lock.lock() {
+            if let Some(sender) = guard.as_ref() {
+                let _ = sender.send(port);
+            }
+        }
+    }
+}
 
 pub fn start_filling_available_parameters(
     vrc: Arc<Mutex<VrcInfo>>,
@@ -21,66 +38,83 @@ pub fn start_filling_available_parameters(
 ) {
     let vrc_clone = Arc::clone(&vrc);
     thread::spawn(move || {
-        // Launch the sidecar process.
-        let mut child = Command::new("./sidecars/listen-for-vrc.exe")
-            .arg(format!("--pid={}", id()))
-            .creation_flags(0x08000000 as u32)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .expect("Failed to launch sidecar");
+        let library_path = Path::new("./sidecars/listen-for-vrc.dll");
+        let library = match unsafe { Library::new(library_path) } {
+            Ok(lib) => lib,
+            Err(err) => {
+                log::error!("Failed to load VRC discovery library: {}", err);
+                return;
+            }
+        };
 
-        let stdout = child.stdout.take().expect("Failed to capture stdout");
-        let reader = BufReader::new(stdout);
+        let start: libloading::Symbol<StartListener> = match unsafe { library.get(b"vrc_start_listener\0") } {
+            Ok(symbol) => symbol,
+            Err(err) => {
+                log::error!("Failed to load start symbol: {}", err);
+                return;
+            }
+        };
 
-        // Monitor the sidecar output line by line.
-        for line in reader.lines() {
-            match line {
-                Ok(msg) => {
-                    if let Some(port_str) = msg.strip_prefix("FOUND:") {
-                        // Try parsing the port as a u16.
-                        if let Ok(port) = port_str.trim().parse::<u16>() {
-                            log::debug!("Sidecar found vrc with port: {}", port);
-                            let mut vrc = vrc_clone.lock().expect("couldn't lock vrc");
-                            let params = {
-                                vrc.vrc_connected = true;
-                                &Arc::clone(&vrc.available_parameters)
-                            };
-                            let avatar = { Arc::clone(&vrc.avatar) };
-                            drop(vrc);
-                            // Call the sub-function with the extracted port.
-                            run_vrc_http_polling(
-                                port,
-                                params,
-                                avatar,
-                                Arc::clone(&vrc_clone),
-                                Arc::clone(&api),
-                                Arc::clone(&global_map),
-                            );
+        let stop: libloading::Symbol<StopListener> = match unsafe { library.get(b"vrc_stop_listener\0") } {
+            Ok(symbol) => symbol,
+            Err(err) => {
+                log::error!("Failed to load stop symbol: {}", err);
+                return;
+            }
+        };
 
-                            // purge connected settings.
-                            let mut vrc_lock = vrc_clone.lock().expect("COulnd't lock vrc.");
-                            vrc_lock.vrc_connected = false;
-                            vrc_lock.available_parameters.clear();
-                            vrc_lock.purge_cache();
-                            let mut avatar_lock =
-                                vrc_lock.avatar.write().expect("Couldn't get read instance");
-                            *avatar_lock = None;
-                            // When run_vrc_http_polling returns, continue waiting for the next FOUND message.
-                        } else {
-                            log::error!("Error: Could not parse port from message: {}", msg);
-                        }
-                    } else if msg.starts_with("Attached to PID") {
-                        log::trace!("sidecar process started: {}", msg);
-                    } else {
-                        log::error!("Received non-matching message: {}", msg);
-                    }
-                }
-                Err(e) => {
-                    log::error!("Error reading sidecar output: {}", e);
-                    break;
-                }
+        let receiver = {
+            let (tx, rx) = mpsc::channel::<u16>();
+            let storage = PORT_SENDER.get_or_init(|| Mutex::new(None));
+            if let Ok(mut guard) = storage.lock() {
+                *guard = Some(tx);
+            } else {
+                log::error!("Failed to acquire port sender storage lock");
+            }
+            rx
+        };
+
+        unsafe {
+            start(dispatch_port);
+        }
+
+        while let Ok(port) = receiver.recv() {
+            log::debug!("VRC discovery library reported port: {}", port);
+
+            let (params, avatar_handle) = {
+                let mut vrc = vrc_clone.lock().expect("couldn't lock vrc");
+                vrc.vrc_connected = true;
+                (
+                    Arc::clone(&vrc.available_parameters),
+                    Arc::clone(&vrc.avatar),
+                )
+            };
+
+            run_vrc_http_polling(
+                port,
+                &params,
+                avatar_handle,
+                Arc::clone(&vrc_clone),
+                Arc::clone(&api),
+                Arc::clone(&global_map),
+            );
+
+            let mut vrc_lock = vrc_clone.lock().expect("Couldn't lock vrc.");
+            vrc_lock.vrc_connected = false;
+            vrc_lock.available_parameters.clear();
+            vrc_lock.purge_cache();
+            let mut avatar_lock = vrc_lock
+                .avatar
+                .write()
+                .expect("Couldn't get read instance");
+            *avatar_lock = None;
+        }
+
+        unsafe { stop(); }
+
+        if let Some(lock) = PORT_SENDER.get() {
+            if let Ok(mut guard) = lock.lock() {
+                *guard = None;
             }
         }
     });
