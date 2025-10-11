@@ -36,6 +36,11 @@ macro_rules! p {
 
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-changed=../src-proxy/src");
+    println!("cargo::rerun-if-changed=../src-proxy/Cargo.toml");
+    println!("cargo::rerun-if-changed=../src-elevated-register/src");
+    println!("cargo::rerun-if-changed=../src-elevated-register/Cargo.toml");
+    println!("cargo::rerun-if-changed=../src-vrc-oscquery/listen-for-vrc");
 
     let workspace_sidecars = PathBuf::from("../target/sidecars");
     let output_folder = PathBuf::from("./sidecars");
@@ -47,7 +52,12 @@ fn main() {
         .expect("Failed to create bHapticsPlayer directory");
 
     let publish_output_dir = workspace_sidecars.join("listen-for-vrc");
+    if publish_output_dir.exists() {
+        let _ = fs::remove_dir_all(&publish_output_dir);
+    }
     fs::create_dir_all(&publish_output_dir).expect("Failed to create listen-for-vrc output");
+    let proxy_build_dir = workspace_sidecars.join("proxy-target");
+    let register_build_dir = workspace_sidecars.join("register-target");
 
     p!("Building proxy sidecar");
 
@@ -57,6 +67,8 @@ fn main() {
             "--release",
             "--manifest-path",
             "../src-proxy/Cargo.toml",
+            "--target-dir",
+            proxy_build_dir.to_str().expect("proxy target dir not utf8"),
         ])
         .status()
         .expect("failed to build proxy sidecar");
@@ -72,6 +84,8 @@ fn main() {
             "--release",
             "--manifest-path",
             "../src-elevated-register/Cargo.toml",
+            "--target-dir",
+            register_build_dir.to_str().expect("register target dir not utf8"),
         ])
         .status()
         .expect("failed to build reigster sidecar");
@@ -93,6 +107,8 @@ fn main() {
             "-p:NativeLib=Shared",
             "-p:SelfContained=true",
             "-p:StripSymbols=true",
+            "-p:IlcGenerateDebugInfo=false",
+            "-p:IlcGenerateCompletePdb=false",
             "-o",
             publish_output_dir.to_str().expect("non utf8 path"),
         ])
@@ -111,27 +127,22 @@ fn main() {
         panic!("Sidecar build failed!");
     }
 
-    let proxy_src = Path::new("../target/release/BhapticsPlayer.exe");
+    let proxy_src = proxy_build_dir.join("release/BhapticsPlayer.exe");
     let proxy_dst = output_folder.join("bHapticsPlayer/BhapticsPlayer.exe");
-    copy_if_different(proxy_src, &proxy_dst).expect("failed to copy proxy sidecar binary");
+    copy_if_different(&proxy_src, &proxy_dst).expect("failed to copy proxy sidecar binary");
 
     p!("Bhaptics Proxy replaced");
 
-    let register_src = Path::new("../target/release/elevated-register.exe");
+    let register_src = register_build_dir.join("release/elevated-register.exe");
     let register_dst = output_folder.join("elevated-register.exe");
-    copy_if_different(register_src, &register_dst).expect("failed to copy elevated sidecar binary");
+    copy_if_different(&register_src, &register_dst).expect("failed to copy elevated sidecar binary");
 
     p!("elevated sidecar replaced");
 
     let dll_src = publish_output_dir.join("listen-for-vrc.dll");
-    let pdb_src = publish_output_dir.join("listen-for-vrc.pdb");
     let dll_dst = output_folder.join("listen-for-vrc.dll");
-    let pdb_dst = output_folder.join("listen-for-vrc.pdb");
 
     copy_if_different(&dll_src, &dll_dst).expect("failed to copy listen-for-vrc dll");
-    if pdb_src.exists() {
-        copy_if_different(&pdb_src, &pdb_dst).expect("failed to copy listen-for-vrc pdb");
-    }
 
     tauri_build::build();
 }
