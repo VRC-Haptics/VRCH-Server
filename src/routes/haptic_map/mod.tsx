@@ -5,6 +5,7 @@ import { useMapContext } from "../../context/mapContext";
 import { useDeviceContext } from "../../context/DevicesContext";
 import StandardModel from "./standard";
 import VrcConfigRadiusEditor from "./VrcConfigRadiusEditor";
+import NodeFilterOverlay, { type NodeFilter } from "./NodeFilterOverlay";
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
@@ -34,6 +35,33 @@ export default function InputNodesViewer() {
 
   const inputNodes = Object.values(globalMap.input_nodes);
 
+  // filter state
+  const [filter, setFilter] = useState<NodeFilter>({ mode: "all" });
+
+  const visibleInputNodes = inputNodes.filter((node) => {
+    if (filter.mode === "all") return true;
+    if (filter.mode === "prefab") {
+      const tag = filter.tag;
+      if (!tag) return true;
+      const nt = node.tags || [];
+      return nt.some((t) => t.includes(tag));
+    }
+    if (filter.mode === "tags") {
+      const required = filter.tags;
+      if (!required.length) return true;
+      const nt = node.tags || [];
+      if (filter.ignoreCase) {
+        const lowerTags = nt.map((t) => t.toLowerCase());
+        return required.some((q) => {
+          const qq = q.toLowerCase();
+          return lowerTags.some((t) => t.includes(qq));
+        });
+      }
+      return required.some((q) => nt.some((t) => t.includes(q)));
+    }
+    return true;
+  });
+
   // camera tracking
   const [cam, setCam] = useState<Camera | null>(null);
   const fmt = (v: number) => v.toFixed(2);
@@ -49,6 +77,7 @@ export default function InputNodesViewer() {
   return (
     <div className="relative w-full h-full">
       <VrcConfigRadiusEditor />
+      <NodeFilterOverlay filter={filter} onChange={setFilter} />
       <Canvas
         className="w-full h-full"
         camera={{ position: DEFAULT_POS, rotation: DEFAULT_ROT, fov: 90 }}
@@ -62,7 +91,7 @@ export default function InputNodesViewer() {
         {/* The human standard model */}
         <StandardModel />
         {/* Input nodes */}
-        {inputNodes.map((node) => {
+        {visibleInputNodes.map((node) => {
           const key = `input-${node.id}`;
           return (
             <group
