@@ -9,7 +9,6 @@ macro_rules! p {
 }
 
 fn main() {
-    /*
     let output_folder = "./sidecars";
 
     p!("Building proxy sidecar");
@@ -82,7 +81,7 @@ fn main() {
     let destination = Path::new("sidecars/elevated-register.exe");
     fs::copy(source, destination).expect("failed to copy elevated sidecar binary");
 
-    p!("elevated sidecar replaced");*/
+    p!("elevated sidecar replaced");
 
     tauri_build::build();
 }
