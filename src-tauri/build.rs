@@ -35,6 +35,7 @@ macro_rules! p {
 }
 
 fn main() {
+    p!("starting build script");
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=../src-proxy/src");
     println!("cargo::rerun-if-changed=../src-proxy/Cargo.toml");
@@ -42,6 +43,7 @@ fn main() {
     println!("cargo::rerun-if-changed=../src-elevated-register/Cargo.toml");
     println!("cargo::rerun-if-changed=../src-vrc-oscquery/listen-for-vrc");
 
+    p!("Finsihed rerun stuff");
     let workspace_sidecars = PathBuf::from("../target/sidecars");
     let output_folder = PathBuf::from("./sidecars");
 
@@ -50,6 +52,7 @@ fn main() {
     fs::create_dir_all(&output_folder).expect("Failed to create sidecars directory");
     fs::create_dir_all(output_folder.join("bHapticsPlayer"))
         .expect("Failed to create bHapticsPlayer directory");
+    p!("created directory");
 
     let publish_output_dir = workspace_sidecars.join("listen-for-vrc");
     if publish_output_dir.exists() {
