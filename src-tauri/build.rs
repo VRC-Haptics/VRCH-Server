@@ -54,6 +54,8 @@ fn main() {
         .expect("Failed to create bHapticsPlayer directory");
     p!("created directory");
 
+    panic!();
+
     let publish_output_dir = workspace_sidecars.join("listen-for-vrc");
     if publish_output_dir.exists() {
         let _ = fs::remove_dir_all(&publish_output_dir);
