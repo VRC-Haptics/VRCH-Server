@@ -98,36 +98,28 @@ fn main() {
 
     p!("Building C# VRC native library");
 
-    let output = Command::new("dotnet")
-        .args(&[
-            "publish",
-            "../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj",
-            "-c",
-            "Release",
-            "-r",
-            "win-x64",
-            "-p:PublishAot=true",
-            "-p:NativeLib=Shared",
-            "-p:SelfContained=true",
-            "-p:StripSymbols=true",
-            "-p:IlcGenerateDebugInfo=false",
-            "-p:IlcGenerateCompletePdb=false",
-            "-o",
-            publish_output_dir.to_str().expect("non utf8 path"),
-        ])
-        .output()
-        .expect("Failed to execute dotnet publish.");
+    let mut dotnet = Command::new("dotnet");
+    dotnet.args(&[
+        "publish",
+        "../src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj",
+        "-c", "Release",
+        "-r", "win-x64",
+        "-p:PublishAot=true",
+        "-p:NativeLib=Shared",
+        "-p:SelfContained=true",
+        "-p:StripSymbols=true",
+        "-p:IlcGenerateDebugInfo=false",
+        "-p:IlcGenerateCompletePdb=false",
+        "-o", publish_output_dir.to_str().expect("non utf8 path"),
+    ]);
 
-    if !output.status.success() {
-        // Convert stdout from bytes to a string and print.
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        p!(
-            "dotnet publish failed with output:\n{} ERR:{}",
-            stdout,
-            stderr
-        );
-        panic!("Sidecar build failed!");
+    dotnet.env("DOTNET_CLI_TELEMETRY_OPTOUT", "1");
+    dotnet.env("DOTNET_NOLOGO", "1");
+    dotnet.env("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "1");
+
+    let status = dotnet.status().expect("Failed to execute dotnet publish.");
+    if !status.success() {
+        panic!("dotnet publish failed with status: {:?}", status);
     }
 
     let proxy_src = proxy_build_dir.join("release/BhapticsPlayer.exe");
