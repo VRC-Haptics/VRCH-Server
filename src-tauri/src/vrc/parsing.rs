@@ -4,16 +4,17 @@ use regex::Regex;
 use rosc::OscType;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::vec;
+
+static REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"VF\d+_").unwrap()
+});
 
 /// Removes the VRC Fury naming from the parameters
 pub fn remove_version(path: &str) -> String {
-    let re = Regex::new(r"VF\d+_").unwrap();
-    // We capture the leading slash.
-    //let re = Regex::new(r"(/)VF\d{2}_").unwrap();
-
     // Replace all matches with the captured slash "$1" to avoid producing a double slash.
-    re.replace_all(path, "$1").to_string()
+    REGEX.replace_all(path, "$1").to_string()
 }
 
 /// convenience function for parsing returned HTTP OSCQuery messages
