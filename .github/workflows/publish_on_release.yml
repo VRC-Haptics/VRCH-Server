@@ -62,6 +62,10 @@ jobs:
       - name: Compile Elevated Sidecar
         run: cargo build --release --manifest-path "src-elevated-register/Cargo.toml" --target-dir "src-tauri\sidecars"
 
+      - name: List sidecar files
+        shell: pwsh
+        run: dir "src-tauri\sidecars" -Recurse -File
+
       - name: Install frontend dependencies
         run: pnpm install
 
