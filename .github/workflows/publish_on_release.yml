@@ -56,11 +56,17 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Compile Proxy Shim
-        run: cargo build --release --manifest-path "src-proxy/Cargo.toml" --artifact-dir "src-tauri\sidecars\bHapticsPlayer"
+      - name: Compile rust sidecars
+        run: | 
+          cd "src-proxy"
+          cargo build --release
+          cd "../src-src-elevated-register"
+          cargo build --release
+          cd ..
 
-      - name: Compile Elevated Sidecar
-        run: cargo build --release --manifest-path "src-elevated-register/Cargo.toml" --artifact-dir "src-tauri\sidecars"
+          mkdir -p "src-tauri\sidecars\bHapticsPlayer"
+          copy "src-proxy\target\release\*.exe" "src-tauri\sidecars\bHapticsPlayer\BhapticsPlayer.exe"
+          copy "src-elevated-register\target\release\elevated-register.exe" "src-tauri\sidecars\elevated-register.exe"
 
       - name: List sidecar files
         shell: pwsh
