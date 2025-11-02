@@ -68,13 +68,6 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_TERM_VERBOSE: true
-          CARGO_LOG: cargo::core::compiler=trace
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
-          CARGO_BUILD_JOBS: 1
-          DOTNET_CLI_TELEMETRY_OPTOUT: "1"
-          DOTNET_NOLOGO: "1"
-          DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
         with:
           tagName: app-v__VERSION__ # the action automatically replaces __VERSION__ with the app version.
           releaseName: 'App v__VERSION__'
