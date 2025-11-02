@@ -58,7 +58,7 @@ jobs:
 
       - name: Compile Proxy Shim
         run: |
-          cargo build --release --manifest-path "src-proxy/Cargo.toml"
+          cargo build --release --manifest-path "src-proxy/Cargo.toml" --target-dir "src-elevated-register"
           copy "src-proxy\target\release\BhapticsPlayer.exe" "src-tauri\sidecars\bHapticsPlayer\BhapticsPlayer.exe"
 
       - name: Compile Elevated Sidecar  
