@@ -64,7 +64,6 @@ jobs:
           cargo build --release
           cd ..
 
-          mkdir -p "src-tauri\sidecars\bHapticsPlayer"
           copy "src-proxy\target\release\*.exe" "src-tauri\sidecars\bHapticsPlayer\BhapticsPlayer.exe"
           copy "src-elevated-register\target\release\elevated-register.exe" "src-tauri\sidecars\elevated-register.exe"
 
