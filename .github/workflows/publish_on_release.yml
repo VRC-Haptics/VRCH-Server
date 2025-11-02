@@ -57,7 +57,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Compile Proxy Shim
-        run: cargo build --release --manifest-path "src-proxy/Cargo.toml" --target-dir "src-tauri\sidecars"
+        run: cargo build --release --manifest-path "src-proxy/Cargo.toml" --target-dir "src-tauri\sidecars\bHapticsPlayer\BhapticsPlayer.exe"
 
       - name: Compile Elevated Sidecar
         run: cargo build --release --manifest-path "src-elevated-register/Cargo.toml" --target-dir "src-tauri\sidecars"
