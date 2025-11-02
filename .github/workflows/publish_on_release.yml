@@ -38,7 +38,7 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: compile dotnet dll
-        run: publish "src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj" -c Release -r "win-x64 -p:PublishAot=true -p:NativeLib=Shared -p:SelfContained=true -p:StripSymbols=true -p:IlcGenerateDebugInfo=false -p:IlcGenerateCompletePdb=false -o "src-tauri\sidecars"
+        run: publish "src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj" -c Release -r "win-x64" -p:PublishAot=true -p:NativeLib=Shared -p:SelfContained=true -p:StripSymbols=true -p:IlcGenerateDebugInfo=false -p:IlcGenerateCompletePdb=false -o "src-tauri\sidecars"
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
