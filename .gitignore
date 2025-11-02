@@ -28,5 +28,8 @@ target/*
 *.exe
 *.dll
 *.pdb
-# Keep vrc-sidecar.exe tracked
+# Keep sidecars so they don't have to be rebuilt
 !src-tauri/sidecars/vrc-sidecar.exe
+!src-tauri/sidecars/listen-for-vrc.dll
+!src-tauri/sidecars/elevated-register.exe
+!src-tauri/sidecars/bHapticsPlayer/BhapticsPlayer.exe
