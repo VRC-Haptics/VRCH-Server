@@ -68,8 +68,8 @@ jobs:
           ls
           cd "..\.."
 
-          copy "src-proxy\target\release\*.exe" "src-tauri\sidecars\bHapticsPlayer\BhapticsPlayer.exe"
-          copy "src-elevated-register\target\release\elevated-register.exe" "src-tauri\sidecars\elevated-register.exe"
+          copy "target\release\BhapticsPlayer.exe" "src-tauri\sidecars\bHapticsPlayer\BhapticsPlayer.exe"
+          copy "target\release\elevated-register.exe" "src-tauri\sidecars\elevated-register.exe"
 
       - name: List sidecar files
         shell: pwsh
