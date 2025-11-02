@@ -36,6 +36,9 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 8.0.x
+
+      - name: compile dotnet dll
+        run: publish "src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj" -c Release -r "win-x64 -p:PublishAot=true -p:NativeLib=Shared -p:SelfContained=true -p:StripSymbols=true -p:IlcGenerateDebugInfo=false -p:IlcGenerateCompletePdb=false -o "src-tauri\sidecars"
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -52,6 +55,12 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+
+      - name: Compile Proxy Shim
+        run: build --release --mainfest-path src-proxy/Cargo.toml --target-dir "src-tauri\sidecars"
+
+      - name: Compile Elevated Sidecar
+        run: build --release --mainfest-path src-elevated-register/Cargo.toml --target-dir "src-tauri\sidecars"
 
       - name: Install frontend dependencies
         run: pnpm install
