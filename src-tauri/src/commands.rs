@@ -1,5 +1,5 @@
 // local modules
-use crate::devices::{Device, DeviceType};
+use crate::devices::{Device, DeviceType, update::{Firmware, UpdateMethod}};
 use crate::mapping::{global_map::GlobalMap, Id};
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::event::Event;
@@ -12,6 +12,20 @@ use runas::Command;
 use tauri::Manager;
 use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
+
+#[tauri::command]
+pub fn start_device_update(fw: Firmware, devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Result<(), String> {
+    let lock = devices.lock().expect("Lock could not be held");
+    let devices = lock.iter().find(|d| {d.id == fw.id});
+    if let Some(device) = devices {
+        fw.do_update(device)?;
+    } else {
+        log::error!("Couldn't find device with specified id.");
+        return Err("Failed: ID".to_string());
+    }
+
+    Ok(())
+}
 
 #[tauri::command]
 pub fn set_tags_radius(tag: String, radius: f32, global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> Result<(), ()> {

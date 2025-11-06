@@ -1,14 +1,16 @@
 pub mod config;
 mod connection_manager;
 pub mod discovery;
+pub mod ota;
 
+use espflash::target::Esp32Target;
 // outside imports
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use std::time::{Duration, SystemTime};
 use std::vec;
 
 // local imports
-use crate::devices::OutputFactors;
+use crate::devices::{ESP32Model, OutputFactors};
 use crate::mapping::global_map::GlobalMap;
 use crate::mapping::haptic_node::HapticNode;
 use crate::util::math::Vec3;
@@ -32,6 +34,10 @@ pub struct WifiDevice {
     pub last_queried: SystemTime,
     // The Port We Send data to
     pub send_port: u16,
+    ///the type of esp32 is actually on this (for flashing purposes)
+    esp_type: ESP32Model,
+    /// whether we should find teh esp_type
+    find_esp: bool,
     // Abstracts communication.
     connection_manager: WifiConnManager,
 }
@@ -42,6 +48,10 @@ pub struct Packet {
 }
 
 impl WifiDevice {
+    pub fn get_esp_type(&self) -> ESP32Model {
+        self.esp_type.clone()
+    }
+
     #[allow(dead_code)]
     /// Instantiate new device instance
     pub fn new(mac: String, ip: String, send_port: u16, name: String) -> WifiDevice {
@@ -56,6 +66,8 @@ impl WifiDevice {
             push_map: false,
             last_queried: SystemTime::UNIX_EPOCH,
             send_port: send_port,
+            esp_type: ESP32Model::Unknown,
+            find_esp: true,
             connection_manager: connection_manager,
         };
     }
@@ -80,7 +92,7 @@ impl WifiDevice {
         manage_hrtbt(is_alive, &mut self.been_pinged, &self.connection_manager);
 
         // check if we recieved and parsed the config yet.
-        if let Some(conf) = self.connection_manager.config.write().unwrap().as_ref() {
+        if let Some(conf) =self.connection_manager.config.write().unwrap().as_ref() {
             //push config to device if necessary
             if self.push_map {
                 self.push_map = false;
@@ -107,9 +119,33 @@ impl WifiDevice {
                 self.last_queried = now;
                 return Some(self.build_get_all());
             }
-
-            return None;
         }
+
+        if self.connection_manager.identifier.read().unwrap().is_none() {
+
+            let now = SystemTime::now();
+            let diff = now
+                .duration_since(self.last_queried)
+                .expect("Error getting difference");
+            if diff > Duration::from_millis(2000) || self.last_queried == SystemTime::UNIX_EPOCH {
+                self.last_queried = now;
+                log::trace!("sent esp message; get platform");
+                return Some(WifiDevice::build_get_type());
+            }
+        }
+
+        return None;
+    }
+
+    /// Builds the command to get type.
+    pub fn build_get_type() -> Packet {
+        let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: "/command".to_string(),
+            args: vec![OscType::String("GET PLATFORM".to_string())],
+        }))
+        .unwrap();
+
+        Packet { packet: msg_buf }
     }
 
     /// Sends updated message
@@ -205,8 +241,8 @@ impl WifiDevice {
         let mut lock = self.connection_manager.config.write().unwrap();
         if let Some(wifi_con) = lock.as_mut() {
             // get index of nodes
-            let mut index1:Option<usize> = None;
-            let mut index2:Option<usize> = None;
+            let mut index1: Option<usize> = None;
+            let mut index2: Option<usize> = None;
             for (index, node) in wifi_con.node_map.iter().enumerate() {
                 if node.to_vec3().close_to(&pos_1, EPSILON) {
                     index1 = Some(index);
@@ -227,7 +263,6 @@ impl WifiDevice {
             } else {
                 return Err("Couldn't find both nodes to swap".to_string());
             }
-
         } else {
             return Err("no_map".to_string());
         }
@@ -244,9 +279,9 @@ fn scale(val: f32, factors: &OutputFactors, global_offset: f32) -> f32 {
     if 1.0 - val <= EPSILON {
         return factors.sens_mult;
     }
-    
+
     let range = factors.sens_mult - factors.start_offset;
-    (val*global_offset) * range + factors.start_offset
+    (val * global_offset) * range + factors.start_offset
 }
 
 /// Manipulates the given flags according to the heartbeat timings.
@@ -278,7 +313,7 @@ fn manage_hrtbt(
         log::trace!("Set to false");
     // if the not ttl has passed.
     } else if diff <= ttl {
-    // if the not ttl has passed.
+        // if the not ttl has passed.
     } else if diff <= ttl {
         *is_alive = true;
     }
