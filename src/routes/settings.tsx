@@ -1,25 +1,26 @@
 // import { Outlet } from "react-router-dom";
 import themes from "../utils/themes";
 import { useSettingsContext } from "../context/SettingsProvider";
+import RepositorySettings from "./settings/fw-repository";
 
 type SettingType = "toggle" | "dropdown" | "int" | "float";
 
 export interface Setting<T = string | number | boolean> {
   title: string;
-  help:  string;
-  type:  SettingType;
+  help: string;
+  type: SettingType;
   defaultValue: T;
-  getFunction: T;                  // current value
+  getFunction: T; // current value
   setFunction: (value: T) => void; // updater
-  options?: string[];              // <‑‑ dropdown‑only
+  options?: string[]; // <‑‑ dropdown‑only
 }
 
 interface Group {
   title: string;
-  help:  string;
+  help: string;
 }
 
-/// A single Settings item. 
+/// A single Settings item.
 function SettingsItem<T extends string | number | boolean>({
   title,
   help,
@@ -31,9 +32,11 @@ function SettingsItem<T extends string | number | boolean>({
 }: Setting<T>) {
   const numberHandler = (raw: string) => {
     const parsed =
-      type === "int" ? parseInt(raw, 10) :
-      type === "float" ? parseFloat(raw) :
-      (raw as unknown as T);
+      type === "int"
+        ? parseInt(raw, 10)
+        : type === "float"
+        ? parseFloat(raw)
+        : (raw as unknown as T);
 
     if (typeof parsed === "number" ? !Number.isNaN(parsed) : true) {
       setFunction(parsed as T);
@@ -47,43 +50,48 @@ function SettingsItem<T extends string | number | boolean>({
 
       <div className="max-h-min rounded-md p-1">
         {type === "toggle" && (
-            <label className="label cursor-pointer">
+          <label className="label cursor-pointer">
             <input
               type="checkbox"
               className="toggle toggle-primary"
               checked={Boolean(getFunction)}
-              onChange={e => setFunction(e.target.checked as T)}
+              onChange={(e) => setFunction(e.target.checked as T)}
             />
-            <span className="text-xs opacity-70">(Default {String(defaultValue)})</span>
+            <span className="text-xs opacity-70">
+              (Default {String(defaultValue)})
+            </span>
           </label>
-          
         )}
 
         {type === "dropdown" && (
           <select
             className="select-s select-primary select-bordered rounded"
             value={String(getFunction)}
-            onChange={e => setFunction(e.target.value as T)}
+            onChange={(e) => setFunction(e.target.value as T)}
           >
-            {options?.map(o => (
-              <option key={o} value={o}>{o}</option>
+            {options?.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
             ))}
           </select>
         )}
 
         {(type === "int" || type === "float") && (
           <>
-          <input
-            type="number"
-            className="input input-primary input-sm w-20 text-right"
-            value={String(getFunction)}
-            step={type === "int" ? 1 : "any"}
-            inputMode={type === "int" ? "numeric" : "decimal"}
-            pattern={type === "int" ? "\\d+" : undefined}
-            onChange={e => numberHandler(e.target.value)}
-          />
-          <p className="text-xs opacity-70 mt-1">Default: {String(defaultValue)}</p>
-        </>
+            <input
+              type="number"
+              className="input input-primary input-sm w-20 text-right"
+              value={String(getFunction)}
+              step={type === "int" ? 1 : "any"}
+              inputMode={type === "int" ? "numeric" : "decimal"}
+              pattern={type === "int" ? "\\d+" : undefined}
+              onChange={(e) => numberHandler(e.target.value)}
+            />
+            <p className="text-xs opacity-70 mt-1">
+              Default: {String(defaultValue)}
+            </p>
+          </>
         )}
       </div>
     </div>
@@ -93,19 +101,22 @@ function SettingsItem<T extends string | number | boolean>({
 function SettingsGroup<T extends string | number | boolean>({
   group,
   settings,
+  children,
 }: {
   group: Group;
   settings: Setting<T>[];
+  children?: React.ReactNode;
 }) {
   return (
     <div id={group.title} className="h-fit w-full px-4">
       <div className="text-md font-bold w-fit text-center text-lg">
         <h2 title={group.help}>{group.title}</h2>
       </div>
-      <div className="flex flex-col h-fit justify-center p-1 w-full">
+      <div className="flex flex-col gap-2 h-fit justify-center p-1 w-full">
         {settings.map((s, i) => (
           <SettingsItem key={i} {...s} />
         ))}
+        {children}
       </div>
     </div>
   );
@@ -120,7 +131,10 @@ export default function Settings() {
   } = useSettingsContext();
 
   /* App‑level settings */
-  const appGroup: Group = { title: "App Settings", help: "Settings for the app" };
+  const appGroup: Group = {
+    title: "App Settings",
+    help: "Settings for the app",
+  };
   const appData: Setting<string>[] = [
     {
       title: "Theme",
@@ -141,8 +155,7 @@ export default function Settings() {
   const wifiData: Setting<number>[] = [
     {
       title: "Timeout (s)",
-      help:
-        "Seconds until a device is considered disconnected. Raise this if devices keep dropping out.",
+      help: "Seconds until a device is considered disconnected. Raise this if devices keep dropping out.",
       type: "int",
       defaultValue: 3,
       getFunction: wifiDeviceTimeout,
@@ -154,9 +167,12 @@ export default function Settings() {
     <div className="flex flex-col h-full w-full">
       <h1 className="text-2xl font-bold padding-5 text-center">Settings</h1>
 
-      {/* generic inference keeps each group type‑safe */}
-      <SettingsGroup group={appGroup}  settings={appData} />
-      <SettingsGroup group={wifiGroup} settings={wifiData} />
+      <div className="flex flex-col overflow-y-scroll outline outline-base-200">
+        <SettingsGroup group={appGroup} settings={appData}>
+          <RepositorySettings />
+        </SettingsGroup>
+        <SettingsGroup group={wifiGroup} settings={wifiData} />
+      </div>
     </div>
   );
 }

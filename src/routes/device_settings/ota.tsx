@@ -5,6 +5,8 @@ import { useDeviceContext } from "../../context/DevicesContext";
 import { FaArrowRight } from "react-icons/fa";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { GitRepo } from "../../utils/commonClasses";
+import { useSettingsContext } from "../../context/SettingsProvider";
+import { DEFAULT_REPO } from "../../context/SettingsProvider";
 
 const LATEST_TAG: string = "latest";
 
@@ -25,9 +27,9 @@ async function githubReleases(repo: GitRepo): Promise<Release[]> {
     throw new Error(`GitHub API error: ${response.status}`);
   }
 
-  const resp_releases = await response.json();
   const releases: Release[] = [];
-  resp_releases.forEach((item: any) => {
+  const resp_releases = await response.json();
+  resp_releases.forEach((item: any, idx:number) => {
     const assets: ReleaseAsset[] = item.assets.map(
       (asset: any) =>
         new ReleaseAsset(
@@ -38,7 +40,7 @@ async function githubReleases(repo: GitRepo): Promise<Release[]> {
     );
 
     releases.push(
-      new Release(item.tag_name, item.html_url, item.prerelease, assets)
+      new Release(idx === 0, item.tag_name, item.html_url, item.prerelease, assets)
     );
   });
 
@@ -46,17 +48,20 @@ async function githubReleases(repo: GitRepo): Promise<Release[]> {
 }
 
 class Release {
+  is_latest: boolean = true;
   pre_release: boolean = true;
   tag_name: string = "";
   git_url: string = "";
   assets: ReleaseAsset[] = [];
 
   constructor(
+    is_latest: boolean,
     tag_name: string,
     git_url: string,
     pre_release: boolean,
     assets: ReleaseAsset[]
   ) {
+    this.is_latest = is_latest;
     this.pre_release = pre_release;
     this.tag_name = tag_name;
     this.git_url = git_url;
@@ -76,9 +81,8 @@ class ReleaseAsset {
   }
 }
 
-const OFFICIAL_REPO: GitRepo = new GitRepo("VRC-Haptics", "VRCH-Firmware");
-
 export default function OtaUpdate() {
+  const { repositories } = useSettingsContext();
   const { devices } = useDeviceContext();
   // all devices elligable for OTA updates.
   const [eligibleDevices, setEligibleDevices] = useState<
@@ -89,10 +93,10 @@ export default function OtaUpdate() {
   // the currently selected release tag.
   const [releaseTag, setReleaseTag] = useState<string>(LATEST_TAG);
   // where we should pull releases from
-  const [repository, setRepository] = useState<GitRepo>(OFFICIAL_REPO);
+  const [repository, setRepository] = useState<GitRepo>(DEFAULT_REPO);
   // releases that are in tthe currently selected repository
   const [availableReleases, setAvailableReleases] = useState<Release[]>([]);
-  // all tags that contains a valid asset for the selected device
+  // releases that are compatible with our current device.
   const [filteredReleases, setFilteredReleases] = useState<Release[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   // update status that is shown on the bottom of the panel.
@@ -138,6 +142,7 @@ export default function OtaUpdate() {
   useEffect(() => {
     const device = eligibleDevices.find((d) => d.id === selectedDevice);
     if (device == null) {
+      error("Device to udpate is null");
       return;
     }
 
@@ -145,7 +150,7 @@ export default function OtaUpdate() {
     const filter = `${platform.toLowerCase()}.bin`;
     const filtered = availableReleases.filter((release) =>
       release.assets.some(
-        (asset) => asset.file_name.endsWith(filter) // or use regex: /pattern/.test(asset.file_name)
+        (asset) => asset.file_name.endsWith(filter)
       )
     );
     setFilteredReleases(filtered);
@@ -164,7 +169,14 @@ export default function OtaUpdate() {
     try {
       // Target release
       const device = eligibleDevices.find((d) => d.id === selectedDevice);
-      const release = filteredReleases.find((r) => r.tag_name === releaseTag);
+      let release: Release | undefined = undefined;
+      if (releaseTag === LATEST_TAG) {
+        release = filteredReleases.find((r) => r.is_latest);
+        // sort filtered releases by 
+      } else {
+        release = filteredReleases.find((r) => r.tag_name === releaseTag);
+      }
+ 
       if (release == null || device == null) {
         error(`Unable to find release with tag: ${releaseTag}`);
         return;
@@ -236,7 +248,31 @@ export default function OtaUpdate() {
         </ul>
       </div>
       <FaArrowRight />
-      <div id="repositorySelector">Implement Repository Field.</div>
+      <div id="repositorySelector" className="dropdown dropdown-start">
+        <div tabIndex={0} role="button" className="btn m-1">
+          {repository
+            ? `${repository.owner}/${repository.name}`
+            : "Select Repository"}
+        </div>
+        <ul
+          tabIndex={0}
+          className="dropdown-content menu bg-base-200 rounded-box z-[1] p-2 shadow"
+        >
+          {repositories.map((repo, index) => (
+            <li key={index}>
+              <a onClick={() => setRepository(repo)}>
+                {repo.owner}/{repo.name}
+                {repo.owner === DEFAULT_REPO.owner &&
+                  repo.name === DEFAULT_REPO.name && (
+                    <span className="badge badge-primary badge-sm">
+                      Official
+                    </span>
+                  )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
       <FaArrowRight />
       <div id="versSelector" className="dropdown dropdown-start">
         <div tabIndex={0} role="button" className="btn m-1">
@@ -256,7 +292,11 @@ export default function OtaUpdate() {
             filteredReleases.map((release) => (
               <li key={release.tag_name}>
                 <a onClick={() => setReleaseTag(release.tag_name)}>
-                  {release.tag_name} {release.pre_release ? "Pre-Release" : ""}
+                  {release.tag_name} {release.pre_release ? "Pre-Release" : ""} {release.is_latest ? (
+                    <span className="badge badge-primary badge-sm">
+                      Latest
+                    </span>
+                  ) : ""}
                 </a>
               </li>
             ))
