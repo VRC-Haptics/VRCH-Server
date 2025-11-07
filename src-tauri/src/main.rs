@@ -309,6 +309,7 @@ fn main() {
             commands::set_tags_radius,
             commands::set_node_radius,
             commands::start_device_update,
+            commands::get_device_esp_model,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {

@@ -1,9 +1,7 @@
-use std::net::{Ipv4Addr, TcpListener, UdpSocket, TcpStream};
-use std::time::Duration;
 use std::io::{Read, Write};
+use std::net::{Ipv4Addr, TcpListener, TcpStream, UdpSocket};
+use std::time::Duration;
 use uuid::Uuid;
-
-use crate::devices::update::Firmware;
 
 /// Connect to port 8266
 ///
@@ -49,7 +47,7 @@ pub fn update_ota(bytes: Vec<u8>, password: String, device_ip: Ipv4Addr) -> Opti
     log::debug!("Authentication succeded.");
 
     log::info!("Waiting for device ready...");
-    
+
     let mut stream = match wait_for_connection(tcp_listener, Duration::from_secs(10)) {
         Some(s) => s,
         None => {
@@ -72,39 +70,41 @@ fn upload_firmware(stream: &mut TcpStream, firmware: &[u8]) -> Option<()> {
     const CHUNK_SIZE: usize = 2048;
     let mut offset = 0;
     let mut skip_buffer = [0u8; 4];
-    
+
     while offset < firmware.len() {
         let chunk_end = (offset + CHUNK_SIZE).min(firmware.len());
         let chunk = &firmware[offset..chunk_end];
-        
+
         // Send chunk
         if let Err(e) = stream.write_all(chunk) {
             log::error!("Write failed: {}", e);
             return None;
         }
-        
+
         if let Err(e) = stream.flush() {
             log::error!("Flush failed: {}", e);
             return None;
         }
-        
+
         // Skip 4 bytes (device acknowledgment)
         if let Err(e) = stream.read_exact(&mut skip_buffer) {
             log::error!("Failed to read ack: {}", e);
             return None;
         }
-        
+
         offset = chunk_end;
-        
+
         let progress = (offset as f32 / firmware.len() as f32 * 100.0) as u32;
         log::debug!("Upload progress: {}%", progress);
     }
-    
+
     log::info!("Upload complete, waiting for confirmation...");
-    
+
     // Wait for OK response
-    stream.set_read_timeout(Some(Duration::from_secs(10))).ok()?;
-    
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .ok()?;
+
     let mut response = Vec::new();
     match stream.read_to_end(&mut response) {
         Ok(_) => {
@@ -126,13 +126,18 @@ fn upload_firmware(stream: &mut TcpStream, firmware: &[u8]) -> Option<()> {
 
 fn wait_for_connection(listener: TcpListener, timeout: Duration) -> Option<TcpStream> {
     let start = std::time::Instant::now();
-    
+
     loop {
         match listener.accept() {
             Ok((stream, addr)) => {
                 log::info!("Device connected from: {}", addr);
-                stream.set_read_timeout(Some(Duration::from_millis(1000))).ok()?;
-                stream.set_write_timeout(Some(Duration::from_millis(1000))).ok()?;
+                stream.set_nonblocking(false).ok()?;
+                stream
+                    .set_read_timeout(Some(Duration::from_millis(1000)))
+                    .ok()?;
+                stream
+                    .set_write_timeout(Some(Duration::from_millis(1000)))
+                    .ok()?;
                 return Some(stream);
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -180,7 +185,7 @@ pub fn authenticate(
 
     let invitation: String = format!("{FLASH} {fw_port} {fw_size} {fw_hash}");
     log::trace!("Sending: {}", invitation.clone());
-    out_socket.send(invitation.as_bytes());
+    let _ = out_socket.send(invitation.as_bytes());
 
     let mut auth_buf = [0u8; 128];
     let len_recv = match out_socket.recv(&mut auth_buf) {
@@ -191,18 +196,20 @@ pub fn authenticate(
         }
     };
 
-    log::trace!(
-        "Got Auth Response: {}",
-        String::from_utf8_lossy(&auth_buf[..len_recv])
-    );
-    if auth_buf[..len_recv].starts_with(b"AUTH") {
-        let signature = md5_string(Uuid::new_v4());
+    let response = String::from_utf8_lossy(&auth_buf[..len_recv]);
+    log::trace!("Got Auth Response: {}", response);
+    if response.starts_with("AUTH") {
+        let parts: Vec<&str> = response.trim().split(' ').collect();
+        if parts.len() != 2 {
+            log::error!("Invalid AUTH response format");
+            return false;
+        }
+
+        let auth_token = parts[1];
+        let signature = md5_string(Uuid::new_v4().to_string());
         let hashed_pass = md5_string(password);
-        let nonce = &auth_buf[5..len_recv - 1]
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>();
-        let payload = md5_string(format!("{hashed_pass}:{nonce}:{signature}"));
+        let result_text = format!("{hashed_pass}:{auth_token}:{signature}");
+        let payload = md5_string(result_text);
 
         let full_msg = format!("{AUTH} {signature} {payload}");
 
@@ -224,10 +231,7 @@ pub fn authenticate(
             }
         };
 
-        let response = recv_buff[0..len]
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>();
+        let response = String::from_utf8_lossy(&recv_buff[0..len]);
 
         log::trace!("Auth response recieved: {}", response);
 

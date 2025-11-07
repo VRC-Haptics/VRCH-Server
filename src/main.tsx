@@ -10,6 +10,7 @@ import "./styles.css";
 import { SettingsProvider } from "./context/SettingsProvider";
 import GameSettings from "./routes/game_settings/game_settings";
 import GlobalMapContainer from "./routes/haptic_map";
+import DeviceSettings from "./routes/device_settings";
 
 const router = createBrowserRouter([
   {
@@ -32,6 +33,10 @@ const router = createBrowserRouter([
       {
         path: "/global_map",
         element: <GlobalMapContainer />,
+      },
+      {
+        path: "/device_settings",
+        element: <DeviceSettings/>
       }
     ],
   },

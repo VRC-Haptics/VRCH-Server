@@ -9,6 +9,13 @@
     "core:default",
     "opener:default",
     "http:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.github.com/*" },
+        { "url": "https://github.com/*" }
+      ]
+    },
     "store:default",
     "dialog:default",
     "log:default"

@@ -34,10 +34,6 @@ pub struct WifiDevice {
     pub last_queried: SystemTime,
     // The Port We Send data to
     pub send_port: u16,
-    ///the type of esp32 is actually on this (for flashing purposes)
-    esp_type: ESP32Model,
-    /// whether we should find teh esp_type
-    find_esp: bool,
     // Abstracts communication.
     connection_manager: WifiConnManager,
 }
@@ -49,7 +45,13 @@ pub struct Packet {
 
 impl WifiDevice {
     pub fn get_esp_type(&self) -> ESP32Model {
-        self.esp_type.clone()
+        let lock = self.connection_manager.identifier.read().expect("Unable to get lock");
+        if let Some(esp) = lock.as_ref() {
+            return esp.clone();
+        } else {
+            log::trace!("Defaulting to unknown");
+            return ESP32Model::Unknown;
+        }
     }
 
     #[allow(dead_code)]
@@ -66,8 +68,6 @@ impl WifiDevice {
             push_map: false,
             last_queried: SystemTime::UNIX_EPOCH,
             send_port: send_port,
-            esp_type: ESP32Model::Unknown,
-            find_esp: true,
             connection_manager: connection_manager,
         };
     }
@@ -92,6 +92,8 @@ impl WifiDevice {
         manage_hrtbt(is_alive, &mut self.been_pinged, &self.connection_manager);
 
         // check if we recieved and parsed the config yet.
+        let mut intensities = vec![];
+        let mut should_push_intensities = false;
         if let Some(conf) =self.connection_manager.config.write().unwrap().as_ref() {
             //push config to device if necessary
             if self.push_map {
@@ -101,13 +103,13 @@ impl WifiDevice {
             }
 
             // Collect haptic values and scale to output.
-            let mut intensities =
+            intensities =
                 inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
             let global_offset = inputs.standard_menu.lock().expect("Global Lock").intensity;
             intensities
                 .iter_mut()
                 .for_each(|x| *x = scale(*x, factors, global_offset));
-            return Some(self.compile_message(&intensities));
+            should_push_intensities = true;
         } else {
             // If no mapping configuration found
             // Gather the configuration
@@ -121,8 +123,8 @@ impl WifiDevice {
             }
         }
 
+        // Retrieve board identifier (ESP32C3) if not found
         if self.connection_manager.identifier.read().unwrap().is_none() {
-
             let now = SystemTime::now();
             let diff = now
                 .duration_since(self.last_queried)
@@ -134,7 +136,11 @@ impl WifiDevice {
             }
         }
 
-        return None;
+        if should_push_intensities {
+            return Some(self.compile_message(&intensities));
+        } else {
+            return None;
+        }
     }
 
     /// Builds the command to get type.

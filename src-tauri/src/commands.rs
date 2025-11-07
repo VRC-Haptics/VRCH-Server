@@ -1,5 +1,5 @@
 // local modules
-use crate::devices::{Device, DeviceType, update::{Firmware, UpdateMethod}};
+use crate::devices::{Device, DeviceType, ESP32Model, update::{Firmware, UpdateMethod}};
 use crate::mapping::{global_map::GlobalMap, Id};
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::event::Event;
@@ -12,6 +12,18 @@ use runas::Command;
 use tauri::Manager;
 use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
+
+#[tauri::command]
+pub fn get_device_esp_model(id: String, devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Result<ESP32Model, String> {
+    let lock = devices.lock().expect("Lock could not be held");
+    let device = lock.iter().find(|d| {d.id == id});
+    if let Some(device) = device.as_ref() {
+        return Ok(device.get_esp_type());
+    } else {
+        log::error!("Couldn't find device with specified id.");
+        return Err("Failed: ID".to_string());
+    }
+}
 
 #[tauri::command]
 pub fn start_device_update(fw: Firmware, devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Result<(), String> {

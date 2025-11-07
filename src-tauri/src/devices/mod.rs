@@ -44,7 +44,7 @@ pub struct Device {
 }
 
 /// The firmware type returned from the device.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
 pub enum ESP32Model {
     /// All original ESP32 variants
     ESP32,
@@ -168,6 +168,15 @@ impl ESP32Model {
             Self::ESP8266 => "ESP8266",
             Self::Unknown => "Unknown",
         }
+    }
+}
+
+impl serde::Serialize for ESP32Model {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.display_name())
     }
 }
 
