@@ -56,9 +56,9 @@ export default function VrcInfoCard({}) {
       className="bg-base-200 rounded-md p-2 min-w-0 min-h-0 overflow-hidden h-full flex flex-col"
     >
       {/* Header */}
-      <div className="font-bold bg-base-300 rounded-md px-2 py-1 h-min">
+      <div className="font-bold bg-base-300 rounded-md px-2 py-1 h-min flex items-center">
         <h2>VRC</h2>
-        <div className="w-2"></div>
+        <div className="flex-grow"></div>
         <span
           className={clsx(
             "h-3 w-3 rounded-full",
