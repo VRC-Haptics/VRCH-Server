@@ -7,9 +7,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 use std::vec;
 
-static REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"VF\d+_").unwrap()
-});
+static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"VF\d+_").unwrap());
 
 /// Removes the VRC Fury naming from the parameters
 pub fn remove_version(path: &str) -> String {
@@ -138,7 +136,7 @@ impl OscInfo {
                     contents
                 };
 
-                // create array 
+                // create array
                 for (tag, value) in type_tags.chars().zip(values_to_parse) {
                     if !access.is_readable() && *value == Value::Null {
                         types.push(OscType::Nil);
@@ -179,7 +177,10 @@ fn match_tag(tag: char, content: &Value) -> Result<OscType, (OscType, String)> {
             } else if let Some(obj) = content.as_object() {
                 Ok(handle_obj(obj))
             } else {
-                Err((OscType::Nil, format!("Couldn't coerce string: {:?}", content)))
+                Err((
+                    OscType::Nil,
+                    format!("Couldn't coerce string: {:?}", content),
+                ))
             }
         }
         'i' => {
@@ -188,28 +189,47 @@ fn match_tag(tag: char, content: &Value) -> Result<OscType, (OscType, String)> {
             } else if let Some(obj) = content.as_object() {
                 Ok(handle_obj(obj))
             } else {
-                Err((OscType::Nil, format!("Couldn't coerce integer: {:?}", content)))
+                Err((
+                    OscType::Nil,
+                    format!("Couldn't coerce integer: {:?}", content),
+                ))
             }
         }
         'f' => {
             if let Some(num) = content.as_f64() {
                 Ok(OscType::Float(num as f32))
+            } else if let Some(s) = content.as_str() {
+                // Handle special float string values
+                match s {
+                    "NaN" => Ok(OscType::Float(f32::NAN)),
+                    "Infinity" | "Inf" => Ok(OscType::Float(f32::INFINITY)),
+                    "-Infinity" | "-Inf" => Ok(OscType::Float(f32::NEG_INFINITY)),
+                    _ => Err((
+                        OscType::Nil,
+                        format!("Couldn't coerce float: {:?}", content),
+                    )),
+                }
             } else if let Some(obj) = content.as_object() {
                 Ok(handle_obj(obj))
             } else {
-                Err((OscType::Nil, format!("Couldn't coerce float: {:?}", content)))
+                Err((
+                    OscType::Nil,
+                    format!("Couldn't coerce float: {:?}", content),
+                ))
             }
         }
         'T' => Ok(OscType::Bool(true)),
         'F' => Ok(OscType::Bool(false)),
         'I' => Ok(OscType::Inf),
         'N' => Ok(OscType::Nil),
-        't' => {
-            Err((OscType::Nil, format!("time tag types are unsupported")))
-        }
-        tag => {
-            Err((OscType::Nil, format!("Unsupported OSC Type tag: {}, With Contents: {:?}", tag, content)))
-        }
+        't' => Err((OscType::Nil, format!("time tag types are unsupported"))),
+        tag => Err((
+            OscType::Nil,
+            format!(
+                "Unsupported OSC Type tag: {}, With Contents: {:?}",
+                tag, content
+            ),
+        )),
     }
 }
 
