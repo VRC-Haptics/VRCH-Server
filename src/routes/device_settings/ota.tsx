@@ -245,6 +245,8 @@ export default function OtaUpdate() {
               </a>
             </li>
           ))}
+
+          {eligibleDevices.length === 0 ? (<p>No Devices Connected</p>) : "" }
         </ul>
       </div>
       <FaArrowRight />

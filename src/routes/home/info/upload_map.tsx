@@ -65,7 +65,7 @@ export default function DeviceJsonUpload({ device }: DeviceJsonUploadProps) {
   };
 
   return (
-    <div id="DeviceJsonUpload" className="p-2 min-w-full mx-auto">
+    <div id="DeviceJsonUpload" className="min-w-full">
       <p className="text-md font-bold">Set Device Node Map</p>
       <div className="bg-base-300 rounded-md p-4 flex flex-col gap-4">
         <input 

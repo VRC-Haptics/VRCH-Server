@@ -14,10 +14,10 @@ export default function Layout() {
     "hover:text-primary w-10 h-10 hover:bg-base-300 rounded-md flex items-center justify-center";
 
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden">
+    <div className="h-screen w-screen flex flex-col">
       <div
         id="settingsBar"
-        className="bg-base-200 flex flex-row w-full p-3 gap-3 items-center"
+        className="bg-base-200 flex flex-row w-full p-3 gap-3 items-center h-16 flex-shrink-0"
       >
         <Link title="Home" className={linkClass} to="/">
           <AiOutlineHome
@@ -75,7 +75,7 @@ export default function Layout() {
       </div>
       <div
         id="windowContainer"
-        className="flex flex-col flex-1 overflow-hidden"
+        className="flex flex-1 w-full"
       >
         <Outlet />
       </div>

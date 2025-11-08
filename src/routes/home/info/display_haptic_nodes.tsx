@@ -53,7 +53,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
   };
 
   return (
-    <div id="DisplayHapticNodes" className="p-2 min-w-full mx-auto">
+    <div id="DisplayHapticNodes" className="min-w-full">
       {/* DaisyUI collapse ▾  (closed by default) */}
       <div className="collapse collapse-arrow bg-base-300 rounded-box">
         {/* The <input> toggles open/closed; leave it unchecked for “closed by default”. */}

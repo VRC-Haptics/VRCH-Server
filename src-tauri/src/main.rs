@@ -292,12 +292,6 @@ fn main() {
 
             log::trace!("done with tauri setup");
             Ok(())
-        }).setup(|app| {
-            // Log panic info before crash
-            std::panic::set_hook(Box::new(|panic_info| {
-                log::error!("PANIC: {:?}", panic_info);
-            }));
-            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_device_list, 

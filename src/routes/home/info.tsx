@@ -16,10 +16,16 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
 
     if (device != null) {
       return (
-        <div id="DeviceInfoCard" className="flex-col min-w-0 max-w-full h-full overflow-y-auto">
+        <div
+          id="DeviceInfoCard"
+          className="flex flex-col min-w-0 max-w-full overflow-y-scroll"
+        >
           <DeviceOffset selectedDevice={device}></DeviceOffset>
+          <div className="h-2"></div>
           <DisplayHapticNodes selectedDevice={device}></DisplayHapticNodes>
+          <div className="h-2"></div>
           <DeviceJsonUpload device={device}></DeviceJsonUpload>
+          <div className="h-2"></div>
           <RawDeviceInfo device={device} />
         </div>
       );
@@ -29,28 +35,24 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   return (
     <div
       id="infoPageContainer"
-      className="flex flex-col min-w-56 max-w-full h-full bg-base-200 rounded-md p-2 space-y-2"
+      className="bg-base-200 rounded-md p-2 min-w-0 min-h-0"
     >
-      <div className="flex font-bold bg-base-300 rounded-md px-2 py-1 min-w-3 w-full h-min">
+      <div className="font-bold bg-base-300 rounded-md px-2 py-1 h-min">
         <h1>Device Info</h1>
       </div>
-      <div
-        id="infoElements"
-        className="flex-1 overflow-y-scroll max-h-fit border-4 min-w-0 border-dotted rounded-md border-base-300"
-      >
-        {selectedDevice ? (
-          createInfo(selectedDevice)
-        ) : (
-          <div id="defaultInfoCard" className="text-center">
-            <h1 className="text-lg">Welcome To VRC Haptics!</h1>
-            <p>
-              Make sure you device is connected to the same wifi network and
-              then select it from the connected devices tab. Your device info
-              will pop up here.
-            </p>
-          </div>
-        )}
-      </div>
+      <div className="divider my-0"></div>
+      {selectedDevice ? (
+        createInfo(selectedDevice)
+      ) : (
+        <div id="defaultInfoCard" className="text-center">
+          <h1 className="text-lg">Welcome To VRC Haptics!</h1>
+          <p>
+            Make sure you device is connected to the same wifi network and then
+            select it from the connected devices tab. Your device info will pop
+            up here.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

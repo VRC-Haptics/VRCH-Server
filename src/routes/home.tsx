@@ -13,7 +13,7 @@ export default function Home() {
   };
 
   return (
-    <div id="homeContainer" className="flex flex-1 p-0 min-w-0 space-x-2 space-y-2">
+    <div id="homeContainer" className="flex h-full p-0 min-w-0">
       <DeviceProvider>
         <ConnectedDevices onSelectDevice={handleSelectDevice} />
         <InfoPage selectedDevice={selectedDevice} />

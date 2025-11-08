@@ -42,7 +42,7 @@ export const DeviceOffset: React.FC<DeviceOffsetProps> = ({ selectedDevice }) =>
   };
 
   return (
-    <div id="DeviceSettings" className="p-2 min-w-full mx-auto">
+    <div id="DeviceSettings" className="min-w-full">
 
       <p className="text-md font-bold">Power Limit</p>
       <div className="bg-base-300 rounded-md p-4 flex flex-col gap-4">
