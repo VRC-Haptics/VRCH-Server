@@ -40,7 +40,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
       <div className="font-bold bg-base-300 rounded-md px-2 py-1 h-min">
         <h1>Device Info</h1>
       </div>
-      <div className="divider my-0"></div>
+      <div className="divider my-0"/>
       {selectedDevice ? (
         createInfo(selectedDevice)
       ) : (
