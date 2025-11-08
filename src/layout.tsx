@@ -75,7 +75,7 @@ export default function Layout() {
       </div>
       <div
         id="windowContainer"
-        className="flex flex-1 w-full"
+        className="flex flex-1 w-full h-full min-h-0 overflow-auto"
       >
         <Outlet />
       </div>

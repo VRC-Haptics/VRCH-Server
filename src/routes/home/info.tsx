@@ -18,7 +18,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
       return (
         <div
           id="DeviceInfoCard"
-          className="flex flex-col min-w-0 max-w-full overflow-y-scroll"
+          className="max-w-full max-h-full overflow-auto"
         >
           <DeviceOffset selectedDevice={device}></DeviceOffset>
           <div className="h-2"></div>
@@ -35,7 +35,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   return (
     <div
       id="infoPageContainer"
-      className="bg-base-200 rounded-md p-2 min-w-0 min-h-0"
+      className="bg-base-200 rounded-md p-2 min-w-0 min-h-0 overflow-hidden h-full flex flex-col"
     >
       <div className="font-bold bg-base-300 rounded-md px-2 py-1 h-min">
         <h1>Device Info</h1>

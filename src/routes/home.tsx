@@ -13,7 +13,7 @@ export default function Home() {
   };
 
   return (
-    <div id="homeContainer" className="flex h-full p-0 min-w-0">
+    <>
       <DeviceProvider>
         <ConnectedDevices onSelectDevice={handleSelectDevice} />
         <InfoPage selectedDevice={selectedDevice} />
@@ -21,6 +21,6 @@ export default function Home() {
       <VrcProvider>
         <GameSettings/>
       </VrcProvider>
-    </div>
+    </>
   );
 }
