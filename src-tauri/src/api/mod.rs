@@ -64,10 +64,10 @@ impl ApiManager {
 
         let handle = std::thread::spawn(move || {
             log::debug!("Starting async cache refresh");
-            
+
             // Refresh local index
             Self::refresh_local_index_thread(config_folder, local_maps.clone());
-            
+
             // Refresh remote index
             Self::refresh_remote_index_thread(base_url, remote_maps.clone());
 
@@ -75,7 +75,7 @@ impl ApiManager {
             if let Ok(local) = local_maps.lock() {
                 log::trace!("Local Cache: {:?} Maps", local.len());
             }
-            
+
             if let Ok(remote) = remote_maps.lock() {
                 if let Some(ref maps) = *remote {
                     log::trace!("Remote Cache: {:?} Maps", maps.len());
@@ -83,7 +83,7 @@ impl ApiManager {
                     log::error!("Empty Remote Cache");
                 }
             }
-            
+
             log::debug!("Async cache refresh completed");
         });
 
@@ -115,7 +115,7 @@ impl ApiManager {
         if let Ok(local) = self.local_maps.lock() {
             log::trace!("Local Cache: {:?} Maps", local.len());
         }
-        
+
         if let Ok(remote) = self.remote_maps.lock() {
             if let Some(ref maps) = *remote {
                 log::trace!("Remote Cache: {:?} Maps", maps.len());
@@ -126,9 +126,12 @@ impl ApiManager {
     }
 
     /// Thread-safe version of refresh_local_index for use in async refresh
-    fn refresh_local_index_thread(config_folder: String, local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>) {
+    fn refresh_local_index_thread(
+        config_folder: String,
+        local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
+    ) {
         let mut new_local_maps = HashSet::new();
-        
+
         for entry in WalkDir::new(&config_folder)
             .into_iter()
             .filter_map(Result::ok)
@@ -142,7 +145,7 @@ impl ApiManager {
                             version: game_map.meta.map_version,
                             path: entry.clone().into_path(),
                         };
-                        
+
                         if !new_local_maps.insert(map) {
                             log::warn!(
                                 "Duplicate config files, Will be ignored: {:?}",
@@ -157,7 +160,7 @@ impl ApiManager {
                 }
             }
         }
-        
+
         // Update the shared state
         if let Ok(mut maps) = local_maps.lock() {
             *maps = new_local_maps;
@@ -165,23 +168,24 @@ impl ApiManager {
     }
 
     /// Thread-safe version of refresh_remote_index for use in async refresh
-    fn refresh_remote_index_thread(base_url: String, remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>) {
+    fn refresh_remote_index_thread(
+        base_url: String,
+        remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>,
+    ) {
         match get(base_url.clone() + "catalog.json") {
             Ok(res) => {
                 log::trace!("Retrieved remote index with status: {:?}", res.status());
                 match res.text() {
-                    Ok(text) => {
-                        match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
-                            Ok(updated_index) => {
-                                if let Ok(mut maps) = remote_maps.lock() {
-                                    *maps = Some(updated_index);
-                                }
-                            }
-                            Err(err) => {
-                                log::error!("Unable to parse returned response: {}\n{}", err, &text);
+                    Ok(text) => match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
+                        Ok(updated_index) => {
+                            if let Ok(mut maps) = remote_maps.lock() {
+                                *maps = Some(updated_index);
                             }
                         }
-                    }
+                        Err(err) => {
+                            log::error!("Unable to parse returned response: {}\n{}", err, &text);
+                        }
+                    },
                     Err(err) => {
                         log::error!("Unable to get text from index response: {}", err);
                     }
@@ -212,14 +216,16 @@ impl ApiManager {
                                 if let Ok(map) = serde_json::from_str::<GameMap>(&content) {
                                     return Ok(map);
                                 } else {
-                                    return Err(ApiRetrievalError::BadResponseFromServer(
-                                        format!("Failed to parse local map file: {:?}", local.path)
-                                    ));
+                                    return Err(ApiRetrievalError::BadResponseFromServer(format!(
+                                        "Failed to parse local map file: {:?}",
+                                        local.path
+                                    )));
                                 }
                             } else {
-                                return Err(ApiRetrievalError::UnableToRetrieve(
-                                    format!("Failed to read local map file: {:?}", local.path)
-                                ));
+                                return Err(ApiRetrievalError::UnableToRetrieve(format!(
+                                    "Failed to read local map file: {:?}",
+                                    local.path
+                                )));
                             }
                         } // TODO: try to resolve versions
                     }
@@ -229,7 +235,7 @@ impl ApiManager {
                 true // If we can't lock, trigger a refresh
             }
         }; // Lock is dropped here
-        
+
         if should_refresh {
             self.refresh_local_index();
             // Try once more after refresh
@@ -284,7 +290,7 @@ impl ApiManager {
     pub fn refresh_local_index(&mut self) {
         // Find already locally cached maps.
         let mut new_local_maps = HashSet::new();
-        
+
         for entry in WalkDir::new(&self.config_folder)
             .into_iter()
             .filter_map(Result::ok)
@@ -311,14 +317,11 @@ impl ApiManager {
                         log::warn!("Unable to load file as config: {:?}", entry.file_name());
                     }
                 } else {
-                    log::warn!(
-                        "Unable to load string from file: {:?}",
-                        entry.path()
-                    );
+                    log::warn!("Unable to load string from file: {:?}", entry.path());
                 }
             }
         }
-        
+
         if let Ok(mut maps) = self.local_maps.lock() {
             *maps = new_local_maps;
         }
@@ -331,18 +334,16 @@ impl ApiManager {
             Ok(res) => {
                 log::trace!("Retrieved remote index with status: {:?}", res.status());
                 match res.text() {
-                    Ok(text) => {
-                        match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
-                            Ok(updated_index) => {
-                                if let Ok(mut maps) = self.remote_maps.lock() {
-                                    *maps = Some(updated_index);
-                                }
-                            }
-                            Err(err) => {
-                                log::error!("Unable to parse returned response: {}\n{}", err, &text);
+                    Ok(text) => match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
+                        Ok(updated_index) => {
+                            if let Ok(mut maps) = self.remote_maps.lock() {
+                                *maps = Some(updated_index);
                             }
                         }
-                    }
+                        Err(err) => {
+                            log::error!("Unable to parse returned response: {}\n{}", err, &text);
+                        }
+                    },
                     Err(err) => {
                         log::error!("Unable to get text from index response: {}", err);
                     }

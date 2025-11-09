@@ -1,4 +1,5 @@
 //mod ble;
+pub mod serial;
 mod traits;
 pub mod update;
 pub mod wifi;
@@ -62,7 +63,6 @@ pub enum ESP32Model {
     Unknown,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Factors that affect or modulate output of Devices
 pub struct OutputFactors {
@@ -78,9 +78,7 @@ impl Device {
     /// Retrieves the ESP32's model
     pub fn get_esp_type(&self) -> ESP32Model {
         match &self.device_type {
-            DeviceType::Wifi(d) => {
-                d.get_esp_type()
-            }
+            DeviceType::Wifi(d) => d.get_esp_type(),
         }
     }
 
@@ -119,16 +117,16 @@ impl ESP32Model {
             .strip_prefix("PLATFORM ")
             .unwrap_or(platform)
             .trim();
-        
+
         Self::from_model_string(model)
     }
-    
+
     /// Parse raw model string (e.g., "ESP32-D0WDQ6")
     pub fn from_model_string(model: &str) -> Self {
         match model {
             // ESP8266
             "ESP8266" => Self::ESP8266,
-            
+
             // ESP32 variants (all map to ESP32)
             s if s.starts_with("ESP32-D0WDQ6") => Self::ESP32,
             s if s.starts_with("ESP32-D0WD") => Self::ESP32,
@@ -137,23 +135,23 @@ impl ESP32Model {
             "ESP32-PICO-D4" => Self::ESP32,
             "ESP32-PICO-V3-02" => Self::ESP32,
             "ESP32-D0WDR2-V3" => Self::ESP32,
-            
+
             // ESP32-S2 variants
             "ESP32-S2" => Self::ESP32S2,
             "ESP32-S2FH16" => Self::ESP32S2FH16,
             "ESP32-S2FH32" => Self::ESP32S2FH32,
             s if s.starts_with("ESP32-S2") => Self::ESP32S2, // Fallback for "ESP32-S2 (Unknown)"
-            
+
             // Other models
             "ESP32-S3" => Self::ESP32S3,
             "ESP32-C3" => Self::ESP32C3,
             "ESP32-C2" => Self::ESP32C2,
             "ESP32-C6" => Self::ESP32C6,
-            
+
             _ => Self::Unknown,
         }
     }
-    
+
     /// Get display name for the model
     pub fn display_name(&self) -> &'static str {
         match self {
@@ -183,13 +181,28 @@ impl serde::Serialize for ESP32Model {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_platform_parsing() {
-        assert_eq!(ESP32Model::from_platform_string("PLATFORM ESP8266"), ESP32Model::ESP8266);
-        assert_eq!(ESP32Model::from_platform_string("PLATFORM ESP32-D0WDQ6-V3"), ESP32Model::ESP32);
-        assert_eq!(ESP32Model::from_platform_string("PLATFORM ESP32-S2FH16"), ESP32Model::ESP32S2FH16);
-        assert_eq!(ESP32Model::from_platform_string("PLATFORM ESP32-S3"), ESP32Model::ESP32S3);
-        assert_eq!(ESP32Model::from_platform_string("PLATFORM Unknown"), ESP32Model::Unknown);
+        assert_eq!(
+            ESP32Model::from_platform_string("PLATFORM ESP8266"),
+            ESP32Model::ESP8266
+        );
+        assert_eq!(
+            ESP32Model::from_platform_string("PLATFORM ESP32-D0WDQ6-V3"),
+            ESP32Model::ESP32
+        );
+        assert_eq!(
+            ESP32Model::from_platform_string("PLATFORM ESP32-S2FH16"),
+            ESP32Model::ESP32S2FH16
+        );
+        assert_eq!(
+            ESP32Model::from_platform_string("PLATFORM ESP32-S3"),
+            ESP32Model::ESP32S3
+        );
+        assert_eq!(
+            ESP32Model::from_platform_string("PLATFORM Unknown"),
+            ESP32Model::Unknown
+        );
     }
 }

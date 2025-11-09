@@ -1,19 +1,16 @@
 /// A mess of serialization crap that sorta works to deserialize the weirdly formatted AuthenticationInit Message
 pub mod network;
+mod player_messages;
 mod v1;
 mod v2;
 mod v3;
-mod player_messages;
 
 use super::game::v3::BhapticsApiV3;
 use crate::{
-    bhaptics::game::{v1::BhapticsApiV1, v2::BhapticsApiV2}, 
-    mapping::{
-        event::Event, 
-        global_map::GlobalMap
-    }
-    };
-    
+    bhaptics::game::{v1::BhapticsApiV1, v2::BhapticsApiV2},
+    mapping::{event::Event, global_map::GlobalMap},
+};
+
 use network::event_map::PatternLocation;
 use serde;
 use std::sync::{Arc, Mutex};

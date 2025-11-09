@@ -10,12 +10,6 @@ import { DEFAULT_REPO } from "../../context/SettingsProvider";
 
 const LATEST_TAG: string = "latest";
 
-enum OtaState {
-  NotStarted,
-  DownloadingFw,
-  PushingUpdate,
-  Restarting,
-}
 
 async function githubReleases(repo: GitRepo): Promise<Release[]> {
   const response = await fetch(

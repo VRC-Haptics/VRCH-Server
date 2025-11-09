@@ -1,8 +1,8 @@
 pub mod cache_node;
 pub mod config;
 pub mod discovery;
-pub mod parsing;
 pub mod osc_query;
+pub mod parsing;
 
 // crate dependencies
 use crate::api::ApiManager;
@@ -81,7 +81,7 @@ impl VrcInfo {
     ) -> Arc<Mutex<VrcInfo>> {
         let avi: Arc<RwLock<Option<Avatar>>> = Arc::new(RwLock::new(None));
         let value_cache_size = 10;
-        
+
         let dist_weight = get_store_field(app_handle, "distance_weight").or(Some(0.20));
         let vel_multiplier = get_store_field(app_handle, "velocity_multiplier").or(Some(1.0));
 
@@ -102,7 +102,7 @@ impl VrcInfo {
         let vrc = Arc::new(Mutex::new(vrc));
 
         // Start the thread that handles finding available vrc parameters
-    start_filling_available_parameters(Arc::clone(&vrc), api, Arc::clone(&global_map));
+        start_filling_available_parameters(Arc::clone(&vrc), api, Arc::clone(&global_map));
         // create clone for closure
         let vrc_lock = vrc.lock().unwrap();
         let cached_parameters_rcve = Arc::clone(&vrc_lock.parameter_cache);
@@ -155,7 +155,7 @@ impl VrcInfo {
         let params_refresh = Arc::clone(&vrc_lock.parameter_cache);
         let vrc_refresh = Arc::clone(&vrc);
         let on_refresh = move |inputs: &DashMap<Id, InputNode>, menu: &Mutex<StandardMenu>| {
-            // If we have an avi in use, and haptics are on the avatar, 
+            // If we have an avi in use, and haptics are on the avatar,
             // we can use haptics
             let avi_option = avi_refresh.read().expect("Unable to lock avi");
             if let Some(avi_read) = &*avi_option {
@@ -173,16 +173,19 @@ impl VrcInfo {
                             menu_l.intensity = intensity;
                             menu_l.enable = false;
                         }
-                    } 
+                    }
 
                     // for each node in our configs, see if we have received a value.
                     let vrc_lock = vrc_refresh.lock().unwrap();
                     for conf in &avi_read.configs {
                         for node in &conf.nodes {
-                            if let Some(mut cache_node) = params_refresh.get_mut(&OscPath(node.address.clone()))
+                            if let Some(mut cache_node) =
+                                params_refresh.get_mut(&OscPath(node.address.clone()))
                             {
                                 // update node if already created
-                                if let Some(mut old_node) = inputs.get_mut(&Id(node.address.clone())) {
+                                if let Some(mut old_node) =
+                                    inputs.get_mut(&Id(node.address.clone()))
+                                {
                                     // don't do velocity for external addresses
                                     if node.is_external_address {
                                         old_node.set_intensity(cache_node.raw_last());

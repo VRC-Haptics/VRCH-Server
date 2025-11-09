@@ -8,7 +8,7 @@ use super::{
     HapticNode,
 };
 
-use dashmap::{DashMap, mapref::one::RefMut};
+use dashmap::{mapref::one::RefMut, DashMap};
 use std::sync::Mutex;
 use std::{fmt, sync::Arc};
 
@@ -59,14 +59,15 @@ impl GlobalMap {
 
     /// sets all input nodes with a given tag to the radius.
     pub fn set_radius_by_tag(&self, target_tag: &str, new_radius: f32) {
-        self.input_nodes.iter_mut()
+        self.input_nodes
+            .iter_mut()
             .filter(|entry| entry.tags.contains(&target_tag.to_string()))
             .for_each(|mut entry| {
                 entry.set_radius(new_radius);
             });
     }
- 
-    pub fn get_mut_node(&mut self, id: &Id) -> Option<RefMut<'_, Id, InputNode>>{
+
+    pub fn get_mut_node(&mut self, id: &Id) -> Option<RefMut<'_, Id, InputNode>> {
         self.input_nodes.get_mut(id)
     }
 
@@ -86,7 +87,7 @@ impl GlobalMap {
     }
 
     /// registers a function to be called on a refresh event before every device update.
-    /// 
+    ///
     /// DO NOT OPEN A REFERENCE TO THE GLOBAL MAP WITHIN THESE. WILL CAUSE A DEADLOCK
     pub fn register_refresh<F>(&mut self, fun: F)
     where
@@ -127,8 +128,16 @@ impl GlobalMap {
             });
         }
 
-        self.input_nodes
-            .insert(Id(id.clone()), InputNode::new(new_node, tags, Id(id), radius, input_type.unwrap_or_else(|| InputType::INTERP)));
+        self.input_nodes.insert(
+            Id(id.clone()),
+            InputNode::new(
+                new_node,
+                tags,
+                Id(id),
+                radius,
+                input_type.unwrap_or_else(|| InputType::INTERP),
+            ),
+        );
 
         Ok(())
     }

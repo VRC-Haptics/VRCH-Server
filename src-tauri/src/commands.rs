@@ -1,22 +1,28 @@
 // local modules
-use crate::devices::{Device, DeviceType, ESP32Model, update::{Firmware, UpdateMethod}};
-use crate::mapping::{global_map::GlobalMap, Id};
-use crate::mapping::haptic_node::HapticNode;
+use crate::devices::{
+    update::{Firmware, UpdateMethod},
+    Device, DeviceType, ESP32Model,
+};
 use crate::mapping::event::Event;
+use crate::mapping::haptic_node::HapticNode;
+use crate::mapping::{global_map::GlobalMap, Id};
 
 use crate::util::math::Vec3;
-use crate::{set_device_store_field, set_store_field};
 use crate::vrc::{config::GameMap, VrcInfo};
+use crate::{set_device_store_field, set_store_field};
 //standard imports
 use runas::Command;
-use tauri::Manager;
 use std::sync::{Arc, Mutex};
+use tauri::Manager;
 use tokio::time::Duration;
 
 #[tauri::command]
-pub fn get_device_esp_model(id: String, devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Result<ESP32Model, String> {
+pub fn get_device_esp_model(
+    id: String,
+    devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+) -> Result<ESP32Model, String> {
     let lock = devices.lock().expect("Lock could not be held");
-    let device = lock.iter().find(|d| {d.id == id});
+    let device = lock.iter().find(|d| d.id == id);
     if let Some(device) = device.as_ref() {
         return Ok(device.get_esp_type());
     } else {
@@ -26,9 +32,12 @@ pub fn get_device_esp_model(id: String, devices: tauri::State<'_, Arc<Mutex<Vec<
 }
 
 #[tauri::command]
-pub fn start_device_update(fw: Firmware, devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Result<(), String> {
+pub fn start_device_update(
+    fw: Firmware,
+    devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+) -> Result<(), String> {
     let lock = devices.lock().expect("Lock could not be held");
-    let devices = lock.iter().find(|d| {d.id == fw.id});
+    let devices = lock.iter().find(|d| d.id == fw.id);
     if let Some(device) = devices {
         fw.do_update(device)?;
     } else {
@@ -40,22 +49,30 @@ pub fn start_device_update(fw: Firmware, devices: tauri::State<'_, Arc<Mutex<Vec
 }
 
 #[tauri::command]
-pub fn set_tags_radius(tag: String, radius: f32, global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> Result<(), ()> {
+pub fn set_tags_radius(
+    tag: String,
+    radius: f32,
+    global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+) -> Result<(), ()> {
     let lock = global_map.lock().expect("this is wrong");
     lock.set_radius_by_tag(&tag, radius);
     Ok(())
 }
 
 #[tauri::command]
-pub fn set_node_radius(id: String, radius: f32, global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> Result<(), String> {
-  let mut lock = global_map.lock().unwrap();
-  let node = lock.get_mut_node(&Id(id));
-  if let Some(mut node) = node {
-    node.set_radius(radius);
-    Ok(())
-  } else {
-    Err("Can't find node".to_string())
-  }
+pub fn set_node_radius(
+    id: String,
+    radius: f32,
+    global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+) -> Result<(), String> {
+    let mut lock = global_map.lock().unwrap();
+    let node = lock.get_mut_node(&Id(id));
+    if let Some(mut node) = node {
+        node.set_radius(radius);
+        Ok(())
+    } else {
+        Err("Can't find node".to_string())
+    }
 }
 
 /// Swaps the haptic node indices on the given device id
@@ -92,19 +109,21 @@ pub fn play_point(
     duration: f32,                      // When should this point be removed.
     global_map_state: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
 ) -> Result<(), ()> {
-    let event = Event::new("Play Point".to_string(), 
-        crate::mapping::event::EventEffectType::Location(Vec3 { 
-            x: feedback_location.0, 
-            y: feedback_location.1, 
-            z: feedback_location.2 
-        }), 
-        vec![power], 
-        Duration::from_secs_f32(duration), 
-        vec!["UI".to_string()]
-    ).expect("unable to create play point event");
+    let event = Event::new(
+        "Play Point".to_string(),
+        crate::mapping::event::EventEffectType::Location(Vec3 {
+            x: feedback_location.0,
+            y: feedback_location.1,
+            z: feedback_location.2,
+        }),
+        vec![power],
+        Duration::from_secs_f32(duration),
+        vec!["UI".to_string()],
+    )
+    .expect("unable to create play point event");
 
     let mut global_map = global_map_state.lock().expect("couldn't lock global map");
-    
+
     global_map.start_event(event);
 
     return Ok(());
@@ -126,7 +145,7 @@ pub fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
 #[tauri::command]
 pub fn get_core_map(state: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> GlobalMap {
     let map = state.lock().expect("Unable to lock global map");
-    map.clone() 
+    map.clone()
 }
 
 #[tauri::command]
@@ -192,27 +211,20 @@ pub async fn update_device_offset(
 }
 
 #[tauri::command]
-pub async fn update_vrc_velocity_multiplier(
-    vel_multiplier: f32,
-    window: tauri::Window,
-) {
+pub async fn update_vrc_velocity_multiplier(vel_multiplier: f32, window: tauri::Window) {
     let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
     let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
     vrc_lock.vel_multiplier = vel_multiplier;
     set_store_field(window.app_handle(), "velocity_multiplier", vel_multiplier);
-} 
+}
 
 #[tauri::command]
-pub async fn update_vrc_distance_weight(
-    distance_weight: f32,
-    window: tauri::Window,
-) {
+pub async fn update_vrc_distance_weight(distance_weight: f32, window: tauri::Window) {
     let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
     let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
     vrc_lock.dist_weight = distance_weight;
     set_store_field(window.app_handle(), "distance_weight", distance_weight);
 }
-
 
 /// Handles setting our app to launch instead of the bHapticsPlayer
 #[tauri::command]

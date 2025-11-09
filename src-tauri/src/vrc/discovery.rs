@@ -4,11 +4,11 @@ use crate::api::ApiManager;
 use crate::vrc::AVATAR_ID_PATH;
 use crate::{mapping::input_node::InputType, GlobalMap, VrcInfo};
 
-use std::collections::HashSet;
 use libloading::Library;
-use std::sync::OnceLock;
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::mpsc;
+use std::sync::OnceLock;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -47,21 +47,23 @@ pub fn start_filling_available_parameters(
             }
         };
 
-        let start: libloading::Symbol<StartListener> = match unsafe { library.get(b"vrc_start_listener\0") } {
-            Ok(symbol) => symbol,
-            Err(err) => {
-                log::error!("Failed to load start symbol: {}", err);
-                return;
-            }
-        };
+        let start: libloading::Symbol<StartListener> =
+            match unsafe { library.get(b"vrc_start_listener\0") } {
+                Ok(symbol) => symbol,
+                Err(err) => {
+                    log::error!("Failed to load start symbol: {}", err);
+                    return;
+                }
+            };
 
-        let stop: libloading::Symbol<StopListener> = match unsafe { library.get(b"vrc_stop_listener\0") } {
-            Ok(symbol) => symbol,
-            Err(err) => {
-                log::error!("Failed to load stop symbol: {}", err);
-                return;
-            }
-        };
+        let stop: libloading::Symbol<StopListener> =
+            match unsafe { library.get(b"vrc_stop_listener\0") } {
+                Ok(symbol) => symbol,
+                Err(err) => {
+                    log::error!("Failed to load stop symbol: {}", err);
+                    return;
+                }
+            };
 
         let receiver = {
             let (tx, rx) = mpsc::channel::<u16>();
@@ -103,14 +105,13 @@ pub fn start_filling_available_parameters(
             vrc_lock.vrc_connected = false;
             vrc_lock.available_parameters.clear();
             vrc_lock.purge_cache();
-            let mut avatar_lock = vrc_lock
-                .avatar
-                .write()
-                .expect("Couldn't get read instance");
+            let mut avatar_lock = vrc_lock.avatar.write().expect("Couldn't get read instance");
             *avatar_lock = None;
         }
 
-        unsafe { stop(); }
+        unsafe {
+            stop();
+        }
 
         if let Some(lock) = PORT_SENDER.get() {
             if let Ok(mut guard) = lock.lock() {

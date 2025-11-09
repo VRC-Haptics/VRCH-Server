@@ -1,8 +1,8 @@
 use super::bHapticDevice;
 
-use crate::util::math::Vec3;
-use crate::mapping::NodeGroup;
 use crate::mapping::haptic_node::HapticNode;
+use crate::mapping::NodeGroup;
+use crate::util::math::Vec3;
 
 pub fn tactal_ble_device() -> bHapticDevice {
     // Original coordinates, unchanged
@@ -16,10 +16,9 @@ pub fn tactal_ble_device() -> bHapticDevice {
     ];
 
     // Map each Vec3 to a HapticNode with tags
-    let nodes = RAW_NODES.into_iter()
-        .map(|p| {
-            HapticNode::new(p, vec![NodeGroup::Head])
-        })
+    let nodes = RAW_NODES
+        .into_iter()
+        .map(|p| HapticNode::new(p, vec![NodeGroup::Head]))
         .collect();
 
     bHapticDevice {

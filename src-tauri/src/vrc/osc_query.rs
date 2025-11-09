@@ -1,11 +1,9 @@
-use std::thread;
 use std::sync::mpsc;
+use std::thread;
 
+use oyasumivr_oscquery;
 use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
 use serde;
-use oyasumivr_oscquery;
-
-
 
 /// Handles advertising our server for vrc to send values to if we need it.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]

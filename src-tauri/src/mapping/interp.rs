@@ -50,7 +50,9 @@ impl GaussianState {
     /// used in interp function to get a weight between zero and one for the distance between two points.
     #[inline]
     fn gaussian_kernel(&self, distance: f32, max_radius: f32) -> f32 {
-        debug_assert!(distance >= 0.0 && max_radius > 0.0 && self.at_edge > 0.0 && self.at_edge < 1.0);
+        debug_assert!(
+            distance >= 0.0 && max_radius > 0.0 && self.at_edge > 0.0 && self.at_edge < 1.0
+        );
 
         let sigma = max_radius / (-2.0 * self.at_edge.ln()).sqrt();
 
@@ -76,20 +78,18 @@ impl GaussianState {
                             let weight = self.gaussian_kernel(distance, in_node.get_radius());
                             interp_numerator += weight * in_node.get_intensity();
                             interp_denominator += weight;
-                        }, 
+                        }
                         InputType::ADDITIVE => {
                             let weight = distance / in_node.get_radius();
                             add_numerator += weight * in_node.get_intensity();
                             add_denominator += weight;
-                        }, 
+                        }
                         InputType::SUBTRACTIVE => {
                             let weight = distance / in_node.get_radius();
                             add_numerator += weight * (-in_node.get_intensity());
                             add_denominator += weight;
-                        },
-                        
+                        }
                     }
-                    
                 }
             }
         }

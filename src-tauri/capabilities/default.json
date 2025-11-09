@@ -12,12 +12,17 @@
     {
       "identifier": "http:default",
       "allow": [
-        { "url": "https://api.github.com/*" },
-        { "url": "https://github.com/*" }
+        {
+          "url": "https://api.github.com/*"
+        },
+        {
+          "url": "https://github.com/*"
+        }
       ]
     },
     "store:default",
     "dialog:default",
-    "log:default"
+    "log:default",
+    "serialplugin:default"
   ]
 }

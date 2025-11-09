@@ -53,6 +53,9 @@ importers:
       react-router-dom:
         specifier: ^7.6.2
         version: 7.6.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      tauri-plugin-serialplugin-api:
+        specifier: ^2.21.1
+        version: 2.21.1
       three:
         specifier: ^0.176.0
         version: 0.176.0
@@ -1341,6 +1344,9 @@ packages:
     resolution: {integrity: sha512-w33E2aCvSDP0tW9RZuNXadXlkHXqFzSkQew/aIa2i/Sj8fThxwovwlXHSPXTbAHwEIhBFXAedUhP2tueAKP8Og==}
     engines: {node: '>=14.0.0'}
     hasBin: true
+
+  tauri-plugin-serialplugin-api@2.21.1:
+    resolution: {integrity: sha512-V89gkiHmsjRXN000oSP+6Oiatsvt1EGJHjcS2c7+VLiSic+934UYWxKaZ3oG4s3zefajzKFLl3EjankRIaPHRQ==}
 
   thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
@@ -2690,6 +2696,10 @@ snapshots:
       sucrase: 3.35.0
     transitivePeerDependencies:
       - ts-node
+
+  tauri-plugin-serialplugin-api@2.21.1:
+    dependencies:
+      '@tauri-apps/api': 2.5.0
 
   thenify-all@1.6.0:
     dependencies:

@@ -45,7 +45,9 @@ impl Vec3 {
 
     /// Returns true if each component is within `tol` of the corresponding component of `other`.
     pub fn close_to(&self, other: &Vec3, tol: f32) -> bool {
-        (self.x - other.x).abs() < tol && (self.y - other.y).abs() < tol && (self.z - other.z).abs() < tol
+        (self.x - other.x).abs() < tol
+            && (self.y - other.y).abs() < tol
+            && (self.z - other.z).abs() < tol
     }
 }
 

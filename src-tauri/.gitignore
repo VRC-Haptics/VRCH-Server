@@ -12,3 +12,4 @@
 !/src-tauri/sidecars/vrc-sidecar.exe
 !/src-tauri/sidecars/bHapticsPlayer/
 !/src-tauri/sidecars/bHapticsPlayer/**
+!/src-tauri/sidecars/espflash.exe

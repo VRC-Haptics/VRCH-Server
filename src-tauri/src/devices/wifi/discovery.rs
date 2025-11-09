@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::devices::{Device, DeviceType, WifiDevice};
 
-pub const DISCOVERY_PORT:u32 = 6868;
+pub const DISCOVERY_PORT: u32 = 6868;
 
 /// Listen for wifi based device advertisements
 pub fn start_wifi_listener(
@@ -26,7 +26,11 @@ pub fn start_wifi_listener(
         let socket = UdpSocket::bind(format!("0.0.0.0:{DISCOVERY_PORT}")).unwrap();
         let multicast_addr = Ipv4Addr::new(239, 0, 0, 1);
         multicast_all_interfaces(&socket, &multicast_addr).ok();
-        log::trace!("Listening for Devices on {}:{}", multicast_addr, DISCOVERY_PORT.to_string());
+        log::trace!(
+            "Listening for Devices on {}:{}",
+            multicast_addr,
+            DISCOVERY_PORT.to_string()
+        );
 
         // Buffer to store incoming data.
         let mut buf = [0u8; 1024];
@@ -63,7 +67,9 @@ pub fn start_wifi_listener(
                                 full_device.factors.sens_mult = old_offset;
                             }
 
-                            if let Some(old_offset) = crate::get_device_store_field(&app_handle, &mac, "start_offset") {
+                            if let Some(old_offset) =
+                                crate::get_device_store_field(&app_handle, &mac, "start_offset")
+                            {
                                 full_device.factors.start_offset = old_offset;
                             }
 

@@ -1,7 +1,6 @@
-import themes from "../../utils/themes";
 import { useSettingsContext } from "../../context/SettingsProvider";
 import { GitRepo } from "../../utils/commonClasses";
-import { createContext, useState, useEffect, useContext } from "react";
+import { useState} from "react";
 
 async function validateGitHubRepo(url: string): Promise<GitRepo | null> {
   const patterns = [

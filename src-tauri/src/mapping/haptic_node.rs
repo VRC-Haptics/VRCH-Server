@@ -22,7 +22,12 @@ pub struct HapticNode {
 impl HapticNode {
     /// Creates a new haptic node
     pub fn new(pos: Vec3, groups: Vec<NodeGroup>) -> HapticNode {
-        HapticNode { x: pos.x, y: pos.y, z: pos.z, groups: groups }
+        HapticNode {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            groups: groups,
+        }
     }
 
     /// Returns Euclidean distance in meters between this and the other HapticNode.
@@ -44,7 +49,7 @@ impl HapticNode {
 
     /// Returns true if self and other share any common NodeGroup.
     pub fn interacts(&self, other: &HapticNode) -> bool {
-        if other.groups.contains(&NodeGroup::All) || self.groups.contains(&NodeGroup::All){
+        if other.groups.contains(&NodeGroup::All) || self.groups.contains(&NodeGroup::All) {
             return true;
         }
 

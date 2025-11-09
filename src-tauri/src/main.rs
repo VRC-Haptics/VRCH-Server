@@ -26,11 +26,11 @@ use serde_json::json;
 use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
-use tauri_plugin_store::{StoreExt, JsonValue};
+use tauri_plugin_store::{JsonValue, StoreExt};
 
 use crate::bhaptics::devices::start_bt_nonblocking;
 
@@ -108,11 +108,10 @@ fn get_store_field<T: serde::de::DeserializeOwned>(
     }
 }
 
-fn set_store_field<T>(
-    app_handle: &tauri::AppHandle,
-    field: &str,
-    value: T,
-) where JsonValue: From<T> {
+fn set_store_field<T>(app_handle: &tauri::AppHandle, field: &str, value: T)
+where
+    JsonValue: From<T>,
+{
     let store = app_handle
         .store("context_store.json")
         .expect("couldn't access context_store.json");
@@ -130,7 +129,6 @@ fn tick_devices(
     io::stdout().flush().unwrap();
 
     tauri::async_runtime::spawn(async move {
-
         let mut interval = spin_sleep_util::interval(Duration::from_secs(1) / 100);
 
         let device_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
@@ -149,7 +147,8 @@ fn tick_devices(
             }
             prev_tick = tick_time;
 
-            { // handle actual device ticks 
+            {
+                // handle actual device ticks
                 let mut device_list_guard = device_list.lock().unwrap();
 
                 // Remove devices that need to be killed.
@@ -168,7 +167,6 @@ fn tick_devices(
                 map_guard.refresh_inputs();
                 let mut bh = bhaptics.lock().expect("Couldn't lock bhaptics");
                 map_guard.start_events(&mut bh.tick());
-
 
                 // push updated input state to devices
                 for device in device_list_guard.iter_mut() {
@@ -222,7 +220,6 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 }
 
 fn main() {
-
     // Core state machines that interface devices and the haptics providers
     // The GlobalMap; provides interpolated feedback values.
     let global_map: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
@@ -232,11 +229,13 @@ fn main() {
     let api_manager: Arc<Mutex<ApiManager>> = Arc::new(Mutex::new(ApiManager::new()));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_serialplugin::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             println!("Instance already open, shutting down.");
-            let _ = app.get_webview_window("main")
-                       .expect("no main window")
-                       .set_focus();
+            let _ = app
+                .get_webview_window("main")
+                .expect("no main window")
+                .set_focus();
         }))
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_log::Builder::new().build())
@@ -246,6 +245,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_blec::init())
+        .plugin(tauri_plugin_serialplugin::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(Target::new(TargetKind::Webview))
@@ -265,11 +265,14 @@ fn main() {
         .manage(Arc::clone(&api_manager))
         .setup(move |app| {
             let app_handle = app.handle();
-            
+
             // Managers for game integrations; each handling connectivity and communications
             // Global VRC State; connection management and GlobalMap interaction
-            let vrc_info: Arc<Mutex<VrcInfo>> =
-                VrcInfo::new(Arc::clone(&global_map), Arc::clone(&api_manager), app_handle);
+            let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(
+                Arc::clone(&global_map),
+                Arc::clone(&api_manager),
+                app_handle,
+            );
             // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
             let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&global_map));
 
@@ -277,7 +280,12 @@ fn main() {
             app.manage(Arc::clone(&bhaptics));
 
             // Initialize stuff that needs the app handle. (interacts directly with GUI)
-            tick_devices(device_list.clone(), global_map.clone(), bhaptics.clone(), app_handle);
+            tick_devices(
+                device_list.clone(),
+                global_map.clone(),
+                bhaptics.clone(),
+                app_handle,
+            );
             start_wifi_listener(app_handle.clone(), app.state());
             throw_vrc_notif(app_handle, vrc_info.clone());
             let mut lock = api_manager.lock().unwrap();
@@ -294,7 +302,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_device_list, 
+            commands::get_device_list,
             commands::get_vrc_info,
             commands::get_core_map,
             commands::upload_device_map,

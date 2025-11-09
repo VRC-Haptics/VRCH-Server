@@ -8,9 +8,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use auth_message::handle_auth_init;
-use crate::mapping::{event::Event, global_map::GlobalMap, haptic_node::HapticNode, NodeGroup};
 use super::{BhapticsGame, PatternLocation};
+use crate::mapping::{event::Event, global_map::GlobalMap, haptic_node::HapticNode, NodeGroup};
+use auth_message::handle_auth_init;
 use serde;
 use strum::IntoEnumIterator;
 
@@ -49,7 +49,7 @@ pub struct ApiInfo {
 impl BhapticsApiV3 {
     /// Creates a new instance, starts the server on a separate thread,
     /// and returns an Arc-wrapped and Mutex-guarded game state.
-    pub fn new(game:Arc<Mutex<GlobalMap>>) -> Arc<Mutex<Self>> {
+    pub fn new(game: Arc<Mutex<GlobalMap>>) -> Arc<Mutex<Self>> {
         let shutdown_token = CancellationToken::new();
         let api = Arc::new(Mutex::new(BhapticsApiV3 {
             game_mapping: HashMap::new(),
@@ -79,9 +79,9 @@ impl BhapticsApiV3 {
     pub fn tick(&mut self) -> Vec<Event> {
         let mut new_events = Vec::new();
         let new_events_names = std::mem::take(&mut self.new_events);
-        
+
         // Iterate over the events collected for THIS tick
-        for event_name in new_events_names { 
+        for event_name in new_events_names {
             if let Some(mapped_events) = self.game_mapping.get(&event_name) {
                 new_events.extend(mapped_events.iter().cloned());
             } else {
@@ -93,7 +93,7 @@ impl BhapticsApiV3 {
     }
 
     /// Kills this API instance
-    /// 
+    ///
     /// Shuts down the TCP listener by signalling the cancellation token.
     pub fn shutdown(&self) {
         self.shutdown_token.cancel();
@@ -127,10 +127,7 @@ fn insert_bhaptics_maps(map: Arc<Mutex<GlobalMap>>) {
                 z: position.z,
                 groups: vec![NodeGroup::All], //TODO: Actually make the groups apply right.
             };
-            let tags = vec![
-                "Bhaptics_V3".to_string(),
-                loc.to_input_tag().to_string(),
-            ];
+            let tags = vec!["Bhaptics_V3".to_string(), loc.to_input_tag().to_string()];
             if let Some(id) = loc.to_id(index) {
                 // doesn't really matter if it is already there, we want to keep only one instance.
                 let _ = input_lock.add_input_node(node, tags, id.0, 0.1, None);
@@ -144,7 +141,6 @@ fn remove_bhaptics_maps(map: Arc<Mutex<GlobalMap>>) {
     let input_lock = map.lock().expect("Unable to lock inputs");
     input_lock.remove_all_with_tag(&"Bhaptics_V3".to_string());
 }
-
 
 /// Runs the server by setting up TLS, binding the TCP listener, and
 /// handling incoming connections with cancellation support.
@@ -192,7 +188,7 @@ async fn run_server(
                                 game_clone
                             ).await {
                                 log::error!("Connection error: {:?}", e);
-                                
+
                             };
                             remove_bhaptics_maps(map_clone);
                         });
@@ -265,14 +261,10 @@ async fn handle_connection(
 
 /// Handles decoding message strings into their respective structs.
 fn msg_received(msg: Message, api: Arc<Mutex<BhapticsApiV3>>) {
-    let raw_text = msg
-        .as_text()
-        .expect("Failed to convert message to text");
+    let raw_text = msg.as_text().expect("Failed to convert message to text");
 
     match serde_json::from_str::<RecievedMessage>(raw_text) {
-        Ok(RecievedMessage::SdkRequestAuthInit(contents)) => {
-            handle_auth_init(&contents, api)
-        }
+        Ok(RecievedMessage::SdkRequestAuthInit(contents)) => handle_auth_init(&contents, api),
         Ok(RecievedMessage::SdkPlay(event)) => {
             handle_sdk_play(api, &event);
             log::trace!("Played event: {}", event);
@@ -284,7 +276,6 @@ fn msg_received(msg: Message, api: Arc<Mutex<BhapticsApiV3>>) {
     }
 }
 
-
 fn handle_sdk_stop(game: &Arc<Mutex<BhapticsGame>>) {
     let lock = game.lock().expect("Couldn't get game lock");
     let mut in_list = lock.global_map.lock().expect("couldn't lock input_list");
@@ -293,14 +284,16 @@ fn handle_sdk_stop(game: &Arc<Mutex<BhapticsGame>>) {
 
 fn handle_sdk_play(api: Arc<Mutex<BhapticsApiV3>>, input: &str) {
     let mut api_lock = api.lock().expect("Api lock");
-    
+
     let content = serde_json::from_str::<SdkPlayMessage>(input);
     match content {
         Ok(content) => {
             api_lock.new_events.push(content.event_name);
         }
         Err(err) => log::error!(
-            "Error decoding bhaptics play message: {} \n Content: {:?}", err, input
+            "Error decoding bhaptics play message: {} \n Content: {:?}",
+            err,
+            input
         ),
     }
 }

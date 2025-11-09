@@ -22,19 +22,19 @@ pub struct InputNode {
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 /// Describes how an `InputNode` should be used during interpolation.
-/// 
+///
 /// Layers are ordered in processing order according to the enum, with the cumulative outputs being passed to the next step.
 pub enum InputType {
     /// Default choice, which weights closer values exponentially more.
-    /// 
+    ///
     /// Output will not be influenced easily by distant input nodes if there is one close to the output node.
     INTERP,
-    /// Additive layers adds the nodes influence into the result of the `InputType::INTERP` step. 
-    /// 
+    /// Additive layers adds the nodes influence into the result of the `InputType::INTERP` step.
+    ///
     /// Uses linear scaling based off of the `InputNode.radius`
     ADDITIVE,
-    /// Subtractive layers subtracts the nodes influence into the result of the `InputType::INTERP` step. 
-    /// 
+    /// Subtractive layers subtracts the nodes influence into the result of the `InputType::INTERP` step.
+    ///
     /// Uses linear scaling based off of the `InputNode.radius`
     SUBTRACTIVE,
 }
@@ -49,7 +49,13 @@ impl InputNode {
     /// tags: Use these to find groups of InputNodes
     ///
     /// **NOTE:** Initializes intensity to 0.0, set the intensity using class functions
-    pub fn new(node: HapticNode, tags: Vec<String>, id: Id, radius: f32, input_type: InputType) -> InputNode {
+    pub fn new(
+        node: HapticNode,
+        tags: Vec<String>,
+        id: Id,
+        radius: f32,
+        input_type: InputType,
+    ) -> InputNode {
         return InputNode {
             id: id,
             haptic_node: node,

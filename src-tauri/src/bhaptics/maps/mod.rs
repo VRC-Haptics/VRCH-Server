@@ -3,7 +3,9 @@ use x6_head::x6_headset;
 
 use std::time::Duration;
 
-use super::game::network::event_map::{AudioFilePattern, HapticMapping, PatternLine, PatternLocation};
+use super::game::network::event_map::{
+    AudioFilePattern, HapticMapping, PatternLine, PatternLocation,
+};
 use crate::mapping::event::Event;
 /// Contains all the index -> position matricies for bhaptics devices.
 use crate::{mapping::event::EventEffectType, util::math::Vec3};

@@ -1,11 +1,8 @@
-use crate::bhaptics::game::v3::{
-    BhapticsApiV3,
-    create_init_response,
-};
+use super::ApiInfo;
 use crate::bhaptics::game::network;
+use crate::bhaptics::game::v3::{create_init_response, BhapticsApiV3};
 use crate::bhaptics::maps::pattern_to_events;
 use crate::util::deserialization::skip_outer_quotes;
-use super::ApiInfo;
 use std::sync::{Arc, Mutex};
 use tokio::task;
 

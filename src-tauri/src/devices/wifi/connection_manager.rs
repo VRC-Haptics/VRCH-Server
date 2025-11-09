@@ -1,8 +1,8 @@
 use rosc::{OscMessage, OscType};
 use serde::{Deserialize, Serialize};
+use std::net::Ipv4Addr;
 use std::sync::mpsc;
 use std::time::SystemTime;
-use std::net::Ipv4Addr;
 
 use crate::devices::wifi::config::WifiConfig;
 use crate::devices::wifi::WifiTickSignal;
@@ -26,7 +26,6 @@ impl WifiConnManager {
     ) -> WifiConnManager {
         // The closure that gets called anytime an osc message is recieved.
         let on_receive = move |msg: OscMessage| {
-
             //if heartbeat
             if msg.addr == hrtbt_addr {
                 tx.send(WifiTickSignal::NewHeartBeat(SystemTime::now()));
