@@ -27,6 +27,7 @@ use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::panic::{take_hook, set_hook};
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
@@ -265,6 +266,14 @@ fn main() {
         .manage(Arc::clone(&api_manager))
         .setup(move |app| {
             let app_handle = app.handle();
+
+            let default_panic = take_hook();
+            set_hook(Box::new(move |info| {
+                log::logger().flush(); // flush previous logs
+                log::error!("Panic Captured: {info}");
+                log::logger().flush(); // flush added info.
+                default_panic(info);
+            }));
 
             // Managers for game integrations; each handling connectivity and communications
             // Global VRC State; connection management and GlobalMap interaction
