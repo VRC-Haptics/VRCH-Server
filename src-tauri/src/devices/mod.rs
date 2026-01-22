@@ -63,6 +63,23 @@ pub enum ESP32Model {
     Unknown,
 }
 
+impl ESP32Model {
+    pub fn ota_auth_port(&self) -> u16 {
+        match *self {
+            ESP32Model::ESP32 |
+            ESP32Model::ESP32S2 |
+            ESP32Model::ESP32C2 |
+            ESP32Model::ESP32C3 |
+            ESP32Model::ESP32C6 |
+            ESP32Model::ESP32S2FH16 |
+            ESP32Model::ESP32S2FH32 |
+            ESP32Model::ESP32S3 =>  return 3232,
+            ESP32Model::ESP8266 =>  return 8266,
+            ESP32Model::Unknown =>  return 3232,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Factors that affect or modulate output of Devices
 pub struct OutputFactors {

@@ -118,6 +118,7 @@ export default function OtaUpdate() {
           name: d.name,
           esp: d.espModel as string,
         }));
+     
       setEligibleDevices(elig_dev);
     }
 
@@ -141,12 +142,14 @@ export default function OtaUpdate() {
     }
 
     const platform = device.esp;
-    const filter = `${platform.toLowerCase()}.bin`;
+    const filter = `${platform.toLowerCase()}.bin`.replace(/-/g, '');
+    console.log(filter);
     const filtered = availableReleases.filter((release) =>
       release.assets.some(
         (asset) => asset.file_name.endsWith(filter)
       )
     );
+    console.log(filtered)
     setFilteredReleases(filtered);
   }, [selectedDevice, availableReleases]);
 
@@ -177,7 +180,7 @@ export default function OtaUpdate() {
       }
 
       // find specific binary
-      const filter = `${device.esp.toLowerCase()}.bin`;
+      const filter = `${device.esp.toLowerCase()}.bin`.replace(/-/g, '');
       const bin_asset = release.assets.find((d) =>
         d.file_name.endsWith(filter)
       );

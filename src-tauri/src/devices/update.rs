@@ -40,6 +40,7 @@ impl Firmware {
                         self.bytes.clone(),
                         pass.0.clone(),
                         Ipv4Addr::from_str(&wifi.ip).expect("invalid ip"),
+                        wifi.get_esp_type().ota_auth_port()
                     );
                     if res.is_none() {
                         return Err("Couldn't OTA update device".to_string());

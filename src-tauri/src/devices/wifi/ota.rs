@@ -22,7 +22,7 @@ const REQUEST_PORT: u16 = 8266;
 /// Trys to update, using the firmware. Returns success.
 ///
 /// Transmits 'fw-update': (pctg: f32, id: String)
-pub fn update_ota(bytes: Vec<u8>, password: String, device_ip: Ipv4Addr) -> Option<()> {
+pub fn update_ota(bytes: Vec<u8>, password: String, device_ip: Ipv4Addr, request_port: u16) -> Option<()> {
     let tcp_listener = match TcpListener::bind((Ipv4Addr::UNSPECIFIED, 0)) {
         Ok(l) => l,
         Err(e) => {
@@ -39,7 +39,7 @@ pub fn update_ota(bytes: Vec<u8>, password: String, device_ip: Ipv4Addr) -> Opti
     let fw_size = bytes.len();
     let fw_hash = md5_string(bytes.clone());
 
-    if !authenticate(device_ip, fw_hash, fw_size, tcp_port, password) {
+    if !authenticate(device_ip, fw_hash, fw_size, tcp_port, password, request_port) {
         log::error!("Unable to authenticate with device");
         return None;
     }
@@ -163,6 +163,8 @@ pub fn authenticate(
     // port we will send the TCP stream from.
     fw_port: u16,
     password: String,
+    // Where we will send our request to (Depends on esp32 an esp8266 model)
+    request_port: u16,
 ) -> bool {
     let out_socket = match UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)) {
         Ok(s) => s,
@@ -178,7 +180,7 @@ pub fn authenticate(
 
     log::trace!("Local port bound to: {:?}", our_port.clone());
 
-    if let Err(e) = out_socket.connect((device_ip, REQUEST_PORT)) {
+    if let Err(e) = out_socket.connect((device_ip, request_port)) {
         log::error!("Couldn't connect to device: {e:?}");
         return false;
     }
