@@ -5,11 +5,21 @@ pub mod ota;
 
 // outside imports
 use rosc::{encoder, OscMessage, OscPacket, OscType};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::net::SocketAddr;
+use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 use std::vec;
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{channel, Receiver, Sender},
+        Mutex, RwLock,
+    },
+    time::Instant,
+};
+use tokio_util::sync::CancellationToken;
 
-use crate::devices::wifi::config::WifiConfig;
+use crate::{devices::wifi::config::WifiConfig, state};
 // local imports
 use crate::devices::{ESP32Model, OutputFactors};
 use crate::mapping::global_map::GlobalMap;
@@ -23,27 +33,28 @@ use connection_manager::WifiConnManager;
 pub struct WifiDevice {
     // this devices mac address, used as id in Device::from_wifi().
     pub mac: String,
-    // This devices ip
-    pub ip: String,
-    // keeps the user-facing name
-    pub name: String,
-    // Flag for keeping from pinging on every tick() call
-    pub been_pinged: bool,
-    // Push whatever device map we have in memory to physical Device
-    pub push_map: bool,
-    // Last time a query, "GET", command was sent. used for debouncing
-    pub last_queried: SystemTime,
-    // The Port We Send data to
-    pub send_port: u16,
+    // The address we send data too.
+    pub dev_addr: RwLock<SocketAddr>,
+    // user-facing name
+    pub name: RwLock<String>,
     // Abstracts communication.
     connection_manager: WifiConnManager,
     #[serde(skip)] // no need to serialize channel only usable in rust.
     /// NOTE: disconnects in clone implementation.
-    tick_channel: (Sender<WifiTickSignal>, Receiver<WifiTickSignal>),
-    config: Option<WifiConfig>,
-    identifier: Option<ESP32Model>,
-    logs: Vec<String>,
-    last_heartbeat: SystemTime,
+    tick_channel: RwLock<(Sender<WifiTickSignal>, Receiver<WifiTickSignal>)>,
+    config: RwLock<Option<WifiConfig>>,
+    identifier: RwLock<Option<ESP32Model>>,
+    // Flag for keeping from pinging on every tick() call
+    been_pinged: AtomicBool,
+    logs: RwLock<Vec<String>>,
+    #[serde(skip)]
+    last_heartbeat: Mutex<Instant>,
+    // Last time a query, "GET", command was sent. used for debouncing
+    pub last_queried: RwLock<SystemTime>,
+    #[serde(skip)]
+    is_alive: CancellationToken,
+    // Push whatever device map we have in memory to physical Device
+    push_map: AtomicBool,
 }
 
 /// Set a signal that will be processed on the next device tick.
@@ -72,6 +83,10 @@ impl WifiDevice {
         }
     }
 
+    pub fn re_ping(&self) {
+        self.been_pinged.store(false, Ordering::SeqCst);
+    }
+
     #[allow(dead_code)]
     /// Instantiate new device instance
     pub fn new(mac: String, ip: String, send_port: u16, name: String) -> WifiDevice {
@@ -83,17 +98,47 @@ impl WifiDevice {
             mac: mac,
             ip: ip.clone(),
             name: name,
-            been_pinged: false,
+            been_pinged: AtomicBool::new(false),
             push_map: false,
             last_queried: SystemTime::UNIX_EPOCH,
             send_port: send_port,
             connection_manager: connection_manager,
-            tick_channel: (tx, rx),
+            //tick_channel: (tx, rx),
             config: None,
             identifier: None,
             logs: vec![],
-            last_heartbeat: SystemTime::now(),
+            last_heartbeat: Mutex::new(Instant::now()),
+            is_alive: CancellationToken::new(),
         };
+    }
+
+    async fn keep_alive_service(&self) {
+        loop {
+            let hrtbt = self.last_heartbeat.lock().expect("Heartbeat");
+            let thresh = Duration::from_secs_f32(state::get(|c| c.wifi_device_timeout));
+            if hrtbt.elapsed() >= thresh && self.been_pinged.load(Ordering::SeqCst) {
+                println!("Killed device");
+                self.is_alive.cancel();
+                return;
+            }
+        }
+    }
+
+    pub async fn run_wifi_device(&mut self) {
+        // keep alive service
+        tokio::task::spawn(self.keep_alive_service()).await;
+
+        // start main device management loop
+        tokio::task::spawn(async {
+            // main device management loop
+            loop {
+                if !self.been_pinged.load(Ordering::SeqCst) {
+                    // first round through we ping
+                    self.been_pinged.store(true, Ordering::SeqCst);
+                    return Some(self.build_ping());
+                }
+            }
+        });
     }
 
     /// Called in regular intervals. Optionally returns a packet to be sent to the device.

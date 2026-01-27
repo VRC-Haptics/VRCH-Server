@@ -1,10 +1,11 @@
-/*
+
 
 use crate::{
     devices::{DeviceType, OutputFactors},
     mapping::global_map::GlobalMap,
 };
 
+/*
 /// Called on every server frame (~100hz)
 /// Should handle sending, recieving, killing, etc.
 trait Tick {

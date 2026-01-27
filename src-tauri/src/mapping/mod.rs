@@ -4,15 +4,40 @@ pub mod haptic_node;
 pub mod input_node;
 pub mod interp;
 
+use std::sync::Arc;
+use tokio::sync::{OnceCell};
+
 use global_map::GlobalMap;
 use haptic_node::HapticNode;
 use uuid::Uuid;
 
 use crate::util::math::Vec3;
 
-/// Wrapper function to create a GlobalMap
-pub fn create_global_map() -> GlobalMap {
-    GlobalMap::new()
+static GLOBAL_MAP: OnceCell<Arc<GlobalMap>> = OnceCell::const_new();
+
+pub async fn get_global_map() -> &'static Arc<GlobalMap> {
+    GLOBAL_MAP.get_or_init(|| GlobalMap::new()).await
+}
+
+/// Fills `output` with feedback values for the corresponding 
+pub async fn get_feedback_for_nodes(nodes: &[HapticNode], output: &mut [u16]) -> Result<(), FeedbackError> {
+    let map = get_global_map().await;
+
+    if nodes.len() != output.len() {
+        return Err(FeedbackError::NotEqualLen);
+    }
+
+    for node in nodes {
+        //map.get_intensity_from_haptic(node_list, algo, respect_enable);
+    }
+
+
+    Ok(())
+}
+
+pub enum FeedbackError {
+    NotEqualLen,
+
 }
 
 /// Descriptors for location groups.
@@ -43,6 +68,24 @@ pub enum NodeGroup {
 /// Id unique to the node it references.
 /// if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
 pub struct Id(pub String);
+
+impl PartialEq<str> for Id {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
+impl Into<String> for Id {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+impl From<String> for Id {
+    fn from(value: String) -> Self {
+        Id(value)
+    }
+}
 
 impl Id {
     pub fn new() -> Self {

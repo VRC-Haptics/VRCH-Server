@@ -9,6 +9,7 @@ use std::{
 pub fn is_updateable(dtype: DeviceType) -> bool {
     match dtype {
         DeviceType::Wifi(_) => true,
+        DeviceType::BhapticBle(_) => false,
     }
 }
 
@@ -51,6 +52,7 @@ impl Firmware {
                     return Err("Wrong Firmware type".to_string());
                 }
             },
+            DeviceType::BhapticBle(d) => return Err("Unable to udpate bhaptics devices".to_string())
         }
 
         Ok(())

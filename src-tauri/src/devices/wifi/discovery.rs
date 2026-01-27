@@ -1,29 +1,30 @@
 use if_addrs::get_if_addrs;
 use serde_json::Value;
 use std::io;
-use std::net::{Ipv4Addr, UdpSocket};
-use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc, Mutex};
+use std::net::{Ipv4Addr };
+use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
 use tauri::{AppHandle, Emitter};
+use tokio::net::{UdpSocket};
 
-use crate::devices::{Device, DeviceType, WifiDevice};
+use crate::devices::{get_devices, Device, DeviceType, WifiDevice, DeviceId};
+use crate::state;
 
 pub const DISCOVERY_PORT: u32 = 6868;
 
 /// Listen for wifi based device advertisements
-pub fn start_wifi_listener(
+pub async fn start_wifi_listener(
     app_handle: AppHandle,
-    devices_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
 ) -> Arc<AtomicBool> {
     // Create a cancellation flag.
     let cancelled = Arc::new(AtomicBool::new(false));
     // Lock our device list.
-    let devices = devices_state.inner().clone();
+    let devices = get_devices();
     let cancelled_clone = cancelled.clone();
 
-    std::thread::spawn(move || {
-        // Bind to all interfaces on port 8888 and register for multicast.
+    tokio::task::spawn(async move {
+        // Bind to all interfaces on port 6868 and register for multicast.
 
-        let socket = UdpSocket::bind(format!("0.0.0.0:{DISCOVERY_PORT}")).unwrap();
+        let socket = UdpSocket::bind(format!("0.0.0.0:{DISCOVERY_PORT}")).await.expect("Unable to bind to discovery port");
         let multicast_addr = Ipv4Addr::new(239, 0, 0, 1);
         multicast_all_interfaces(&socket, &multicast_addr).ok();
         log::trace!(
@@ -37,7 +38,7 @@ pub fn start_wifi_listener(
 
         // Main loop: receive and process incoming packets.
         while !cancelled_clone.load(Ordering::Relaxed) {
-            match socket.recv_from(&mut buf) {
+            match socket.recv_from(&mut buf).await {
                 Ok((size, _)) => {
                     let received = String::from_utf8_lossy(&buf[..size]);
 
@@ -50,10 +51,9 @@ pub fn start_wifi_listener(
                             .unwrap_or("Unknown Device")
                             .to_string();
                         let port: u16 = json["port"].as_u64().unwrap_or(1027) as u16;
-                        let mut lock = devices.lock().unwrap();
 
                         // Check if device already exists
-                        if !lock.iter().any(|d| d.id == mac) {
+                        if !devices.iter().any(|d| d.id == DeviceId(mac.clone())) {
                             log::trace!("New device found: {} at {}", name, ip);
 
                             let new_device =
@@ -61,28 +61,26 @@ pub fn start_wifi_listener(
                             let mut full_device = Device::from_wifi(new_device, &app_handle);
 
                             //try to recall saved multiplier
-                            if let Some(old_offset) =
-                                crate::get_device_store_field(&app_handle, &mac, "sens_mult")
+                            if let Some(old_offset) = 
+                                state::get_device(&mac, |d| d.intensity).flatten()
                             {
                                 full_device.factors.sens_mult = old_offset;
                             }
 
-                            if let Some(old_offset) =
-                                crate::get_device_store_field(&app_handle, &mac, "start_offset")
-                            {
+                            if let Some(old_offset) = state::get_device(&mac, |d| d.offset).flatten() {
                                 full_device.factors.start_offset = old_offset;
                             }
 
                             if let Err(e) = app_handle.emit("device-added", full_device.clone()) {
                                 log::error!("Failed to emit device-added: {:?}", e);
                             }
-                            lock.push(full_device);
+                            devices.insert(full_device.id.clone(), full_device);
                         } else {
                             // If the device already exists, probably needs a reset
-                            if let Some(dev) = lock.iter_mut().find(|d| (d.id == mac)) {
+                            if let Some(mut dev) = devices.get_mut(&DeviceId(mac)) {
                                 match &mut dev.device_type {
                                     DeviceType::Wifi(ex) => ex.been_pinged = false,
-                                    //_ => panic!("Unexpected device type with same ID as new wifi device"),
+                                    _ => panic!("Unexpected device type with same ID as new wifi device"),
                                 }
                             }
                             log::debug!("Multicast for {}, which already exists", name);
@@ -115,7 +113,7 @@ fn multicast_all_interfaces(socket: &UdpSocket, multicast_addr: &Ipv4Addr) -> io
             if !iface.is_loopback() {
                 log::trace!("Listening on: {}", v4_addr.ip);
                 // Attempt to join multicast group on this interface.
-                if let Err(e) = socket.join_multicast_v4(multicast_addr, &v4_addr.ip) {
+                if let Err(e) = socket.join_multicast_v4(*multicast_addr, v4_addr.ip) {
                     log::error!(
                         "Failed to join multicast on interface {}: {}",
                         v4_addr.ip,

@@ -3,46 +3,168 @@ pub mod serial;
 mod traits;
 pub mod update;
 pub mod wifi;
+mod bhaptics;
+
+use std::ops::Deref;
+use std::sync::{Arc, Mutex, LazyLock};
+use dashmap::DashMap;
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use wifi::WifiDevice;
+use bhaptics::BhapticBleDevice;
 
-use crate::mapping::interp::{GaussianState, InterpAlgo};
+use crate::{devices::wifi::discovery::start_wifi_listener, mapping::{ haptic_node::HapticNode, interp::{GaussianState, InterpAlgo}}};
 use crate::GlobalMap;
+
+// Global device list; contains all active devices.
+static DEVICES: LazyLock<DashMap<DeviceId, Device>> = LazyLock::new(||{DashMap::new()});
+
+pub fn get_devices() -> &'static DashMap<DeviceId, Device> {
+    &DEVICES
+}
+
+/// Starts all device handlers managing the various connected devices
+pub async fn start_devices() {
+    let register_fn = register_device;
+    let remove_fn = remove_device;
+    // calculates the 
+    let gather_fn = get_intensity_from_nodes(&Vec<HapticNode>, );
+
+    // Each listener is expected to handle removing adding, and pushing data to their devices.
+    start_wifi_listener(app_handle);
+}
+
+pub fn register_device(dev: Device) -> Option<Device> {
+    DEVICES.insert(dev.id.clone(), dev)
+}
+
+pub fn remove_device(id: DeviceId) -> Option<(DeviceId, Device)> {
+    DEVICES.remove(&id)
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceType {
     Wifi(WifiDevice),
+    BhapticBle(BhapticBleDevice),
 }
 
-impl DeviceType {
-    fn tick(&mut self, is_alive: &mut bool, factors: &mut OutputFactors, inputs: &GlobalMap) {
-        match self {
-            DeviceType::Wifi(dev) => {
-                dev.tick(is_alive, factors, inputs);
-            }
-            _ => log::error!("unknown device type"),
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct DeviceId(pub String);
+
+impl Deref for DeviceId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<String> for DeviceId {
+    fn from(s: String) -> Self { Self(s) }
+}
+
+impl From<&str> for DeviceId {
+    fn from(s: &str) -> Self { Self(s.to_owned()) }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Represents a protocol-agnostic haptic device. 
+/// 
+/// A device is expected to handle it's own removal from the `DEVICES` list.
+/// 
+/// At its core a haptic device 
+pub struct Device {
+    /// ID garunteed to be unique to this device
+    pub id: DeviceId,
+    /// user-facing name
+    pub name: String,
+    /// Onput nodes attached to this device. 
+    /// 
+    /// NEVER change the length of this value without first updating the outputs.
+    pub nodes: Arc<Mutex<OutputNodes>>,
+    /// All factors that affect nodes on a device level
+    pub factors: OutputFactors,
+    /// Specific implementations .
+    pub device_type: DeviceType,
+} 
+
+impl Device {
+    /// Given a globalMap state, determine the output values for this device.
+    /// 
+    /// Used to udpate outputs to the most recent state.
+    pub async fn collect_outputs(&mut self, map: &GlobalMap) {
+        let mut nodes = self.nodes.lock().expect("Couldnt lock nodes.");
+        let nodes_ref = nodes.nodes();
+        let this = nodes.outputs_mut();
+        map.get_intensity_from_haptic(nodes_ref, &self.factors.interp_algo, &true, this);
+    }
+
+    /// Removes this device from the static DEVICES list.
+    pub fn remove(&self) {
+        if remove_device(self.id).is_none() {
+            log::error!("Unable to remove device with id: {} \nDevice: {}", id, self)
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Device {
-    /// ID garunteed to be unique to this device
-    pub id: String,
-    /// user-facing name
-    pub name: String,
-    /// number of motors this device controls
-    pub num_motors: u32,
-    /// Not garunteed to change on death, but device should be removed if false
-    pub is_alive: bool,
-    /// Factors that are used in the modulation of devices
-    pub factors: OutputFactors,
-    /// Holds the varying fields/methods that need to be used for each type of device.
-    pub device_type: DeviceType,
+pub struct OutputNodes {
+    nodes: Vec<HapticNode>,
+    outputs: Vec<f32>,
 }
+
+impl OutputNodes {
+    pub fn set_nodes(&mut self, nodes: Vec<HapticNode>) {
+        self.outputs.resize(nodes.len(), 0.0);
+        self.nodes = nodes;
+    }
+    
+    pub fn nodes(&self) -> &[HapticNode] {
+        &self.nodes
+    }
+    
+    pub fn outputs_mut(&mut self) -> &mut [f32] {
+        &mut self.outputs
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Factors that affect or modulate output of Devices
+pub struct OutputFactors {
+    /// sensitivity multiplier (power limiter)
+    pub sens_mult: f32,
+    /// the lowest value that produces feedback
+    pub start_offset: f32,
+    /// Interpolation algorithm
+    pub interp_algo: InterpAlgo,
+}
+
+impl Default for OutputFactors {
+    fn default() -> Self {
+        OutputFactors { sens_mult: 1.0, start_offset: 0.0, interp_algo: InterpAlgo::Gaussian(GaussianState::default()) }
+    }
+}
+
+impl Device {
+    /// Retrieves the ESP32's model
+    pub fn get_esp_type(&self) -> ESP32Model {
+        match &self.device_type {
+            DeviceType::Wifi(d) => d.get_esp_type(),
+            DeviceType::BhapticBle(_) => ESP32Model::Unknown,
+        }
+    }
+
+    /// Starts a new wifi device with the given parameters
+    pub async fn start_wifi_device(mac: String, ip: String, send_port: u16, name: String) -> Device {
+        let wifi = WifiDevice::new(mac, ip, send_port, name);
+        
+        Device { id: DeviceId(wifi.mac.clone()), name, nodes: vec![], outputs: vec![], factors: OutputFactors::def, device_type: DeviceType::Wifi(wifi) }
+    }
+
+}
+
 
 /// The firmware type returned from the device.
 #[derive(Debug, Clone, PartialEq, serde::Deserialize)]
@@ -77,53 +199,6 @@ impl ESP32Model {
             ESP32Model::ESP8266 =>  return 8266,
             ESP32Model::Unknown =>  return 3232,
         }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-/// Factors that affect or modulate output of Devices
-pub struct OutputFactors {
-    /// sensitivity multiplier (power limiter)
-    pub sens_mult: f32,
-    /// the lowest value that produces feedback
-    pub start_offset: f32,
-    /// Interpolation algorithm
-    pub interp_algo: InterpAlgo,
-}
-
-impl Device {
-    /// Retrieves the ESP32's model
-    pub fn get_esp_type(&self) -> ESP32Model {
-        match &self.device_type {
-            DeviceType::Wifi(d) => d.get_esp_type(),
-        }
-    }
-
-    /// Consumes wifi_device and creates a generic Device (with the wifiDevice as a child)
-    pub fn from_wifi(wifi_device: WifiDevice, app_handle: &AppHandle) -> Device {
-        let init_interp = GaussianState::new(0.002, 0.05);
-
-        let mut new_device = Device {
-            id: wifi_device.mac.clone(),
-            name: wifi_device.name.clone(),
-            num_motors: 0,
-            is_alive: true,
-            factors: OutputFactors {
-                sens_mult: 1.0,
-                start_offset: 0.0,
-                interp_algo: InterpAlgo::Gaussian(init_interp),
-            },
-            device_type: DeviceType::Wifi(wifi_device),
-        };
-
-        // Recall last saved sens_multiplier
-        if let Some(old_offset) =
-            crate::get_device_store_field(&app_handle, &new_device.id, "sens_mult")
-        {
-            new_device.factors.sens_mult = old_offset;
-        }
-
-        return new_device;
     }
 }
 
