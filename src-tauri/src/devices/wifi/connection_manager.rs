@@ -1,8 +1,8 @@
 use rosc::{OscMessage, OscType};
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
-use std::sync::mpsc;
-use std::time::SystemTime;
+use std::time::Instant;
+use tokio::sync::mpsc;
 
 use crate::devices::wifi::config::WifiConfig;
 use crate::devices::wifi::WifiTickSignal;
@@ -19,7 +19,7 @@ pub struct WifiConnManager {
 }
 
 impl WifiConnManager {
-    pub fn new(
+    pub async fn new(
         recv_port: &u16,
         hrtbt_addr: String,
         tx: mpsc::Sender<WifiTickSignal>,
@@ -28,7 +28,7 @@ impl WifiConnManager {
         let on_receive = move |msg: OscMessage| {
             //if heartbeat
             if msg.addr == hrtbt_addr {
-                tx.send(WifiTickSignal::NewHeartBeat(SystemTime::now()));
+                tx.send(WifiTickSignal::NewHeartBeat(Instant::now()));
 
             // command was sent
             } else if msg.addr == "/command" {

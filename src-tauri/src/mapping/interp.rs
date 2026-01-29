@@ -1,9 +1,10 @@
 use crate::mapping::input_node::InputType;
 
 use super::{haptic_node::HapticNode, input_node::InputNode};
+use crate::devices::OutputNodes;
 
 pub trait Interpolate {
-    fn interp(&self, node: &[HapticNode], in_nodes: &[InputNode], output: &mut[f32]);
+    fn interp(&self, nodes: &mut OutputNodes, in_nodes: &[InputNode]);
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -13,14 +14,15 @@ pub trait Interpolate {
 /// Each entry implements the mapping::Interpolate trait and provides a self-contained
 /// method for interpolation
 pub enum InterpAlgo {
+    /// Uses a gaussian distribution on the array of input nodes an weights them to determine output.
     Gaussian(GaussianState),
 }
 
-impl Interpolate for InterpAlgo {
+impl InterpAlgo {
     /// fills output with the interpolated values for 
-    fn interp(&self, node: &[HapticNode], in_nodes: &[InputNode], output: &mut[f32]) {
+    pub fn interp(&self, nodes: &mut OutputNodes, in_nodes: &[InputNode]) {
         match self {
-            InterpAlgo::Gaussian(state) => state.interp(node, in_nodes, output),
+            InterpAlgo::Gaussian(state) => state.interp(nodes, in_nodes),
             // add other algo's here
         }
     }
@@ -126,11 +128,10 @@ impl GaussianState {
 }
 
 impl Interpolate for GaussianState {
-    /// Takes in the list of output nodes on a device, and the input nodes that should influence it.
-    fn interp(&self, nodes: &[HapticNode], in_nodes: &[InputNode], output: &mut[f32]) {
-        // For each output node, evaluate the Gaussian kernel against the full set of inputs.
-        for (index, node) in nodes.iter().enumerate() {
-            output[index] = self.single_node(node, in_nodes);
+    fn interp(&self, nodes: &mut OutputNodes, in_nodes: &[InputNode]) {
+        let (haptic_nodes, outputs) = nodes.nodes_and_outputs();
+        for (i, node) in haptic_nodes.iter().enumerate() {
+            outputs[i] = self.single_node(node, in_nodes);
         }
     }
 }

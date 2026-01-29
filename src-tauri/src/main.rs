@@ -19,22 +19,19 @@ mod vrc;
 use api::ApiManager;
 use bhaptics::game::BhapticsGame;
 use devices::wifi::discovery::start_wifi_listener;
-use devices::{Device, get_devices, start_devices};
+use devices::{DeviceManager, init_device_manager};
 use mapping::{get_global_map, global_map::GlobalMap};
 use vrc::VrcInfo;
 
 //standard imports
 use commands::*;
-use serde_json::json;
-use std::io::{self, Write};
-use std::net::UdpSocket;
-use std::sync::{Arc, LazyLock, Mutex, RwLock};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 use std::panic::{take_hook, set_hook};
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
-use tauri_plugin_store::{JsonValue, StoreExt};
+use once_cell::sync::OnceCell;
 
 use crate::ble::start_ble;
 use crate::state::{PerDevice, start_config};
@@ -42,6 +39,7 @@ use crate::udp::start_udp;
 
 // Provides a unified interface for interacting with external api's
 pub static API_MANAGER: LazyLock<Arc<Mutex<ApiManager>>> = LazyLock::new(||{Arc::new(Mutex::new(ApiManager::new()))});
+pub static DEVICE_MANAGER: OnceCell<DeviceManager> = OnceCell::new();
 
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
@@ -81,11 +79,14 @@ async fn start_async_tasks() {
     start_ble(Duration::from_secs(1)).await;
 
     //start_apps()
-    start_devices();
 }
 
 fn main() {
-
+    let manager = DeviceManager::new();
+    init_device_manager(&mut manager);
+    if let Err(e) = DEVICE_MANAGER.set(manager) {
+        log::error!("Failed to start device manager");
+    }
 
     let builder = std::thread::Builder::new().name("AsyncTasks".to_string());
     let handler = builder.spawn(|| {
@@ -125,7 +126,6 @@ fn main() {
                 .build(),
         )
         .manage(get_global_map())
-        .manage(get_devices())
         .manage(API_MANAGER)
         .setup(move |app| {
             let app_handle = app.handle();

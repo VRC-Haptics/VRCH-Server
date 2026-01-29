@@ -218,7 +218,7 @@ impl GlobalMap {
             return;
         }
         let lock = self.input_nodes.read().expect("unable to lock input nodes");
-        algo.interp(node_list, &lock, output);
+        algo.interp(nodes, &lock);
     }
 }
 

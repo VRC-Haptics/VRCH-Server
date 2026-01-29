@@ -1,110 +1,221 @@
 //mod ble;
 pub mod serial;
-mod traits;
+//mod traits;
 pub mod update;
 pub mod wifi;
 mod bhaptics;
+//pub mod device;
 
 use std::ops::Deref;
-use std::sync::{Arc, Mutex, LazyLock};
+use std::sync::Arc;
 use dashmap::DashMap;
+use enum_dispatch::enum_dispatch;
+use parking_lot::Mutex;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
-use wifi::WifiDevice;
-use bhaptics::BhapticBleDevice;
+use wifi::{WifiDevice, WifiDeviceInfo};
 
-use crate::{devices::wifi::discovery::start_wifi_listener, mapping::{ haptic_node::HapticNode, interp::{GaussianState, InterpAlgo}}};
-use crate::GlobalMap;
+use crate::{devices::wifi::start_wifi_devices, mapping::{ haptic_node::HapticNode, interp::{GaussianState, InterpAlgo}}};
 
-// Global device list; contains all active devices.
-static DEVICES: LazyLock<DashMap<DeviceId, Device>> = LazyLock::new(||{DashMap::new()});
+pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
 
-pub fn get_devices() -> &'static DashMap<DeviceId, Device> {
-    &DEVICES
-}
-
-/// Starts all device handlers managing the various connected devices
-pub async fn start_devices() {
-    let register_fn = register_device;
-    let remove_fn = remove_device;
-    // calculates the 
-    let gather_fn = get_intensity_from_nodes(&Vec<HapticNode>, );
-
-    // Each listener is expected to handle removing adding, and pushing data to their devices.
-    start_wifi_listener(app_handle);
-}
-
-pub fn register_device(dev: Device) -> Option<Device> {
-    DEVICES.insert(dev.id.clone(), dev)
-}
-
-pub fn remove_device(id: DeviceId) -> Option<(DeviceId, Device)> {
-    DEVICES.remove(&id)
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "variant", content = "value")]
-pub enum DeviceType {
+#[enum_dispatch]
+pub enum HapticDevice {
     Wifi(WifiDevice),
-    BhapticBle(BhapticBleDevice),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct DeviceId(pub String);
+/// Info container for each device type
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(tag = "variant", content = "value")]
+pub enum DeviceInfo {
+    Wifi(WifiDeviceInfo),
+}
 
-impl Deref for DeviceId {
-    type Target = str;
+/// The generic interface for physical haptic devices
+#[enum_dispatch(HapticDevice)]
+pub trait Device {
+    /// Returns device id that should be unique to this device
+    /// 
+    /// Since id is required to index it should be avialable at device initalization
+    fn get_id(&self) -> DeviceId;
+    /// Returns the info related to this device.
+    /// All info should not be required at device start and will be edited as the device lives on.
+    fn info(&self) -> DeviceInfo;
+    /// set the feedback to these values.
+    /// Will be registered and sent at varying rates depending on internal device types.
+    /// Note; number of values could be the incorrect length due to race conditions
+    async fn set_feedback(&mut self, values: &[f32]);
+    /// Allows this device to interact with the DeviceManager directly.
+    async fn set_manager_channel(&mut self, tx: mpsc::Sender<DeviceMessage>);
+    /// Initiates this devices shutdown process, this should include sending a remove request over the socket.
+    fn disconnect(&mut self);
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+/// Commands a HapticDevice can invoke from the DeviceManager
+pub enum DeviceMessage {
+    Remove(DeviceId),
+    /// Marks the device info for this ID as dirty, will update all subscribers.
+    InfoDirty(DeviceId),
+    Register(HapticDevice),
+}
+
+/// Events that will be passed to subscribers.
+pub enum DeviceOutEvents {
+    /// New device was added to list, most likely info not available.
+    NewDevice(DeviceId),
+    /// A device with ID has been removed,
+    RemovedDevice(DeviceId),
+    /// Info for a device has changed
+    DeviceInfoDirty(DeviceId),
+}
+
+/// Thread safe abstraction layer over physical devices, 
+/// can be freely cloned AFTER the intialization function has been called.
+///
+/// # USE initialiaztion function at top of main.
+pub struct DeviceManager {
+    // Requires Arc to keep fully asynchronus
+    devices: Arc<DashMap<DeviceId, HapticDevice>>,
+    device_channel: Option<mpsc::Receiver<DeviceMessage>>,
+    // doesn't need to be arc because we can just clone it.
+    recieve_channel: mpsc::Sender<DeviceMessage>,
+    // arc for internal loop stuff
+    subscribers: Arc<Mutex<Vec<mpsc::Sender<DeviceOutEvents>>>>,
+    shutdown: CancellationToken,
+}
+
+impl DeviceManager {
+    /// Creates new manager.
+    pub fn new() -> DeviceManager {
+        let shutdown = CancellationToken::new();
+        let (tx, rx) = mpsc::channel(5);
+
+        DeviceManager {
+            devices: Arc::new(DashMap::new()),
+            device_channel: Some(rx),
+            recieve_channel: tx,
+            subscribers: Arc::new(Mutex::new(vec![])),
+            shutdown: shutdown,
+        }
+    }
+
+    pub fn get_channel(&self) -> mpsc::Sender<DeviceMessage> {
+        self.recieve_channel.clone()
+    }
+
+    /// Runs closure `fun` with device `id` as its input
+    /// 
+    /// To get INFO:
+    /// 
+    /// ```
+    /// let info = manager.with_device("mac address", |d| d.info());
+    ///  
+    /// ```
+    pub fn with_device<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
+    where
+        F: Fn(&HapticDevice) -> T,
+    {
+        self.devices.get(id).map(|d| fun(&d))
+    }
+
+    pub fn with_device_mut<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
+    where
+        F: Fn(&mut HapticDevice) -> T,
+    {
+        self.devices.get_mut(id).map(|mut d| fun(&mut d))
+    }
+
+    /// Sets feedback array for the device.
+    pub fn set_feedback(&self, id: &DeviceId, values: &[f32]) {
+        if let Some(mut d) = self.devices.get_mut(id) {
+            d.set_feedback(values);
+        }
+    }
+
+    /// checks if a device is still here.
+    pub fn exists(&self, id: &DeviceId ) -> bool {
+        self.devices.get(id).is_some()
+    }
+
+    pub async fn shutdown(&self) {
+        self.shutdown.cancel();
+        self.devices.iter_mut().map(|mut pair| {
+            let this = pair.value_mut();
+            this.disconnect()
+        });
     }
 }
 
-impl From<String> for DeviceId {
-    fn from(s: String) -> Self { Self(s) }
+/// Handles intitializing all device listeners as well as managing device messaging.
+pub async fn init_device_manager(manager: &mut DeviceManager) {
+    let Some(mut rx) = manager.device_channel.take() else {
+        log::error!("Manager init called after already called earlier.");
+        return;
+    };
+
+    // initialize our device listeners
+    start_wifi_devices(manager);
+
+    // spawn our channel manager
+    let clone = manager.shutdown.clone();
+    let map = Arc::clone(&manager.devices);
+    let subscribers = Arc::clone(&manager.subscribers);
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                msg = rx.recv() => {
+                    let Some(event) = msg else { break };
+
+                    handle_device_message(event, &map, &subscribers);
+                }
+
+                _ = clone.cancelled() => {
+                    break;
+                }
+            }
+        }
+    });
 }
 
-impl From<&str> for DeviceId {
-    fn from(s: &str) -> Self { Self(s.to_owned()) }
+// outside macro allows for intellisense
+fn handle_device_message(event:DeviceMessage, map: &DashMap<DeviceId, HapticDevice>, subscribers: &Mutex<Vec<mpsc::Sender<DeviceOutEvents>>> ) {
+    let lock = subscribers.lock();
+    
+    match event {
+        DeviceMessage::Remove(id) => {
+            map.remove(&id);
+            for sub in lock.iter() {
+                sub.try_send(DeviceOutEvents::RemovedDevice(id.clone()));
+            }
+        },
+        DeviceMessage::Register(d) => {
+            let id = d.get_id();
+            map.insert(id.clone(), d);
+            for sub in lock.iter() {
+                sub.try_send(DeviceOutEvents::NewDevice(id.clone()));
+            }
+        },
+        DeviceMessage::InfoDirty(id) => {
+            for sub in lock.iter() {
+                sub.try_send(DeviceOutEvents::DeviceInfoDirty(id.clone()));
+            }
+        }
+    };
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-/// Represents a protocol-agnostic haptic device. 
-/// 
-/// A device is expected to handle it's own removal from the `DEVICES` list.
-/// 
-/// At its core a haptic device 
-pub struct Device {
-    /// ID garunteed to be unique to this device
-    pub id: DeviceId,
-    /// user-facing name
-    pub name: String,
-    /// Onput nodes attached to this device. 
+impl Clone for DeviceManager {
+    /// will take the device_channel, 
     /// 
-    /// NEVER change the length of this value without first updating the outputs.
-    pub nodes: Arc<Mutex<OutputNodes>>,
-    /// All factors that affect nodes on a device level
-    pub factors: OutputFactors,
-    /// Specific implementations .
-    pub device_type: DeviceType,
-} 
-
-impl Device {
-    /// Given a globalMap state, determine the output values for this device.
-    /// 
-    /// Used to udpate outputs to the most recent state.
-    pub async fn collect_outputs(&mut self, map: &GlobalMap) {
-        let mut nodes = self.nodes.lock().expect("Couldnt lock nodes.");
-        let nodes_ref = nodes.nodes();
-        let this = nodes.outputs_mut();
-        map.get_intensity_from_haptic(nodes_ref, &self.factors.interp_algo, &true, this);
-    }
-
-    /// Removes this device from the static DEVICES list.
-    pub fn remove(&self) {
-        if remove_device(self.id).is_none() {
-            log::error!("Unable to remove device with id: {} \nDevice: {}", id, self)
+    /// ONLY CAN BE INITTED USING THE ORIGINAL COPY.
+    fn clone(&self) -> Self {       
+        Self {
+            devices: Arc::clone(&self.devices),
+            device_channel: None,
+            recieve_channel: self.recieve_channel.clone(),
+            subscribers: Arc::clone(&self.subscribers),
+            shutdown: self.shutdown.clone(),
         }
     }
 }
@@ -128,6 +239,29 @@ impl OutputNodes {
     pub fn outputs_mut(&mut self) -> &mut [f32] {
         &mut self.outputs
     }
+
+    pub fn nodes_and_outputs(&mut self) -> (&[HapticNode], &mut [f32]) {
+        (&self.nodes, &mut self.outputs)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct DeviceId(pub String);
+
+impl Deref for DeviceId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<String> for DeviceId {
+    fn from(s: String) -> Self { Self(s) }
+}
+
+impl From<&str> for DeviceId {
+    fn from(s: &str) -> Self { Self(s.to_owned()) }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -146,25 +280,6 @@ impl Default for OutputFactors {
         OutputFactors { sens_mult: 1.0, start_offset: 0.0, interp_algo: InterpAlgo::Gaussian(GaussianState::default()) }
     }
 }
-
-impl Device {
-    /// Retrieves the ESP32's model
-    pub fn get_esp_type(&self) -> ESP32Model {
-        match &self.device_type {
-            DeviceType::Wifi(d) => d.get_esp_type(),
-            DeviceType::BhapticBle(_) => ESP32Model::Unknown,
-        }
-    }
-
-    /// Starts a new wifi device with the given parameters
-    pub async fn start_wifi_device(mac: String, ip: String, send_port: u16, name: String) -> Device {
-        let wifi = WifiDevice::new(mac, ip, send_port, name);
-        
-        Device { id: DeviceId(wifi.mac.clone()), name, nodes: vec![], outputs: vec![], factors: OutputFactors::def, device_type: DeviceType::Wifi(wifi) }
-    }
-
-}
-
 
 /// The firmware type returned from the device.
 #[derive(Debug, Clone, PartialEq, serde::Deserialize)]
@@ -267,34 +382,5 @@ impl serde::Serialize for ESP32Model {
         S: serde::Serializer,
     {
         serializer.serialize_str(self.display_name())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_platform_parsing() {
-        assert_eq!(
-            ESP32Model::from_platform_string("PLATFORM ESP8266"),
-            ESP32Model::ESP8266
-        );
-        assert_eq!(
-            ESP32Model::from_platform_string("PLATFORM ESP32-D0WDQ6-V3"),
-            ESP32Model::ESP32
-        );
-        assert_eq!(
-            ESP32Model::from_platform_string("PLATFORM ESP32-S2FH16"),
-            ESP32Model::ESP32S2FH16
-        );
-        assert_eq!(
-            ESP32Model::from_platform_string("PLATFORM ESP32-S3"),
-            ESP32Model::ESP32S3
-        );
-        assert_eq!(
-            ESP32Model::from_platform_string("PLATFORM Unknown"),
-            ESP32Model::Unknown
-        );
     }
 }
