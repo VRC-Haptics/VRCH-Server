@@ -64,7 +64,7 @@ async fn clean_subscribers() {
 }
 
 /// Sends the specified `data` to `address` over the common socket
-pub async fn send_udp(data: &[u8], addr: SocketAddr) -> Result<usize, UdpError> {
+pub async fn send_udp(data: &[u8], addr: &SocketAddr) -> Result<usize, UdpError> {
     let sock = get_socket().await;
     sock.send_to(data, addr)
         .await

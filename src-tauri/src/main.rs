@@ -11,22 +11,20 @@ pub mod mapping;
 pub mod osc;
 pub mod util;
 pub mod ble;
-pub mod udp;
 pub mod state;
 mod vrc;
 
 // local modules
 use api::ApiManager;
 use bhaptics::game::BhapticsGame;
-use devices::wifi::discovery::start_wifi_listener;
 use devices::{DeviceManager, init_device_manager};
-use mapping::{get_global_map, global_map::GlobalMap};
+use mapping::{get_global_map, global_map::InputMap};
 use vrc::VrcInfo;
 
 //standard imports
 use commands::*;
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration};
 use std::panic::{take_hook, set_hook};
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
@@ -34,8 +32,7 @@ use tauri_plugin_log::{Target, TargetKind};
 use once_cell::sync::OnceCell;
 
 use crate::ble::start_ble;
-use crate::state::{PerDevice, start_config};
-use crate::udp::start_udp;
+use crate::state::start_config;
 
 // Provides a unified interface for interacting with external api's
 pub static API_MANAGER: LazyLock<Arc<Mutex<ApiManager>>> = LazyLock::new(||{Arc::new(Mutex::new(ApiManager::new()))});
@@ -75,7 +72,6 @@ async fn start_async_tasks() {
     let _ = get_global_map().await;
 
     // start wireless protocols
-    start_udp().await;
     start_ble(Duration::from_secs(1)).await;
 
     //start_apps()
@@ -140,11 +136,12 @@ fn main() {
 
             // Managers for game integrations; each handling connectivity and communications
             // Global VRC State; connection management and GlobalMap interaction
+            /*
             let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(
                 Arc::clone(&global_map),
                 Arc::clone(&api_manager),
                 app_handle,
-            );
+            ); 
             // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
             let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&global_map));
 
@@ -152,9 +149,8 @@ fn main() {
             app.manage(Arc::clone(&bhaptics));
 
             // Initialize stuff that needs the app handle. (interacts directly with GUI)
-            start_wifi_listener(app_handle.clone(), app.state());
-            throw_vrc_notif(app_handle, vrc_info.clone());
-            let mut lock = api_manager.lock().unwrap();
+            throw_vrc_notif(app_handle, vrc_info.clone());*/
+            let mut lock = API_MANAGER.lock().unwrap();
             lock.refresh_caches();
             drop(lock);
 

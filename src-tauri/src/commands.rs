@@ -5,7 +5,7 @@ use crate::devices::{
 };
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
-use crate::mapping::{global_map::GlobalMap, Id};
+use crate::mapping::{global_map::InputMap, Id};
 
 use crate::util::math::Vec3;
 use crate::vrc::{config::GameMap, VrcInfo};
@@ -52,7 +52,7 @@ pub fn start_device_update(
 pub fn set_tags_radius(
     tag: String,
     radius: f32,
-    global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+    global_map: tauri::State<'_, Arc<Mutex<InputMap>>>,
 ) -> Result<(), ()> {
     let lock = global_map.lock().expect("this is wrong");
     lock.set_radius_by_tag(&tag, radius);
@@ -63,7 +63,7 @@ pub fn set_tags_radius(
 pub fn set_node_radius(
     id: String,
     radius: f32,
-    global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+    global_map: tauri::State<'_, Arc<Mutex<InputMap>>>,
 ) -> Result<(), String> {
     let mut lock = global_map.lock().unwrap();
     let node = lock.get_mut_node(&Id(id));
@@ -107,7 +107,7 @@ pub fn play_point(
     feedback_location: (f32, f32, f32), // xyz location to insert point
     power: f32,                         // the power percentage to play 1 = no change
     duration: f32,                      // When should this point be removed.
-    global_map_state: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+    global_map_state: tauri::State<'_, Arc<Mutex<InputMap>>>,
 ) -> Result<(), ()> {
     let event = Event::new(
         "Play Point".to_string(),
@@ -143,7 +143,7 @@ pub fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
 
 /// Gets the core haptics map that is used to drive feedback.
 #[tauri::command]
-pub fn get_core_map(state: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> GlobalMap {
+pub fn get_core_map(state: tauri::State<'_, Arc<Mutex<InputMap>>>) -> InputMap {
     let map = state.lock().expect("Unable to lock global map");
     map.clone()
 }

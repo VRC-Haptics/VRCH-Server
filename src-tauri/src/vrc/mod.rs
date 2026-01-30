@@ -10,7 +10,7 @@ use crate::mapping::input_node::InputType;
 use crate::mapping::{global_map::StandardMenu, input_node::InputNode, Id};
 use crate::osc::server::OscServer;
 use crate::vrc::parsing::OscInfo;
-use crate::{get_store_field, GlobalMap};
+use crate::{get_store_field, InputMap};
 
 // module dependencies
 use cache_node::CacheNode;
@@ -75,7 +75,7 @@ pub struct VrcInfo {
 
 impl VrcInfo {
     pub fn new(
-        global_map: Arc<Mutex<GlobalMap>>,
+        global_map: Arc<Mutex<InputMap>>,
         api: Arc<Mutex<ApiManager>>,
         app_handle: &tauri::AppHandle,
     ) -> Arc<Mutex<VrcInfo>> {

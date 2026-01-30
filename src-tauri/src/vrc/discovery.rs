@@ -2,7 +2,7 @@ use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
 use crate::api::ApiManager;
 use crate::vrc::AVATAR_ID_PATH;
-use crate::{mapping::input_node::InputType, GlobalMap, VrcInfo};
+use crate::{mapping::input_node::InputType, InputMap, VrcInfo};
 
 use libloading::Library;
 use std::collections::HashSet;
@@ -34,7 +34,7 @@ unsafe extern "C" fn dispatch_port(port: u16) {
 pub fn start_filling_available_parameters(
     vrc: Arc<Mutex<VrcInfo>>,
     api: Arc<Mutex<ApiManager>>,
-    global_map: Arc<Mutex<GlobalMap>>,
+    global_map: Arc<Mutex<InputMap>>,
 ) {
     let vrc_clone = Arc::clone(&vrc);
     thread::spawn(move || {
@@ -186,7 +186,7 @@ fn update_avatar(
     params: &DashMap<OscPath, OscInfo>,
     avatar: &Arc<RwLock<Option<Avatar>>>,
     api: Arc<Mutex<ApiManager>>,
-    global_map: Arc<Mutex<GlobalMap>>,
+    global_map: Arc<Mutex<InputMap>>,
 ) {
     // First, retrieve the current avatar ID (if any) using a read lock.
     let current_id = {
@@ -244,7 +244,7 @@ fn update_avatar(
     }
 }
 
-fn push_to_global_map(configs: &Vec<GameMap>, global_map: Arc<Mutex<GlobalMap>>) {
+fn push_to_global_map(configs: &Vec<GameMap>, global_map: Arc<Mutex<InputMap>>) {
     let lock = global_map.lock().unwrap();
     for conf in configs {
         for node in &conf.nodes {
@@ -334,7 +334,7 @@ fn run_vrc_http_polling(
     avatar: Arc<RwLock<Option<Avatar>>>,
     vrc: Arc<Mutex<VrcInfo>>,
     api: Arc<Mutex<ApiManager>>,
-    global_map: Arc<Mutex<GlobalMap>>,
+    global_map: Arc<Mutex<InputMap>>,
 ) {
     let url = format!("http://127.0.0.1:{}/", port);
     log::debug!("Started polling HTTP.");

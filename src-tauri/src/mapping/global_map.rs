@@ -26,13 +26,13 @@ pub struct StandardMenu {
 /// 
 /// Should be fully threadsafe.
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct GlobalMap {
+pub struct InputMap {
     active_events: Arc<RwLock<Vec<Event>>>,
     input_nodes: Arc<RwLock<Vec<InputNode>>>,
     pub standard_menu: Arc<Mutex<StandardMenu>>,
 }
 
-impl Clone for GlobalMap {
+impl Clone for InputMap {
     fn clone(&self) -> Self {
         Self {
             active_events: Arc::clone(&self.active_events),
@@ -42,10 +42,10 @@ impl Clone for GlobalMap {
     }
 }
 
-impl GlobalMap {
+impl InputMap {
     /// NOTE: starts event manager, only intended to be started once per program.
-    pub async fn new() -> Arc<GlobalMap> {
-        let map = Arc::new(GlobalMap {
+    pub async fn new() -> Arc<InputMap> {
+        let map = Arc::new(InputMap {
             active_events: Arc::new(RwLock::new(Vec::new())),
             input_nodes: Arc::new(RwLock::new(Vec::new())),
             standard_menu: Arc::new(Mutex::new(StandardMenu {

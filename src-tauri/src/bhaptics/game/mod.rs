@@ -8,7 +8,7 @@ mod v3;
 use super::game::v3::BhapticsApiV3;
 use crate::{
     bhaptics::game::{v1::BhapticsApiV1, v2::BhapticsApiV2},
-    mapping::{event::Event, global_map::GlobalMap},
+    mapping::{event::Event, global_map::InputMap},
 };
 
 use network::event_map::PatternLocation;
@@ -38,12 +38,12 @@ pub struct BhapticsGame {
     /// handle to v1 api
     v1_api: Arc<Mutex<BhapticsApiV1>>,
     // The Global instance of the global map, jsut for backreferencing
-    global_map: Arc<Mutex<GlobalMap>>,
+    global_map: Arc<Mutex<InputMap>>,
 }
 
 impl BhapticsGame {
     /// Performs startup for all the api versions
-    pub fn new(global_map: Arc<Mutex<GlobalMap>>) -> Arc<Mutex<Self>> {
+    pub fn new(global_map: Arc<Mutex<InputMap>>) -> Arc<Mutex<Self>> {
         let v3 = BhapticsApiV3::new(global_map.clone());
         let v2 = BhapticsApiV2::new();
         let v1 = BhapticsApiV1::new();

@@ -7,16 +7,16 @@ pub mod interp;
 use std::sync::Arc;
 use tokio::sync::{OnceCell};
 
-use global_map::GlobalMap;
+use global_map::InputMap;
 use haptic_node::HapticNode;
 use uuid::Uuid;
 
 use crate::util::math::Vec3;
 
-static GLOBAL_MAP: OnceCell<Arc<GlobalMap>> = OnceCell::const_new();
+static GLOBAL_MAP: OnceCell<Arc<InputMap>> = OnceCell::const_new();
 
-pub async fn get_global_map() -> &'static Arc<GlobalMap> {
-    GLOBAL_MAP.get_or_init(|| GlobalMap::new()).await
+pub async fn get_global_map() -> &'static Arc<InputMap> {
+    GLOBAL_MAP.get_or_init(|| InputMap::new()).await
 }
 
 /// Fills `output` with feedback values for the corresponding 
