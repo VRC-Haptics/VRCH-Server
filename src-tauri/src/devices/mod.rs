@@ -1,27 +1,37 @@
 //mod ble;
 pub mod serial;
 //mod traits;
+mod bhaptics;
 pub mod update;
 pub mod wifi;
-mod bhaptics;
 //pub mod device;
 
-use std::ops::Deref;
-use std::sync::Arc;
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
+use std::ops::Deref;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use serde::{Deserialize, Serialize};
 use wifi::{WifiDevice, WifiDeviceInfo};
 
-use crate::{devices::wifi::start_wifi_devices, mapping::{ haptic_node::HapticNode, interp::{GaussianState, InterpAlgo}}};
+use crate::{
+    devices::wifi::start_wifi_devices,
+    mapping::{
+        haptic_node::HapticNode,
+    },
+};
 
 pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
 
 #[enum_dispatch]
+/// All Haptic Devices implement the `Device` trait
+/// and are not garunteed to provide anything else.
+///
+/// Individual exposed functions for each device type are prone to change,
+/// and are not stable in the least.
 pub enum HapticDevice {
     Wifi(WifiDevice),
 }
@@ -33,20 +43,32 @@ pub enum DeviceInfo {
     Wifi(WifiDeviceInfo),
 }
 
+impl DeviceInfo {
+    pub fn get_nodes(&self) -> &Vec<HapticNode> {
+        match self {
+            DeviceInfo::Wifi(inf) => {
+                return &inf.nodes;
+            }
+        }
+    }
+}
+
 /// The generic interface for physical haptic devices
 #[enum_dispatch(HapticDevice)]
 pub trait Device {
     /// Returns device id that should be unique to this device
-    /// 
-    /// Since id is required to index it should be avialable at device initalization
+    ///
+    /// Since id is required to index it should be available at device initalization
     fn get_id(&self) -> DeviceId;
     /// Returns the info related to this device.
     /// All info should not be required at device start and will be edited as the device lives on.
     fn info(&self) -> DeviceInfo;
-    /// set the feedback to these values.
-    /// Will be registered and sent at varying rates depending on internal device types.
-    /// Note; number of values could be the incorrect length due to race conditions
-    async fn set_feedback(&mut self, values: &[f32]);
+    /// Retrieves the feedback buffer that can be written to to update feedback.
+    ///
+    /// IMPORTANT: Not garunteed to be pushed to device until
+    fn get_feedback_buffer(&self) -> Arc<RwLock<Vec<f32>>>;
+    /// Forces device to treat buffer like it has new data inside.
+    fn buffer_updated(&self);
     /// Allows this device to interact with the DeviceManager directly.
     async fn set_manager_channel(&mut self, tx: mpsc::Sender<DeviceMessage>);
     /// Initiates this devices shutdown process, this should include sending a remove request over the socket.
@@ -54,7 +76,7 @@ pub trait Device {
 }
 
 /// Commands a HapticDevice can invoke from the DeviceManager
-pub enum DeviceMessage {
+enum DeviceMessage {
     Remove(DeviceId),
     /// Marks the device info for this ID as dirty, will update all subscribers.
     InfoDirty(DeviceId),
@@ -71,8 +93,8 @@ pub enum DeviceOutEvents {
     DeviceInfoDirty(DeviceId),
 }
 
-/// Thread safe abstraction layer over physical devices, 
-/// can be freely cloned AFTER the intialization function has been called.
+/// A thin, thread safe abstraction layer over physical devices,
+/// can be freely cloned AFTER the `init_device_manager` has been called.
 ///
 /// # USE initialiaztion function at top of main.
 pub struct DeviceManager {
@@ -101,14 +123,19 @@ impl DeviceManager {
         }
     }
 
-    pub fn get_channel(&self) -> mpsc::Sender<DeviceMessage> {
+    pub fn register(&self, tx: mpsc::Sender<DeviceOutEvents>) {
+        let mut sub = self.subscribers.lock();
+        sub.push(tx);
+    }
+
+    pub fn get_device_channel(&self) -> mpsc::Sender<DeviceMessage> {
         self.recieve_channel.clone()
     }
 
     /// Runs closure `fun` with device `id` as its input
-    /// 
+    ///
     /// To get INFO:
-    /// 
+    ///
     /// ```
     /// let info = manager.with_device("mac address", |d| d.info());
     ///  
@@ -127,16 +154,17 @@ impl DeviceManager {
         self.devices.get_mut(id).map(|mut d| fun(&mut d))
     }
 
-    /// Sets feedback array for the device.
-    pub fn set_feedback(&self, id: &DeviceId, values: &[f32]) {
-        if let Some(mut d) = self.devices.get_mut(id) {
-            d.set_feedback(values);
-        }
+    /// gathers all devices in the map
+    pub fn devices(&self) -> Vec<DeviceId> {
+        self.devices
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect()
     }
 
     /// checks if a device is still here.
-    pub fn exists(&self, id: &DeviceId ) -> bool {
-        self.devices.get(id).is_some()
+    pub fn exists(&self, id: &DeviceId) -> bool {
+        self.devices.contains_key(id)
     }
 
     pub async fn shutdown(&self) {
@@ -180,23 +208,28 @@ pub async fn init_device_manager(manager: &mut DeviceManager) {
 }
 
 // outside macro allows for intellisense
-fn handle_device_message(event:DeviceMessage, map: &DashMap<DeviceId, HapticDevice>, subscribers: &Mutex<Vec<mpsc::Sender<DeviceOutEvents>>> ) {
+fn handle_device_message(
+    event: DeviceMessage,
+    map: &DashMap<DeviceId, HapticDevice>,
+    subscribers: &Mutex<Vec<mpsc::Sender<DeviceOutEvents>>>,
+) {
     let lock = subscribers.lock();
-    
+
     match event {
         DeviceMessage::Remove(id) => {
+            log::trace!("removing wifi device: {:?}", id);
             map.remove(&id);
             for sub in lock.iter() {
                 sub.try_send(DeviceOutEvents::RemovedDevice(id.clone()));
             }
-        },
+        }
         DeviceMessage::Register(d) => {
             let id = d.get_id();
             map.insert(id.clone(), d);
             for sub in lock.iter() {
                 sub.try_send(DeviceOutEvents::NewDevice(id.clone()));
             }
-        },
+        }
         DeviceMessage::InfoDirty(id) => {
             for sub in lock.iter() {
                 sub.try_send(DeviceOutEvents::DeviceInfoDirty(id.clone()));
@@ -206,10 +239,10 @@ fn handle_device_message(event:DeviceMessage, map: &DashMap<DeviceId, HapticDevi
 }
 
 impl Clone for DeviceManager {
-    /// will take the device_channel, 
-    /// 
+    /// will take the device_channel,
+    ///
     /// ONLY CAN BE INITTED USING THE ORIGINAL COPY.
-    fn clone(&self) -> Self {       
+    fn clone(&self) -> Self {
         Self {
             devices: Arc::clone(&self.devices),
             device_channel: None,
@@ -231,11 +264,11 @@ impl OutputNodes {
         self.outputs.resize(nodes.len(), 0.0);
         self.nodes = nodes;
     }
-    
+
     pub fn nodes(&self) -> &[HapticNode] {
         &self.nodes
     }
-    
+
     pub fn outputs_mut(&mut self) -> &mut [f32] {
         &mut self.outputs
     }
@@ -257,27 +290,14 @@ impl Deref for DeviceId {
 }
 
 impl From<String> for DeviceId {
-    fn from(s: String) -> Self { Self(s) }
+    fn from(s: String) -> Self {
+        Self(s)
+    }
 }
 
 impl From<&str> for DeviceId {
-    fn from(s: &str) -> Self { Self(s.to_owned()) }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-/// Factors that affect or modulate output of Devices
-pub struct OutputFactors {
-    /// sensitivity multiplier (power limiter)
-    pub sens_mult: f32,
-    /// the lowest value that produces feedback
-    pub start_offset: f32,
-    /// Interpolation algorithm
-    pub interp_algo: InterpAlgo,
-}
-
-impl Default for OutputFactors {
-    fn default() -> Self {
-        OutputFactors { sens_mult: 1.0, start_offset: 0.0, interp_algo: InterpAlgo::Gaussian(GaussianState::default()) }
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
     }
 }
 
@@ -303,16 +323,16 @@ pub enum ESP32Model {
 impl ESP32Model {
     pub fn ota_auth_port(&self) -> u16 {
         match *self {
-            ESP32Model::ESP32 |
-            ESP32Model::ESP32S2 |
-            ESP32Model::ESP32C2 |
-            ESP32Model::ESP32C3 |
-            ESP32Model::ESP32C6 |
-            ESP32Model::ESP32S2FH16 |
-            ESP32Model::ESP32S2FH32 |
-            ESP32Model::ESP32S3 =>  return 3232,
-            ESP32Model::ESP8266 =>  return 8266,
-            ESP32Model::Unknown =>  return 3232,
+            ESP32Model::ESP32
+            | ESP32Model::ESP32S2
+            | ESP32Model::ESP32C2
+            | ESP32Model::ESP32C3
+            | ESP32Model::ESP32C6
+            | ESP32Model::ESP32S2FH16
+            | ESP32Model::ESP32S2FH32
+            | ESP32Model::ESP32S3 => return 3232,
+            ESP32Model::ESP8266 => return 8266,
+            ESP32Model::Unknown => return 3232,
         }
     }
 }

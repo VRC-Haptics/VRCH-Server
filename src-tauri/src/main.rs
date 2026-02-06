@@ -32,7 +32,7 @@ use tauri_plugin_log::{Target, TargetKind};
 use once_cell::sync::OnceCell;
 
 use crate::ble::start_ble;
-use crate::state::start_config;
+use crate::state::start_config_save;
 
 // Provides a unified interface for interacting with external api's
 pub static API_MANAGER: LazyLock<Arc<Mutex<ApiManager>>> = LazyLock::new(||{Arc::new(Mutex::new(ApiManager::new()))});
@@ -67,7 +67,7 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
 }
 
 async fn start_async_tasks() {
-    start_config(Duration::from_secs(1)).await;
+    start_config_save(Duration::from_secs(1)).await;
     // ensures global map gets intialized somewhat early.
     let _ = get_global_map().await;
 

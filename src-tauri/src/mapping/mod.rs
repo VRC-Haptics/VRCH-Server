@@ -1,43 +1,308 @@
 pub mod event;
-pub mod global_map;
+//pub mod global_map;
 pub mod haptic_node;
 pub mod input_node;
 pub mod interp;
 
-use std::sync::Arc;
-use tokio::sync::{OnceCell};
+use parking_lot::{Mutex, RwLock};
+use std::{
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
+use tokio::sync::mpsc::{self, error::SendError};
 
-use global_map::InputMap;
+use event::Event;
+//use global_map::InputMap;
 use haptic_node::HapticNode;
+use input_node::InputNode;
 use uuid::Uuid;
 
-use crate::util::math::Vec3;
+use crate::{
+    devices::{Device, DeviceId, DeviceInfo, DeviceManager, DeviceOutEvents},
+    state,
+    util::math::Vec3,
+};
 
-static GLOBAL_MAP: OnceCell<Arc<InputMap>> = OnceCell::const_new();
-
-pub async fn get_global_map() -> &'static Arc<InputMap> {
-    GLOBAL_MAP.get_or_init(|| InputMap::new()).await
+/// Implements cheap clone, can be shared between threads safely.
+pub struct MapHandle {
+    event_sender: mpsc::Sender<InputEventMessage>,
 }
 
-/// Fills `output` with feedback values for the corresponding 
-pub async fn get_feedback_for_nodes(nodes: &[HapticNode], output: &mut [u16]) -> Result<(), FeedbackError> {
-    let map = get_global_map().await;
-
-    if nodes.len() != output.len() {
-        return Err(FeedbackError::NotEqualLen);
+impl MapHandle {
+    pub async fn send_event(
+        &self,
+        msg: InputEventMessage,
+    ) -> Result<(), SendError<InputEventMessage>> {
+        self.event_sender.send(msg).await
     }
 
-    for node in nodes {
-        //map.get_intensity_from_haptic(node_list, algo, respect_enable);
+    pub fn send_event_blocking(
+        &self,
+        msg: InputEventMessage,
+    ) -> Result<(), SendError<InputEventMessage>> {
+        self.event_sender.blocking_send(msg)
     }
-
-
-    Ok(())
 }
 
-pub enum FeedbackError {
-    NotEqualLen,
+impl Clone for MapHandle {
+    fn clone(&self) -> Self {
+        Self {
+            event_sender: self.event_sender.clone(),
+        }
+    }
+}
 
+/// Information that the global map needs to calculate haptics for a device.
+pub struct MappingDevice {
+    pub id: DeviceId,
+    /// keep in mind locking this also locks the associated devices access to the buffer.
+    outputs: Arc<RwLock<Vec<f32>>>,
+    nodes: Vec<HapticNode>,
+}
+
+impl MappingDevice {
+    pub fn update_nodes(&mut self, nodes: Vec<HapticNode>) {
+        self.nodes = nodes;
+        let out = self.outputs.read();
+        if out.len() != self.nodes.len() {
+            log::error!(
+                "Lenght of HapticNodes and output buffer not equal for device with id: {:?}",
+                self.id
+            );
+        }
+    }
+
+    /// updates the buffer based on the referenced input nodes.
+    /// 
+    /// Returns whether a value was changed.
+    /// 
+    /// NOTE: This does not update the remote device, to force an update remember to use the `crate::devices::Device` trait as specified
+    pub fn update_buffer(&self, in_nodes: &Vec<InputNode>) -> bool {
+        let mut has_changed = false;
+        let buf = self.outputs.write();
+        if buf.len() < self.nodes.len() {
+            log::warn!("Buffer shorter than recorded nodes.");
+            
+            for (idx, input) in buf.iter().enumerate() {
+                // garunteed because of above check
+                let node = self.nodes.get(idx).unwrap();
+                node.
+            }
+
+
+        }
+
+
+        for (idx, node) in self.nodes.iter().enumerate() {
+            if buf.
+        }
+
+        has_changed
+    } 
+}
+
+/// Needs to handle:
+///
+/// Taking input from games;
+/// Triggering update pushed to devices;
+///
+pub struct InputMap {
+    /// Needs to be shareable so that events can be ticked asyncrhonously.
+    active_events: Arc<RwLock<Vec<Event>>>,
+    input_nodes: Arc<RwLock<Vec<InputNode>>>,
+    manager: DeviceManager,
+    devices: Arc<Mutex<Vec<MappingDevice>>>,
+    event_recv: mpsc::Receiver<InputEventMessage>,
+    /// Whether input mapping has changed in a way that should require device output updates
+    map_state_updated: AtomicBool,
+}
+
+impl InputMap {
+    /// Assumes `DeviceManager` has been intialized.
+    ///
+    /// Initializes state on call if not already intialized.
+    pub async fn new(manager: DeviceManager) -> (Self, MapHandle) {
+        let (tx, rx) = mpsc::channel(10);
+
+        let map = Self {
+            active_events: Arc::new(RwLock::new(Vec::new())),
+            input_nodes: Arc::new(RwLock::new(Vec::new())),
+            manager: manager,
+            devices: Arc::new(Mutex::new(Vec::new())),
+            event_recv: rx,
+            map_state_updated: AtomicBool::new(false),
+        };
+
+        let handle = MapHandle { event_sender: tx };
+
+        return (map, handle);
+    }
+
+    /// Blocks until this operation is cancelled.
+    pub async fn start(&mut self) {
+        let (dev_tx, mut dev_rx) = mpsc::channel(10);
+
+        // handle messages about devices being added/removed/changed
+        let man_clone = self.manager.clone();
+        let devices_clone = Arc::clone(&self.devices);
+        tokio::spawn(async move {
+            loop {
+                match dev_rx.recv().await {
+                    Some(e) => match e {
+                        DeviceOutEvents::DeviceInfoDirty(id) => {
+                            handle_dirty_info(id, &man_clone, &devices_clone)
+                        }
+                        DeviceOutEvents::NewDevice(id) => {
+                            let mut devices = devices_clone.lock();
+                            let Some(buf) = man_clone.with_device(&id, |d| d.get_feedback_buffer()) else {
+                                log::warn!("Could not find new device: {id:?}");
+                                drop(devices);
+                                continue;
+                            };
+                            let Some(info) = man_clone.with_device(&id, |f| f.info()) else {
+                                // This is actually the most common case with wifi devices
+                                log::trace!("Could not find info for new device: {id:?}");
+                                drop(devices);
+                                continue;
+                            };
+                            
+                            devices.push(
+                                MappingDevice {
+                                    id: id,
+                                    outputs: buf,
+                                    nodes: info.get_nodes().to_vec(),
+                                }
+                            );
+                        },
+                        DeviceOutEvents::RemovedDevice(id) => {
+                            let mut devices = devices_clone.lock();
+                            devices.retain(|d| d.id != id);
+                        },
+                    },
+                    None => {}
+                }
+            }
+        });
+
+        start_handle_events(self.active_events.clone(), self.input_nodes.clone());
+
+        // register last to hopefully stop big race conditions.
+        self.manager.register(dev_tx);
+
+        // occupy this task with recieving messages.
+        loop {
+            match self.event_recv.recv().await {
+                Some(msg) => match msg {
+                    InputEventMessage::StartEvent(e) => self.start_event(e),
+                    InputEventMessage::StartEvents(mut e) => self.start_events(&mut e),
+                    InputEventMessage::CancelAllWithTags(t) => {
+                        let num = self.cancel_tags(&t);
+                        log::trace!("Canceled {num} events with tags: {:?}", t);
+                    }
+                },
+                None => {
+                    log::warn!("All channels dropped for map input. Restar required");
+                    break;
+                }
+            }
+        }
+    }
+
+    fn cancel_tags(&mut self, tags: &Vec<String>) -> usize {
+        let mut events = self.active_events.write();
+        let num = events.len();
+        for tag in tags {
+            events.retain(|e| e.tags.contains(&tag));
+        }
+        num - events.len()
+    }
+
+    /// Start a singular input event.
+    fn start_event(&mut self, event: Event) {
+        let mut lock = self.active_events.write();
+        lock.push(event);
+    }
+
+    /// Start a list of events, consumes the events vector.
+    fn start_events(&mut self, events: &mut Vec<Event>) {
+        let mut lock = self.active_events.write();
+        lock.append(events);
+    }
+}
+
+async fn propogate_to_devices(devices: Arc<Mutex<Vec<MappingDevice>>>, in_nodes: Arc<RwLock<Vec<InputNode>>>) {
+    let devices = devices.lock();
+    
+    for device in devices.iter() {
+
+    }
+
+}
+
+async fn start_handle_events(events: Arc<RwLock<Vec<Event>>>, in_nodes: Arc<RwLock<Vec<InputNode>>>) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            let mut nodes = in_nodes.write();
+            let mut events = events.write();
+            events.retain_mut(|event| {
+                let finished = event.tick(&mut nodes);
+                !finished
+            });
+            drop(nodes);
+            drop(events);
+
+            tokio::time::sleep(Duration::from_millis(10));
+        }
+    })
+}
+
+fn handle_dirty_info(id: DeviceId, dev: &DeviceManager, devices: &Mutex<Vec<MappingDevice>>) {
+    if let Some(info) = dev.with_device(&id, |d| d.info()) {
+        match info {
+            DeviceInfo::Wifi(i) => {
+                let mut lock = devices.lock();
+                let Some(device) = lock.iter_mut().find(|d| d.id == id) else {
+                    // if device not found on our list, just continue.
+                    return;
+                };
+                device.nodes = i.nodes;
+                let out_len = device.outputs.read().len();
+                if device.nodes.len() != out_len {
+                    log::error!("Output buffer not same length on device: {}", i.mac);
+                }
+            }
+        }
+    }
+}
+
+pub enum InputEventMessage {
+    StartEvent(Event),
+    StartEvents(Vec<Event>),
+    CancelAllWithTags(Vec<String>),
+}
+
+/// The common factors that will be used across all devices to modify output.
+/// Game inputs should insert values that will be used in device calculations here.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct StandardMenu {
+    pub intensity: f32, // multiplier set by user in-game
+    pub enable: bool,   // Flat enable or disable all haptics
+}
+
+impl Default for StandardMenu {
+    fn default() -> Self {
+        Self {
+            intensity: 1.0,
+            enable: true,
+        }
+    }
+}
+
+impl StandardMenu {
+    // retrieves either the saved values or default from our app state.
+    pub fn from_state() -> Self {
+        state::get(|c| c.mapping_menu.clone())
+    }
 }
 
 /// Descriptors for location groups.

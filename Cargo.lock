@@ -2541,6 +2541,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 
 [[package]]
+name = "hazarc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27675dcc2adfb7ef358447188630a97ede6510721b52a6b45dd925c9279b26c8"
+dependencies = [
+ "crossbeam-utils",
+ "serde",
+]
+
+[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7049,6 +7059,7 @@ dependencies = [
  "espflash",
  "futures",
  "futures-util",
+ "hazarc",
  "if-addrs",
  "libloading 0.8.9",
  "log",

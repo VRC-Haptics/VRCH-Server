@@ -24,7 +24,7 @@ async fn get_broadcast() -> &'static Arc<UdpSocket> {
 pub async fn start_listen_broadcast(manager: &mut DeviceManager) {
     let socket = get_broadcast().await;
     let manager = manager.clone();
-    let tx = manager.get_channel();
+    let tx = manager.get_device_channel();
 
     tokio::task::spawn(async move {
         let mut buf = [0u8; 1024];
@@ -51,7 +51,7 @@ pub async fn start_listen_broadcast(manager: &mut DeviceManager) {
                             log::trace!("New device found: {} at {}", name, ip);
 
                             if let Some(device) =
-                                WifiDevice::new(mac.clone(), ip.clone(), port, name.clone(), manager.get_channel()).await
+                                WifiDevice::new(mac.clone(), ip.clone(), port, name.clone(), manager.get_device_channel()).await
                             {
                                 tx.send(crate::devices::DeviceMessage::Register(
                                     HapticDevice::Wifi(device),

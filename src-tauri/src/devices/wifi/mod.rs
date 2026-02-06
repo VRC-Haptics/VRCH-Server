@@ -1,5 +1,5 @@
 use super::{Device, DeviceId, DeviceInfo, DeviceMessage};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use std::{
     net::{SocketAddr, SocketAddrV4},
@@ -21,9 +21,9 @@ mod config;
 mod connection_manager;
 mod udp;
 
-pub fn start_wifi_devices(manager: &mut DeviceManager) {
-    udp::start_udp();
-    start_listen_broadcast(manager);
+pub async fn start_wifi_devices(manager: &mut DeviceManager) {
+    udp::start_udp().await;
+    start_listen_broadcast(manager).await;
 }
 
 pub struct WifiDevice {
@@ -37,7 +37,7 @@ pub struct WifiDevice {
 }
 
 pub struct WifiDeviceState {
-    output: Vec<f32>,
+    output: Arc<RwLock<Vec<f32>>>,
     push_map: bool,
     been_query: Option<Instant>,
     been_pinged: Option<Instant>,
@@ -51,7 +51,7 @@ pub struct WifiDeviceState {
 impl Default for WifiDeviceState {
     fn default() -> Self {
         WifiDeviceState {
-            output: vec![],
+            output: Arc::new(RwLock::new(vec![])),
             push_map: false,
             been_query: None,
             been_pinged: None,
@@ -66,11 +66,11 @@ impl Default for WifiDeviceState {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct WifiDeviceInfo {
-    remote_addr: SocketAddr,
-    name: String,
-    mac: String,
-
-    rssi: usize,
+    pub nodes: Vec<HapticNode>,
+    pub remote_addr: SocketAddr,
+    pub name: String,
+    pub mac: String,
+    pub rssi: usize,
 }
 
 impl WifiDevice {
@@ -111,6 +111,11 @@ impl WifiDevice {
                                     let mut lock = state_clone.lock();
                                     lock.nodes = conf.node_map.clone();
                                     lock.config = Some(conf);
+                                    // resize buffer if needed
+                                    let mut out = lock.output.write();
+                                    if out.len() != lock.nodes.len() {
+                                        *out = vec![0.0; lock.nodes.len()];
+                                    }
                                 }
                                 tx_clone.send(DeviceMessage::InfoDirty(id_clone.clone())).await;
                             }
@@ -162,8 +167,12 @@ impl WifiDevice {
         })
     }
 
+    /// Please be mindful this call causes lockign with internal state,
+    /// 
     fn get_info(&self) -> WifiDeviceInfo {
+        let state = self.live_state.lock();
         WifiDeviceInfo {
+            nodes: state.nodes.clone(),
             remote_addr: self.remote_addr.clone(),
             name: self.name.clone(),
             mac: self.mac.clone(),
@@ -266,7 +275,8 @@ async fn tick(
         let mut hex = String::new();
         let num_motors = conf.node_map.len();
         for mtr_idx in 0..num_motors {
-            let num = state.output.get(mtr_idx).unwrap_or(&0.0); // if too small just fill zeros
+            let output = state.output.read();
+            let num = output.get(mtr_idx).unwrap_or(&0.0); // if too small just fill zeros
             let clamped = num.clamp(0.0, 1.0);
             let scaled = (clamped * 0xffff as f32).round() as u16;
             hex.push_str(&format!("{:04x}", scaled));
@@ -314,17 +324,34 @@ impl Device for WifiDevice {
         DeviceId(self.mac.clone())
     }
 
+    /// Please note this causes internal locking and while minor,
+    /// should be limited where possible
     fn info(&self) -> DeviceInfo {
-        DeviceInfo::Wifi(self.get_info())
+        let state = self.live_state.lock();
+        let info = WifiDeviceInfo {
+            nodes: state.nodes.clone(),
+            remote_addr: self.remote_addr.clone(),
+            name: self.name.clone(),
+            mac: self.mac.clone(),
+            rssi: 0,
+        };
+        DeviceInfo::Wifi(info)
     }
 
     fn disconnect(&mut self) {
         self.cancel.cancel();
     }
-    async fn set_feedback(&mut self, values: &[f32]) {
-        let mut lock = self.live_state.lock();
-        lock.output = values.to_vec();
+
+    fn get_feedback_buffer(&self) -> Arc<RwLock<Vec<f32>>> {
+        let state = self.live_state.lock();
+        Arc::clone(&state.output)
     }
+
+    /// Does nothing since device continously updated.
+    fn buffer_updated(&self) {
+        
+    }
+
     async fn set_manager_channel(&mut self, tx: mpsc::Sender<DeviceMessage>) {
         self.manager = tx;
     }

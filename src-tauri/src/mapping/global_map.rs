@@ -1,4 +1,5 @@
-use crate::devices::OutputNodes;
+use crate::devices::{DeviceManager, DeviceOutEvents, OutputNodes};
+use crate::mapping::MapHandle;
 use crate::mapping::input_node::InputType;
 
 use super::event::Event;
@@ -10,7 +11,7 @@ use super::{
 };
 
 use dashmap::{mapref::one::RefMut, DashMap};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Mutex, mpsc, RwLock, atomic::AtomicBool};
 use std::time::Duration;
 use std::{fmt, sync::Arc};
 
@@ -23,7 +24,7 @@ pub struct StandardMenu {
 }
 
 /// Provides implementations for interpolating input haptic intensities to device nodes
-/// 
+///
 /// Should be fully threadsafe.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct InputMap {
@@ -33,6 +34,9 @@ pub struct InputMap {
 }
 
 impl Clone for InputMap {
+    /// Similar to Arc clone but doesn't keep the device listener since it is already inited.
+    /// 
+    /// Notably; doesn't keep the device listener
     fn clone(&self) -> Self {
         Self {
             active_events: Arc::clone(&self.active_events),
@@ -44,18 +48,21 @@ impl Clone for InputMap {
 
 impl InputMap {
     /// NOTE: starts event manager, only intended to be started once per program.
-    pub async fn new() -> Arc<InputMap> {
-        let map = Arc::new(InputMap {
+    /// 
+    /// Spawns monitoring task on this runtime.
+    pub async fn new(dev_mngr: &mut DeviceManager) -> (InputMap, MapHandle) {
+        let map = InputMap {
+
             active_events: Arc::new(RwLock::new(Vec::new())),
             input_nodes: Arc::new(RwLock::new(Vec::new())),
             standard_menu: Arc::new(Mutex::new(StandardMenu {
                 intensity: 1.0,
                 enable: true,
-            }))
-        });
+            })),
+        };
 
-        // spawn event manager.
-        let events = Arc::clone(&map);
+        // spawn haptic event manager.
+        let events = Arc::clone(&map.active_events);
         tokio::spawn(async move {
             loop {
                 // Tick every event and keep only those that should continue running.
@@ -67,8 +74,10 @@ impl InputMap {
                 });
 
                 tokio::time::sleep(Duration::from_millis(10));
-            } 
+            }
         });
+
+        // spawn device query
 
         map
     }
@@ -92,7 +101,6 @@ impl InputMap {
         let mut lock = self.input_nodes.write().expect("unable to lock");
         lock.iter_mut().find(|n| n.get_id() == id).map(f)
     }
-
 
     /// Start a singular input event.
     pub fn start_event(&mut self, event: Event) {
@@ -129,29 +137,27 @@ impl InputMap {
         }
 
         let mut lock_mut = self.input_nodes.write().expect("couldn't get node write");
-        lock_mut.push(
-            InputNode::new(
-                new_node,
-                tags,
-                Id(id),
-                radius,
-                input_type.unwrap_or_else(|| InputType::INTERP),
-            ),
-        );
+        lock_mut.push(InputNode::new(
+            new_node,
+            tags,
+            Id(id),
+            radius,
+            input_type.unwrap_or_else(|| InputType::INTERP),
+        ));
 
         Ok(())
     }
 
     /// Removes the input node from being used in haptic interpolation
     pub fn pop_input_node(&self, id: &str) -> Result<InputNode, DoesNotExistError> {
-    let mut lock = self.input_nodes.write().expect("couldn't get node write");
-    let idx = lock.iter().position(|n| n.get_id() == id);
-    
-    match idx {
-        Some(i) => Ok(lock.swap_remove(i)),
-        None => Err(DoesNotExistError { id: id.to_string() }),
+        let mut lock = self.input_nodes.write().expect("couldn't get node write");
+        let idx = lock.iter().position(|n| n.get_id() == id);
+
+        match idx {
+            Some(i) => Ok(lock.swap_remove(i)),
+            None => Err(DoesNotExistError { id: id.to_string() }),
+        }
     }
-}
 
     /// Removes all input nodes with the given tag.
     pub fn remove_all_with_tag(&self, tag: &String) {
@@ -164,7 +170,7 @@ impl InputMap {
     /// Returns old value
     pub fn set_intensity(&mut self, id: &str, new: f32) -> Result<f32, DoesNotExistError> {
         let mut lock = self.input_nodes.write().expect("unable to lock");
-        
+
         if let Some(node) = lock.iter_mut().find(|n| n.get_id() == id) {
             let old = node.get_intensity();
             node.set_intensity(new);
@@ -202,7 +208,7 @@ impl InputMap {
     /// `algo`: the algorithm state that will be used to create the returned value
     ///
     /// `respect_enable`: toggles whether to ignore the global_enable parameter
-    /// 
+    ///
     /// `output`: the output buffer to fill with return values. Scaled between 0 and 1.
     ///
     pub fn get_intensity_from_haptic(

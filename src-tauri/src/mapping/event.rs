@@ -20,6 +20,8 @@ pub enum EventEffectType {
 }
 
 /// Represents a haptic event that takes place over time.
+/// 
+/// Depends on `EventEffectType`
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Event {
     /// user facing name
