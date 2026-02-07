@@ -3,7 +3,9 @@ use std::collections::VecDeque;
 use std::mem::discriminant;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
 
-/// A node cached by vrc, allows for historically informed cache manipulation.
+/// A node cached by vrc, is an intermdieary between an `InputNode`.
+/// 
+/// Provides simple 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct CacheNode {
     /// Ring buffer of values we have recieved.
@@ -64,7 +66,7 @@ impl CacheNode {
     }
 
     /// Returns the velocity interpreted latest value.
-    pub fn latest_interp(&self) -> f32 {
+    fn latest_interp(&self) -> f32 {
         if self.values.len() < 2 {
             return self.values.front().unwrap().0.clone().float().unwrap();
         }
@@ -94,39 +96,35 @@ impl CacheNode {
     /// The delta between `limit` and now can be seen as a smoothing time.
     ///
     /// Units: [Change Value/Second]
-    pub fn velocity_since(&self, limit: &SystemTime) -> f32 {
+    fn velocity_since(&self, limit: &SystemTime) -> f32 {
         let mut sum: f32 = 0.;
         let mut count: f32 = 0.;
 
-        // itterate from newest to oldest.
         for (index, (val, time)) in self.values.iter().enumerate() {
             if *time > *limit {
                 if let Some((older_val, older_time)) = self.values.get(index + 1) {
-                    if *older_time > *limit {
+                    // Calculate velocity even if older_time is before limit
+                    let dt = time.duration_since(*older_time).unwrap().as_secs_f32();
+                    if dt > 0.0 {
                         count += 1.;
-                        sum += self.value_delta(val, older_val)
-                            / time.duration_since(*older_time).unwrap().as_secs_f32();
-                    } else {
+                        sum += self.value_delta(val, older_val) / dt;
+                    }
+                    // Continue if older value is still after limit
+                    if *older_time <= *limit {
                         break;
                     }
                 } else {
-                    // No older value, stop
                     break;
                 }
-            } else {
-                break;
             }
         }
 
-        if count == 0.0 {
-            return count;
-        }
-        return sum / count;
+        if count == 0.0 { 0.0 } else { sum / count }
     }
 
     /// Returns the velocity between the latest value and `entries_back` into the cache.
     /// Units: [Change Value/Second]
-    pub fn velocity_by_entry(&self, entries_back: usize) -> Result<f32, RetrievalError> {
+    fn velocity_by_entry(&self, entries_back: usize) -> Result<f32, RetrievalError> {
         // retrieve values
         if let Some((val, time)) = self.values.back() {
             if let Some((val_late, time_late)) = self.values.get(entries_back) {

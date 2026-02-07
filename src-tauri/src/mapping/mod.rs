@@ -15,20 +15,41 @@ use event::Event;
 //use global_map::InputMap;
 use haptic_node::HapticNode;
 use input_node::InputNode;
+use interp::Interpolate;
 use uuid::Uuid;
 
 use crate::{
-    devices::{Device, DeviceId, DeviceInfo, DeviceManager, DeviceOutEvents},
-    state,
+    devices::{Device, DeviceHandle, DeviceId, DeviceInfo, DeviceOutEvents},
+    state::{self, PerDevice},
     util::math::Vec3,
 };
+
+/// Snapshot of map state.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct MapInfo {
+    nodes: Vec<InputNode>,
+    events: Vec<Event>,
+}
 
 /// Implements cheap clone, can be shared between threads safely.
 pub struct MapHandle {
     event_sender: mpsc::Sender<InputEventMessage>,
+    input_nodes: Arc<RwLock<Vec<InputNode>>>,
+    active_events: Arc<RwLock<Vec<Event>>>,
 }
 
 impl MapHandle {
+    pub fn mark_dirty_blocking(&self) {
+        self.event_sender.blocking_send(InputEventMessage::MarkMapDirty);
+    }
+
+    /// clones snapshot of map state
+    pub fn get_state(&self) -> MapInfo {
+        let nodes = self.input_nodes.read().clone();
+        let events = self.active_events.read().clone();
+        MapInfo { nodes: nodes, events: events }
+    }
+
     pub async fn send_event(
         &self,
         msg: InputEventMessage,
@@ -42,12 +63,69 @@ impl MapHandle {
     ) -> Result<(), SendError<InputEventMessage>> {
         self.event_sender.blocking_send(msg)
     }
+
+    /// collects the outputs of function f, for each node that has the given tag
+    /// 
+    /// Similar to `has_tag`
+    pub fn has_tag_mut<F, T>(&self, tag: &String, fun: F) -> Vec<T>
+    where 
+        F: Fn(&mut InputNode) -> T,    
+    {
+        let mut gather = vec![];
+        let mut nodes = self.input_nodes.write();
+        for node in nodes.iter_mut() {
+            if node.tags.contains(tag) {
+                gather.push(fun(node));
+            }
+        }
+        gather
+    }
+
+    /// collects the outputs of function f, for each node that has the given tag
+    pub fn has_tag<F, T>(&self, tag: String, fun: F) -> Vec<T>
+    where 
+        F: Fn(&InputNode) -> T,    
+    {
+        let mut gather = vec![];
+        let nodes = self.input_nodes.read();
+        for node in nodes.iter() {
+            if node.tags.contains(&tag) {
+                gather.push(fun(node));
+            }
+        }
+        gather
+    }
+
+    /// Performs function f on input node with id: `id`
+    pub fn with_node<F, T>(&self, id: &NodeId, f: F) -> Option<T>
+    where
+        F: FnOnce(&InputNode) -> T,
+    {
+        let nodes = self.input_nodes.read();
+        let node = nodes.iter().find(|n| *n.get_id() == *id)?;
+        Some(f(node))
+    }
+
+    /// Same as `with_node` but with a mutable reference.
+    ///
+    /// This does take a mutable write and locks the entire map list.
+    /// Spamming this function is not desireable.
+    pub fn with_node_mut<F, T>(&self, id: &NodeId, f: F) -> Option<T>
+    where
+        F: FnOnce(&mut InputNode) -> T,
+    {
+        let mut nodes = self.input_nodes.write();
+        let node = nodes.iter_mut().find(|n| *n.get_id() == *id)?;
+        Some(f(node))
+    }
 }
 
 impl Clone for MapHandle {
     fn clone(&self) -> Self {
         Self {
             event_sender: self.event_sender.clone(),
+            input_nodes: Arc::clone(&self.input_nodes),
+            active_events: Arc::clone(&self.active_events),      
         }
     }
 }
@@ -73,32 +151,21 @@ impl MappingDevice {
     }
 
     /// updates the buffer based on the referenced input nodes.
-    /// 
-    /// Returns whether a value was changed.
-    /// 
+    ///
     /// NOTE: This does not update the remote device, to force an update remember to use the `crate::devices::Device` trait as specified
-    pub fn update_buffer(&self, in_nodes: &Vec<InputNode>) -> bool {
-        let mut has_changed = false;
-        let buf = self.outputs.write();
-        if buf.len() < self.nodes.len() {
-            log::warn!("Buffer shorter than recorded nodes.");
-            
-            for (idx, input) in buf.iter().enumerate() {
-                // garunteed because of above check
-                let node = self.nodes.get(idx).unwrap();
-                node.
-            }
-
-
+    /// 
+    /// TODO: Actually take into account device level mapping settings.
+    pub fn update_buffer(&self, in_nodes: &Vec<InputNode>, settings: &PerDevice) {
+        let mut buf = self.outputs.write();
+        if buf.len() != self.nodes.len() {
+            log::warn!(
+                "Buffer not equal node length: buf:{}, nodes: {}",
+                buf.len(),
+                self.nodes.len()
+            );
+            settings.interp_algo.interp(&self.nodes, &mut buf, in_nodes);
         }
-
-
-        for (idx, node) in self.nodes.iter().enumerate() {
-            if buf.
-        }
-
-        has_changed
-    } 
+    }
 }
 
 /// Needs to handle:
@@ -110,30 +177,36 @@ pub struct InputMap {
     /// Needs to be shareable so that events can be ticked asyncrhonously.
     active_events: Arc<RwLock<Vec<Event>>>,
     input_nodes: Arc<RwLock<Vec<InputNode>>>,
-    manager: DeviceManager,
+    manager: DeviceHandle,
     devices: Arc<Mutex<Vec<MappingDevice>>>,
     event_recv: mpsc::Receiver<InputEventMessage>,
+    event_send: mpsc::Sender<InputEventMessage>,
     /// Whether input mapping has changed in a way that should require device output updates
     map_state_updated: AtomicBool,
 }
 
 impl InputMap {
     /// Assumes `DeviceManager` has been intialized.
-    ///
-    /// Initializes state on call if not already intialized.
-    pub async fn new(manager: DeviceManager) -> (Self, MapHandle) {
+    pub async fn new(manager: DeviceHandle) -> (Self, MapHandle) {
         let (tx, rx) = mpsc::channel(10);
+        let input_nodes = Arc::new(RwLock::new(Vec::new()));
+        let events = Arc::new(RwLock::new(Vec::new()));
 
         let map = Self {
-            active_events: Arc::new(RwLock::new(Vec::new())),
-            input_nodes: Arc::new(RwLock::new(Vec::new())),
+            active_events: events.clone(),
+            input_nodes: Arc::clone(&input_nodes),
             manager: manager,
             devices: Arc::new(Mutex::new(Vec::new())),
             event_recv: rx,
+            event_send: tx.clone(),
             map_state_updated: AtomicBool::new(false),
         };
 
-        let handle = MapHandle { event_sender: tx };
+        let handle = MapHandle {
+            event_sender: tx,
+            input_nodes: input_nodes,
+            active_events: events,
+        };
 
         return (map, handle);
     }
@@ -154,7 +227,8 @@ impl InputMap {
                         }
                         DeviceOutEvents::NewDevice(id) => {
                             let mut devices = devices_clone.lock();
-                            let Some(buf) = man_clone.with_device(&id, |d| d.get_feedback_buffer()) else {
+                            let Some(buf) = man_clone.with_device(&id, |d| d.get_feedback_buffer())
+                            else {
                                 log::warn!("Could not find new device: {id:?}");
                                 drop(devices);
                                 continue;
@@ -165,34 +239,73 @@ impl InputMap {
                                 drop(devices);
                                 continue;
                             };
-                            
-                            devices.push(
-                                MappingDevice {
-                                    id: id,
-                                    outputs: buf,
-                                    nodes: info.get_nodes().to_vec(),
-                                }
-                            );
-                        },
+
+                            devices.push(MappingDevice {
+                                id: id,
+                                outputs: buf,
+                                nodes: info.get_nodes().to_vec(),
+                            });
+                        }
                         DeviceOutEvents::RemovedDevice(id) => {
                             let mut devices = devices_clone.lock();
                             devices.retain(|d| d.id != id);
-                        },
+                        }
                     },
                     None => {}
                 }
             }
         });
 
-        start_handle_events(self.active_events.clone(), self.input_nodes.clone());
+        // handle our 100hz event ticks
+        let events = self.active_events.clone();
+        let in_nodes = self.input_nodes.clone();
+        let tx_events = self.event_send.clone();
+        tokio::spawn(async move {
+            loop {
+                let mut nodes = in_nodes.write();
+                let mut events = events.write();
+                events.retain_mut(|event| {
+                    let finished = event.tick(&mut nodes);
+                    !finished
+                });
+                drop(nodes);
+                drop(events);
+                tx_events.send(InputEventMessage::MarkMapDirty);
+                tokio::time::sleep(Duration::from_millis(10));
+            }
+        });
 
-        // register last to hopefully stop big race conditions.
+        // register for device events last to hopefully stop big race conditions.
         self.manager.register(dev_tx);
 
         // occupy this task with recieving messages.
         loop {
             match self.event_recv.recv().await {
                 Some(msg) => match msg {
+                    InputEventMessage::MarkMapDirty => {
+                        self.update_devices();
+                    }
+                    InputEventMessage::InsertNode(node) => {
+                        let mut nodes = self.input_nodes.write();
+                        if !nodes.iter().any(|f| f.get_id() == node.get_id()) {
+                            nodes.push(node);
+                        }
+                    }
+                    InputEventMessage::UpdateNode(id, int, radius) => {
+                        let mut nodes = self.input_nodes.write();
+                        let Some(node) = nodes.iter_mut().find(|d| *d.get_id() == id) else {
+                            log::warn!("Tried to update node that doesn't exist with id: {id:?}");
+                            continue;
+                        };
+                        node.intensity = int.unwrap_or(node.radius);
+                        node.radius = radius.unwrap_or(node.intensity);
+                    }
+                    InputEventMessage::RemoveWithTags(tags) => {
+                        let mut nodes = self.input_nodes.write();
+                        for tag in tags {
+                            nodes.retain(|n| !n.tags.contains(&tag));
+                        }
+                    }
                     InputEventMessage::StartEvent(e) => self.start_event(e),
                     InputEventMessage::StartEvents(mut e) => self.start_events(&mut e),
                     InputEventMessage::CancelAllWithTags(t) => {
@@ -205,6 +318,18 @@ impl InputMap {
                     break;
                 }
             }
+        }
+    }
+
+    /// pushes updates from map to devices
+    fn update_devices(&self) {
+        let mut cache = state::cache();
+        let devices = self.devices.lock();
+        let in_nodes = self.input_nodes.read();
+        for device in devices.iter() { // could be done in parallel here. but few devices means not effeicnet (probably)
+            let settings  = state::get_device_cache(&mut cache, &device.id);
+            device.update_buffer(&in_nodes, &settings);
+            self.manager.with_device(&device.id, |d| d.buffer_updated());
         }
     }
 
@@ -230,33 +355,7 @@ impl InputMap {
     }
 }
 
-async fn propogate_to_devices(devices: Arc<Mutex<Vec<MappingDevice>>>, in_nodes: Arc<RwLock<Vec<InputNode>>>) {
-    let devices = devices.lock();
-    
-    for device in devices.iter() {
-
-    }
-
-}
-
-async fn start_handle_events(events: Arc<RwLock<Vec<Event>>>, in_nodes: Arc<RwLock<Vec<InputNode>>>) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        loop {
-            let mut nodes = in_nodes.write();
-            let mut events = events.write();
-            events.retain_mut(|event| {
-                let finished = event.tick(&mut nodes);
-                !finished
-            });
-            drop(nodes);
-            drop(events);
-
-            tokio::time::sleep(Duration::from_millis(10));
-        }
-    })
-}
-
-fn handle_dirty_info(id: DeviceId, dev: &DeviceManager, devices: &Mutex<Vec<MappingDevice>>) {
+fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &Mutex<Vec<MappingDevice>>) {
     if let Some(info) = dev.with_device(&id, |d| d.info()) {
         match info {
             DeviceInfo::Wifi(i) => {
@@ -276,33 +375,17 @@ fn handle_dirty_info(id: DeviceId, dev: &DeviceManager, devices: &Mutex<Vec<Mapp
 }
 
 pub enum InputEventMessage {
+    /// Sets node with `NodeId`'s intensity, and radius.
+    UpdateNode(NodeId, Option<f32>, Option<f32>),
+    InsertNode(InputNode),
+    /// Removes all `InputNodes` with tags. This includes all input nodes created by events.
+    RemoveWithTags(Vec<String>),
     StartEvent(Event),
     StartEvents(Vec<Event>),
+    /// cancels all events with tags in string
     CancelAllWithTags(Vec<String>),
-}
-
-/// The common factors that will be used across all devices to modify output.
-/// Game inputs should insert values that will be used in device calculations here.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct StandardMenu {
-    pub intensity: f32, // multiplier set by user in-game
-    pub enable: bool,   // Flat enable or disable all haptics
-}
-
-impl Default for StandardMenu {
-    fn default() -> Self {
-        Self {
-            intensity: 1.0,
-            enable: true,
-        }
-    }
-}
-
-impl StandardMenu {
-    // retrieves either the saved values or default from our app state.
-    pub fn from_state() -> Self {
-        state::get(|c| c.mapping_menu.clone())
-    }
+    /// Will push input map contents to device buffers.
+    MarkMapDirty,
 }
 
 /// Descriptors for location groups.
@@ -332,29 +415,29 @@ pub enum NodeGroup {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 /// Id unique to the node it references.
 /// if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
-pub struct Id(pub String);
+pub struct NodeId(pub String);
 
-impl PartialEq<str> for Id {
+impl PartialEq<str> for NodeId {
     fn eq(&self, other: &str) -> bool {
         self.0 == other
     }
 }
 
-impl Into<String> for Id {
+impl Into<String> for NodeId {
     fn into(self) -> String {
         self.0
     }
 }
 
-impl From<String> for Id {
+impl From<String> for NodeId {
     fn from(value: String) -> Self {
-        Id(value)
+        NodeId(value)
     }
 }
 
-impl Id {
+impl NodeId {
     pub fn new() -> Self {
-        Id(Uuid::new_v4().to_string())
+        NodeId(Uuid::new_v4().to_string())
     }
 }
 

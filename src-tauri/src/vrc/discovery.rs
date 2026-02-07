@@ -1,8 +1,8 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
-use super::{Avatar, GameMap, OscPath, PREFAB_PREFIX};
+use super::{Avatar, GameMap, OscPath, VrcHandle, PREFAB_PREFIX, MsgToMainVrc};
 use crate::api::ApiManager;
 use crate::vrc::AVATAR_ID_PATH;
-use crate::{mapping::input_node::InputType, InputMap, VrcInfo};
+use crate::{mapping::input_node::InputType, InputMap, VrcGame};
 
 use libloading::Library;
 use std::collections::HashSet;
@@ -31,13 +31,12 @@ unsafe extern "C" fn dispatch_port(port: u16) {
     }
 }
 
-pub fn start_filling_available_parameters(
-    vrc: Arc<Mutex<VrcInfo>>,
-    api: Arc<Mutex<ApiManager>>,
-    global_map: Arc<Mutex<InputMap>>,
+pub async fn start_filling_available_parameters(
+    vrc: VrcHandle,
+    api: &'static Mutex<ApiManager>,
+    params: Arc<DashMap<OscPath, OscInfo>>,
 ) {
-    let vrc_clone = Arc::clone(&vrc);
-    thread::spawn(move || {
+    tokio::spawn(async move {
         let library_path = Path::new("./sidecars/listen-for-vrc.dll");
         let library = match unsafe { Library::new(library_path) } {
             Ok(lib) => lib,
@@ -83,30 +82,14 @@ pub fn start_filling_available_parameters(
         while let Ok(port) = receiver.recv() {
             log::debug!("VRC discovery library reported port: {}", port);
 
-            let (params, avatar_handle) = {
-                let mut vrc = vrc_clone.lock().expect("couldn't lock vrc");
-                vrc.vrc_connected = true;
-                (
-                    Arc::clone(&vrc.available_parameters),
-                    Arc::clone(&vrc.avatar),
-                )
-            };
-
             run_vrc_http_polling(
                 port,
                 &params,
-                avatar_handle,
-                Arc::clone(&vrc_clone),
-                Arc::clone(&api),
-                Arc::clone(&global_map),
+                vrc.clone(),
+                &api,
             );
 
-            let mut vrc_lock = vrc_clone.lock().expect("Couldn't lock vrc.");
-            vrc_lock.vrc_connected = false;
-            vrc_lock.available_parameters.clear();
-            vrc_lock.purge_cache();
-            let mut avatar_lock = vrc_lock.avatar.write().expect("Couldn't get read instance");
-            *avatar_lock = None;
+            vrc.send(MsgToMainVrc::VrcDisconnected);
         }
 
         unsafe {
@@ -182,107 +165,23 @@ fn update_params_from_text(
 ///
 /// * `params` - The available OSC parameters.
 /// * `avatar` - The shared avatar configuration.
-fn update_avatar(
+fn create_avatar(
     params: &DashMap<OscPath, OscInfo>,
-    avatar: &Arc<RwLock<Option<Avatar>>>,
-    api: Arc<Mutex<ApiManager>>,
-    global_map: Arc<Mutex<InputMap>>,
-) {
-    // First, retrieve the current avatar ID (if any) using a read lock.
-    let current_id = {
-        let avi_read = avatar.read().expect("unable to get read lock");
-        avi_read.as_ref().map(|avi| avi.id.clone())
-    };
+    new_id: String,
+    api: &Mutex<ApiManager>,
+) -> Avatar {
+    // Attempt to load the new configuration using OSC parameters.
+    let configs = load_configs(params, api);
+    let names = configs
+            .iter()
+            .map(|conf| conf.meta.map_name.clone())
+            .collect();
+    log::info!("Updated avatar with new configuration");
 
-    // Extract the new avatar ID from the OSC parameters.
-    if let Some(new_avi_param) = params.get(&OscPath(AVATAR_ID_PATH.to_string())) {
-        let new_id = &new_avi_param
-            .value
-            .first()
-            .unwrap()
-            .clone()
-            .string()
-            .unwrap();
-
-        // Compare the new id with the current avatar's id.
-        if current_id.as_deref() != Some(&new_id) {
-            log::info!("Avatar ID changed: {:?} -> {}", current_id, new_id);
-            // Clear all InputNodes with the tag "vrc_config_node"
-            if let Ok(map) = global_map.lock() {
-                map.remove_all_with_tag(&"vrc_config_node".to_string());
-            } else {
-                log::error!("Failed to lock global_map for clearing vrc_config_node nodes");
-            }
-
-            // Attempt to load the new configuration using OSC parameters.
-            let configs = load_configs(params, api);
-            log::info!("Updated avatar with new configuration");
-
-            push_to_global_map(&configs, global_map);
-            let mut avi_write = avatar.write().expect("unable to get write lock");
-            if let Some(avi_mut) = avi_write.as_mut() {
-                let names = configs
-                    .iter()
-                    .map(|conf| conf.meta.map_name.clone())
-                    .collect();
-                avi_mut.id = new_id.to_string();
-                avi_mut.configs = configs;
-                avi_mut.prefab_names = names;
-            } else {
-                let names = configs
-                    .iter()
-                    .map(|conf| conf.meta.map_name.clone())
-                    .collect();
-                let new_avi = Avatar {
-                    id: new_id.to_string(),
-                    configs: configs,
-                    prefab_names: names,
-                };
-                *avi_write = Some(new_avi);
-            };
-        }
-    }
-}
-
-fn push_to_global_map(configs: &Vec<GameMap>, global_map: Arc<Mutex<InputMap>>) {
-    let lock = global_map.lock().unwrap();
-    for conf in configs {
-        for node in &conf.nodes {
-            let mut haptic_node = node.node_data.clone();
-            // if external address apply all tag.
-            if node.is_external_address {
-                haptic_node.groups.push(crate::mapping::NodeGroup::All);
-            }
-
-            let mut input_type = InputType::INTERP;
-            if node.is_external_address {
-                input_type = InputType::ADDITIVE
-            }
-
-            // set intensity and push to map.
-            let err = lock.add_input_node(
-                haptic_node,
-                vec![
-                    format!(
-                        "{}_{}_{}",
-                        conf.meta.map_author, conf.meta.map_name, conf.meta.map_version
-                    ),
-                    node.target_bone.to_string(),
-                    "vrc_config_node".to_string(),
-                ],
-                node.address.clone(),
-                node.radius,
-                Some(input_type),
-            );
-            if err.is_err() {
-                log::error!(
-                    "Error: {:?} inserting Config: {} node: {}",
-                    err,
-                    conf.meta.map_name,
-                    node.address
-                );
-            }
-        }
+    Avatar {
+        id: new_id,
+        prefab_names: names,
+        configs: configs
     }
 }
 
@@ -296,7 +195,7 @@ fn push_to_global_map(configs: &Vec<GameMap>, global_map: Arc<Mutex<InputMap>>) 
 ///
 /// * `Some(GameMap)` if configurations were successfully loaded and merged.
 /// * `None` if no configs were found or loaded.
-fn load_configs(params: &DashMap<OscPath, OscInfo>, api: Arc<Mutex<ApiManager>>) -> Vec<GameMap> {
+fn load_configs(params: &DashMap<OscPath, OscInfo>, api: &Mutex<ApiManager>) -> Vec<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
@@ -331,10 +230,8 @@ fn load_configs(params: &DashMap<OscPath, OscInfo>, api: Arc<Mutex<ApiManager>>)
 fn run_vrc_http_polling(
     port: u16,
     params: &DashMap<OscPath, OscInfo>,
-    avatar: Arc<RwLock<Option<Avatar>>>,
-    vrc: Arc<Mutex<VrcInfo>>,
-    api: Arc<Mutex<ApiManager>>,
-    global_map: Arc<Mutex<InputMap>>,
+    vrc: VrcHandle,
+    api: &Mutex<ApiManager>,
 ) {
     let url = format!("http://127.0.0.1:{}/", port);
     log::debug!("Started polling HTTP.");
@@ -345,16 +242,24 @@ fn run_vrc_http_polling(
                 // Update OSC parameters based on the incoming HTTP response.
                 let (present_parameters, new_avi) = update_params_from_text(&text, params);
 
-                // remove all old parameters (not present)
                 if new_avi {
                     params.retain(|key, _| present_parameters.contains(key));
 
-                    {
-                        let mut vrc_lock = vrc.lock().expect("couldn't lock vrc");
-                        vrc_lock.purge_cache();
-                    }
+                    let Some(id_path) = params.get(&OscPath(AVATAR_ID_PATH.to_string())) else {
+                        log::error!("Unable to find avatar id message in vrc http response");
+                        continue;
+                    };
 
-                    update_avatar(params, &avatar, Arc::clone(&api), Arc::clone(&global_map));
+                    let new_id = id_path
+                        .value
+                        .first()
+                        .unwrap()
+                        .clone()
+                        .string()
+                        .unwrap();
+
+                    let new_avatar = create_avatar(params, new_id, &api);
+                    vrc.send(MsgToMainVrc::NewAvatar(new_avatar));
                 }
             }
             Err(err) => {

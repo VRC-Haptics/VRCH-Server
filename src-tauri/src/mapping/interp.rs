@@ -1,10 +1,13 @@
+use enum_dispatch::enum_dispatch;
+
 use crate::mapping::input_node::InputType;
 
 use super::{haptic_node::HapticNode, input_node::InputNode};
-use crate::devices::OutputNodes;
 
+#[enum_dispatch(InterpAlgo)]
 pub trait Interpolate {
-    fn interp(&self, nodes: &mut OutputNodes, in_nodes: &[InputNode]);
+    /// Implementations need to take into account that all lengths could be different.
+    fn interp(&self, haptic_nodes: &[HapticNode], output: &mut[f32], in_nodes: &[InputNode]);
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -13,25 +16,14 @@ pub trait Interpolate {
 ///
 /// Each entry implements the mapping::Interpolate trait and provides a self-contained
 /// method for interpolation
+#[enum_dispatch]
 pub enum InterpAlgo {
     /// Uses a gaussian distribution on the array of input nodes an weights them to determine output.
     Gaussian(GaussianState),
 }
 
-impl InterpAlgo {
-    /// fills output with the interpolated values for 
-    pub fn interp(&self, nodes: &mut OutputNodes, in_nodes: &[InputNode]) {
-        match self {
-            InterpAlgo::Gaussian(state) => state.interp(nodes, in_nodes),
-            // add other algo's here
-        }
-    }
-}
-
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-/// A container class holding variables required for gaussian distribution calculations
-///
-/// Provides `Interpolate` Implementation  
+/// A container class holding variables required for gaussian distribution interpolations.
 pub struct GaussianState {
     merge: f32, // TODO: Maybe look at caching interacted values?
     at_edge: f32,
@@ -128,10 +120,9 @@ impl GaussianState {
 }
 
 impl Interpolate for GaussianState {
-    fn interp(&self, nodes: &mut OutputNodes, in_nodes: &[InputNode]) {
-        let (haptic_nodes, outputs) = nodes.nodes_and_outputs();
+    fn interp(&self, haptic_nodes: &[HapticNode], output: &mut[f32], in_nodes: &[InputNode]) {
         for (i, node) in haptic_nodes.iter().enumerate() {
-            outputs[i] = self.single_node(node, in_nodes);
+            output[i] = self.single_node(node, in_nodes);
         }
     }
 }

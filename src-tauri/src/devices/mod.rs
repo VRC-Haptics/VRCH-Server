@@ -2,7 +2,7 @@
 pub mod serial;
 //mod traits;
 mod bhaptics;
-pub mod update;
+//pub mod update;
 pub mod wifi;
 //pub mod device;
 
@@ -14,7 +14,6 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use serde::{Deserialize, Serialize};
 use wifi::{WifiDevice, WifiDeviceInfo};
 
 use crate::{
@@ -51,6 +50,14 @@ impl DeviceInfo {
             }
         }
     }
+
+    pub fn set_nodes(&mut self, new: Vec<HapticNode>) {
+        match self {
+            DeviceInfo::Wifi(ref mut inf) => {
+                inf.nodes = new;
+            }
+        }
+    }
 }
 
 /// The generic interface for physical haptic devices
@@ -63,6 +70,7 @@ pub trait Device {
     /// Returns the info related to this device.
     /// All info should not be required at device start and will be edited as the device lives on.
     fn info(&self) -> DeviceInfo;
+    fn update_info(&self, new: DeviceInfo);
     /// Retrieves the feedback buffer that can be written to to update feedback.
     ///
     /// IMPORTANT: Not garunteed to be pushed to device until
@@ -93,16 +101,81 @@ pub enum DeviceOutEvents {
     DeviceInfoDirty(DeviceId),
 }
 
+/// can be freely cloned, provides cheap access to individual devices.
+pub struct DeviceHandle {
+    devices: Arc<DashMap<DeviceId, HapticDevice>>,
+    subscribers: Arc<Mutex<Vec<mpsc::Sender<DeviceOutEvents>>>>,
+    device_sender: mpsc::Sender<DeviceMessage>,
+}
+
+impl Clone for DeviceHandle {
+    fn clone(&self) -> Self {
+        Self {
+            devices: Arc::clone(&self.devices),
+            subscribers: Arc::clone(&self.subscribers),
+            device_sender: self.device_sender.clone(),
+        }
+    }
+}
+
+impl DeviceHandle {
+
+    /// checks if a device is still here.
+    pub fn exists(&self, id: &DeviceId) -> bool {
+        self.devices.contains_key(id)
+    }
+
+    pub fn get_device_channel(&self) -> mpsc::Sender<DeviceMessage> {
+        self.device_sender.clone()
+    }
+
+    /// Registers a callback for when a device event happens, like connecting or disconnecting.
+    pub fn register(&self, tx: mpsc::Sender<DeviceOutEvents>) {
+        let mut sub = self.subscribers.lock();
+        sub.push(tx);
+    }
+
+    /// gathers all devices in the map
+    pub fn devices(&self) -> Vec<DeviceId> {
+        self.devices
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect()
+    }
+
+    /// Runs closure `fun` with device `id` as its input
+    ///
+    /// To get INFO:
+    ///
+    /// ```
+    /// let info = manager.with_device("mac address", |d| d.info());
+    ///  
+    /// ```
+    pub fn with_device<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
+    where
+        F: FnOnce(&HapticDevice) -> T,
+    {
+        self.devices.get(id).map(|d| fun(&d))
+    }
+
+    pub fn with_device_mut<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
+    where
+        F: FnOnce(&mut HapticDevice) -> T,
+    {
+        self.devices.get_mut(id).map(|mut d| fun(&mut d))
+    }
+}
+
 /// A thin, thread safe abstraction layer over physical devices,
-/// can be freely cloned AFTER the `init_device_manager` has been called.
+/// AFTER the `init_device_manager` has been called.
 ///
 /// # USE initialiaztion function at top of main.
 pub struct DeviceManager {
     // Requires Arc to keep fully asynchronus
     devices: Arc<DashMap<DeviceId, HapticDevice>>,
-    device_channel: Option<mpsc::Receiver<DeviceMessage>>,
+    device_receiver: Option<mpsc::Receiver<DeviceMessage>>,
     // doesn't need to be arc because we can just clone it.
-    recieve_channel: mpsc::Sender<DeviceMessage>,
+    device_sender: mpsc::Sender<DeviceMessage>,
     // arc for internal loop stuff
     subscribers: Arc<Mutex<Vec<mpsc::Sender<DeviceOutEvents>>>>,
     shutdown: CancellationToken,
@@ -116,11 +189,15 @@ impl DeviceManager {
 
         DeviceManager {
             devices: Arc::new(DashMap::new()),
-            device_channel: Some(rx),
-            recieve_channel: tx,
+            device_receiver: Some(rx),
+            device_sender: tx,
             subscribers: Arc::new(Mutex::new(vec![])),
             shutdown: shutdown,
         }
+    }
+
+    pub fn get_handle(&self) -> DeviceHandle {
+        DeviceHandle { devices: Arc::clone(&self.devices), subscribers: Arc::clone(&self.subscribers), device_sender: self.device_sender.clone() }
     }
 
     pub fn register(&self, tx: mpsc::Sender<DeviceOutEvents>) {
@@ -129,11 +206,11 @@ impl DeviceManager {
     }
 
     pub fn get_device_channel(&self) -> mpsc::Sender<DeviceMessage> {
-        self.recieve_channel.clone()
+        self.device_sender.clone()
     }
 
     /// Runs closure `fun` with device `id` as its input
-    ///
+    /// TODO: Isolate per-device commands to only be from handlers.
     /// To get INFO:
     ///
     /// ```
@@ -178,13 +255,13 @@ impl DeviceManager {
 
 /// Handles intitializing all device listeners as well as managing device messaging.
 pub async fn init_device_manager(manager: &mut DeviceManager) {
-    let Some(mut rx) = manager.device_channel.take() else {
+    let Some(mut rx) = manager.device_receiver.take() else {
         log::error!("Manager init called after already called earlier.");
         return;
     };
 
     // initialize our device listeners
-    start_wifi_devices(manager);
+    start_wifi_devices(&mut manager.get_handle());
 
     // spawn our channel manager
     let clone = manager.shutdown.clone();
@@ -238,45 +315,6 @@ fn handle_device_message(
     };
 }
 
-impl Clone for DeviceManager {
-    /// will take the device_channel,
-    ///
-    /// ONLY CAN BE INITTED USING THE ORIGINAL COPY.
-    fn clone(&self) -> Self {
-        Self {
-            devices: Arc::clone(&self.devices),
-            device_channel: None,
-            recieve_channel: self.recieve_channel.clone(),
-            subscribers: Arc::clone(&self.subscribers),
-            shutdown: self.shutdown.clone(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OutputNodes {
-    nodes: Vec<HapticNode>,
-    outputs: Vec<f32>,
-}
-
-impl OutputNodes {
-    pub fn set_nodes(&mut self, nodes: Vec<HapticNode>) {
-        self.outputs.resize(nodes.len(), 0.0);
-        self.nodes = nodes;
-    }
-
-    pub fn nodes(&self) -> &[HapticNode] {
-        &self.nodes
-    }
-
-    pub fn outputs_mut(&mut self) -> &mut [f32] {
-        &mut self.outputs
-    }
-
-    pub fn nodes_and_outputs(&mut self) -> (&[HapticNode], &mut [f32]) {
-        (&self.nodes, &mut self.outputs)
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DeviceId(pub String);

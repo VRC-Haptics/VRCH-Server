@@ -1,4 +1,4 @@
-use super::{haptic_node::HapticNode, input_node::InputNode, Id, NodeGroup};
+use super::{haptic_node::HapticNode, input_node::InputNode, NodeId, NodeGroup};
 use crate::mapping::input_node::InputType;
 use crate::util::math::Vec3;
 use std::time::{Duration, SystemTime};
@@ -8,9 +8,9 @@ use std::time::{Duration, SystemTime};
 pub enum EventEffectType {
     /// Will try to set this node id to this value,
     /// Does not remove node after finished.
-    SingleNode(Id),
+    SingleNode(NodeId),
     /// Same as single node, but with a list of them.
-    MultipleNodes(Vec<Id>),
+    MultipleNodes(Vec<NodeId>),
     /// Effects all InputNodes with the given tag.
     Tags(Vec<String>),
     /// Inserts a node at the given location, automatically removes node when event expires.
@@ -38,7 +38,7 @@ pub struct Event {
     pub tags: Vec<String>,
     /// radius of effect this event will have
     pub radius: f32,
-    managed_nodes: Vec<Id>, // nodes we have control over.
+    managed_nodes: Vec<NodeId>, // nodes we have control over.
     time_step: Duration,
     steps_completed: usize,
     start_time: Option<SystemTime>,
@@ -139,7 +139,7 @@ impl Event {
 
         match &self.effect {
             EventEffectType::Location(pos) => {
-                let id = Id::new();
+                let id = NodeId::new();
                 let haptic_node = HapticNode {
                     x: pos.x,
                     y: pos.y,
@@ -158,7 +158,7 @@ impl Event {
                 self.managed_nodes.push(id);
             }
             EventEffectType::MovingLocation(path) if !path.is_empty() => {
-                let id = Id::new();
+                let id = NodeId::new();
                 let first = path.first().unwrap(); // verified non-zero at new() function
                 let haptic_node = HapticNode {
                     x: first.x,

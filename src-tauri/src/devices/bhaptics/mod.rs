@@ -1,7 +1,5 @@
 use btleplug::api::BDAddr;
 
-use crate::{devices::OutputFactors, mapping::global_map::InputMap};
-
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BhapticsDevice {
     TacsuitX16,
@@ -15,7 +13,7 @@ pub struct BhapticBleDevice {
 }
 
 impl BhapticBleDevice {
-    pub fn tick(&mut self, factors: OutputFactors, inputs: &InputMap) {
-
-    }
+    //pub fn tick(&mut self, factors: OutputFactors, inputs: &InputMap) {
+//
+    //}
 }

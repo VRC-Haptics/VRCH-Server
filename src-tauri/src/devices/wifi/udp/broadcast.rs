@@ -1,4 +1,5 @@
 use crate::devices::DeviceManager;
+use crate::devices::DeviceHandle;
 use crate::devices::{wifi::WifiDevice, DeviceId, HapticDevice};
 use serde_json::Value;
 
@@ -21,7 +22,7 @@ async fn get_broadcast() -> &'static Arc<UdpSocket> {
         .await
 }
 
-pub async fn start_listen_broadcast(manager: &mut DeviceManager) {
+pub async fn start_listen_broadcast(manager: &mut DeviceHandle) {
     let socket = get_broadcast().await;
     let manager = manager.clone();
     let tx = manager.get_device_channel();

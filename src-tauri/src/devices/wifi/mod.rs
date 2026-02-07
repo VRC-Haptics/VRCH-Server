@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::devices::{
     wifi::{config::WifiConfig, connection_manager::WifiConnManager},
-    DeviceManager, ESP32Model,
+    DeviceHandle, ESP32Model,
 };
 use crate::mapping::haptic_node::HapticNode;
 use crate::util::next_free_port;
@@ -21,7 +21,7 @@ mod config;
 mod connection_manager;
 mod udp;
 
-pub async fn start_wifi_devices(manager: &mut DeviceManager) {
+pub async fn start_wifi_devices(manager: &mut DeviceHandle) {
     udp::start_udp().await;
     start_listen_broadcast(manager).await;
 }
@@ -71,6 +71,7 @@ pub struct WifiDeviceInfo {
     pub name: String,
     pub mac: String,
     pub rssi: usize,
+    pub esp_model: ESP32Model,
 }
 
 impl WifiDevice {
@@ -177,6 +178,7 @@ impl WifiDevice {
             name: self.name.clone(),
             mac: self.mac.clone(),
             rssi: 0,
+            esp_model: ESP32Model::Unknown,
         }
     }
 
@@ -334,8 +336,26 @@ impl Device for WifiDevice {
             name: self.name.clone(),
             mac: self.mac.clone(),
             rssi: 0,
+            esp_model: ESP32Model::Unknown,
         };
         DeviceInfo::Wifi(info)
+    }
+
+    /// currently only updates the nodes.
+    fn update_info(&self, new: DeviceInfo) {
+        match new {
+            DeviceInfo::Wifi(inf) => {
+                let mut state = self.live_state.lock();
+                if let Some( ref mut conf) = &mut state.config {
+                    conf.node_map = inf.nodes.clone();
+                    
+                }
+                state.nodes = inf.nodes;
+                state.push_map = true; // signal to persist to device
+                self.manager.blocking_send(DeviceMessage::InfoDirty(self.get_id())); // tell map our info has changed
+            } 
+            _ => log::warn!("Updated with wrong info type on wifi device: {:?}=>{:?}", self.name, self.mac),
+        }
     }
 
     fn disconnect(&mut self) {

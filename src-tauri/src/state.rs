@@ -13,10 +13,7 @@ use std::{
 
 use crate::{
     devices::DeviceId,
-    mapping::{
-        interp::{GaussianState, InterpAlgo},
-        StandardMenu,
-    },
+    mapping::interp::{GaussianState, InterpAlgo},
 };
 
 // not intended to be accessed publicly. Use functions below
@@ -26,6 +23,8 @@ static DIRTY: AtomicBool = AtomicBool::new(false);
 
 /// starts persisting our config to disk. Spawns new task.
 pub async fn start_config_save(save_delay: Duration) {
+    let _ = CONFIG.load(); // make sure it is intialized early.
+
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(save_delay).await;
@@ -34,6 +33,17 @@ pub async fn start_config_save(save_delay: Duration) {
             }
         }
     });
+}
+
+/// retrieves a clone of the given field. 
+/// 
+/// This value is owned and doesn't update atomically.
+pub fn clone_field<F, T>(f: F) -> T
+where 
+    F: FnOnce(&Config) -> &T,
+    T: Clone,
+{
+    f(&CONFIG.load()).clone()
 }
 
 /// Used to cheaply access an atomic value later without blocking.
@@ -55,9 +65,7 @@ pub fn cache() -> Cache<AtomicArc<Config>> {
     Cache::new(CONFIG.load().into_owned().into())
 }
 
-/// Runs function F on the config to produce changes.
-/// 
-/// This 
+/// Runs function F on the config to produce changes. THIS CLONES THE WHOLE CONFIG, BE AWARE OF THIS.
 ///
 /// These changes are immediately available to all references using the cache,
 /// but are stored to drive at specified intervals
@@ -66,6 +74,27 @@ pub fn update(f: impl FnOnce(&mut Config)) {
     f(&mut new);
     CONFIG.store(new.into());
     DIRTY.store(true, Ordering::Relaxed);
+}
+
+/// Swaps the current config for the given one. 
+/// 
+/// This is non-trivial and should be considered as such.
+pub fn swap(conf: Config) {
+    CONFIG.store(conf.into());
+    DIRTY.store(true, Ordering::Relaxed)
+}
+
+pub fn get_device_cache(cache: &mut Cache<AtomicArc<Config>>, id: &DeviceId) -> PerDevice {
+    cache.load()
+        .saved_devices
+        .iter()
+        .find(|d| d.id == *id)
+        .cloned()
+        .unwrap_or_else(|| {
+            let new = PerDevice::default(id.clone());
+            update(|cfg| cfg.saved_devices.push(new.clone()));
+            new
+        })
 }
 
 /// Handles device setting device fields, initializes to default values if none found.
@@ -98,6 +127,14 @@ pub struct Config {
     pub vrc_settings: VrcSettings,
 }
 
+/// The common factors that will be used across all devices to modify output.
+/// Game inputs should insert values that will be used in device calculations here.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct StandardMenu {
+    pub intensity: f32, // multiplier set by user in-game
+    pub enable: bool,   // Flat enable or disable all haptics
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -109,10 +146,11 @@ impl Default for Config {
     }
 }
 
-impl Default for VrcSettings {
+impl Default for StandardMenu {
     fn default() -> Self {
-        Self {
-            velocity_ratio: 0.5,
+        StandardMenu {
+            intensity: 1.0,
+            enable: true,
         }
     }
 }
@@ -129,8 +167,33 @@ impl PerDevice {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Persistant state related to vrc specifically.
 pub struct VrcSettings {
+    /// How much weight distance has, 1-`dist_weight` = the velocity weight
     pub velocity_ratio: f32,
+    /// the magic velocity multiplier. 1 is reasonable, if fast.
+    pub velocity_mult: f32,
+    /// Number of value entries to keep track of for velocity measurements.
+    ///
+    /// VRC Refreshes at 10hz max, so 10*seconds should work just fine.
+    /// Will only refresh on program restart.
+    pub sample_cache: usize,
+
+    /// Takes an average of all data recieved within this past time frame.
+    /// 
+    /// Smooths motor acceleration.
+    pub smoothing_time: Duration,
+}
+
+impl Default for VrcSettings {
+    fn default() -> Self {
+        Self {
+            velocity_ratio: 0.5,
+            velocity_mult: 1.0,
+            sample_cache: 10,
+            smoothing_time: Duration::from_secs_f32(0.12),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

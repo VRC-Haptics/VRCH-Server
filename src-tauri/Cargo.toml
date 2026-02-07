@@ -35,7 +35,7 @@ tauri-plugin-serialplugin = "2.21.1"
 
 # project stuff
 oyasumivr_oscquery = { git = "https://github.com/Raphiiko/oyasumivr_oscquery.git" }
-btleplug = {version = "0.11.8", features = ["serde"]}
+btleplug = {version = "0.11.8", features = ["serde"] }
 tokio = {version = "1.42.1", features = ["rt-multi-thread", "full"] }
 rosc = { git = "https://github.com/virtuallyaverage/rosc-serde.git" }
 regex = "1.11.1"
