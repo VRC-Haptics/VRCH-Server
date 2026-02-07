@@ -151,7 +151,7 @@ impl VrcGame {
             handle_rcv.send_osc_msg_rcv(msg);
         };
 
-        let recieving_port = 9001;
+        let mut recieving_port = 9001;
         let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
         let port_used = vrc_server.start();
 

@@ -5,42 +5,38 @@
 // make local modules available
 pub mod api;
 //mod bhaptics;
+pub mod ble;
 mod commands;
 mod devices;
 pub mod mapping;
 pub mod osc;
-pub mod util;
-pub mod ble;
 pub mod state;
+pub mod util;
 mod vrc;
 
 // local modules
 use api::ApiManager;
 //use bhaptics::game::BhapticsGame;
-use devices::{DeviceManager, init_device_manager};
+use devices::{init_device_manager, DeviceManager};
 use mapping::InputMap;
 use vrc::VrcGame;
 
 //standard imports
 use commands::*;
+use once_cell::sync::OnceCell;
+use std::panic::{set_hook, take_hook};
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration};
-use std::panic::{take_hook, set_hook};
+use std::time::Duration;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
-use once_cell::sync::OnceCell;
 
 use crate::devices::DeviceHandle;
-use crate::{
-    ble::start_ble,
-    state::start_config_save,
-    mapping::MapHandle,
-    vrc::VrcHandle,
-};
+use crate::{ble::start_ble, mapping::MapHandle, state::start_config_save, vrc::VrcHandle};
 
 // Provides a unified interface for interacting with external api's
-pub static API_MANAGER: LazyLock<Mutex<ApiManager>> = LazyLock::new(||{Mutex::new(ApiManager::new())});
+pub static API_MANAGER: LazyLock<Mutex<ApiManager>> =
+    LazyLock::new(|| Mutex::new(ApiManager::new()));
 pub static DEVICE_MANAGER: OnceCell<DeviceHandle> = OnceCell::new();
 
 fn close_app(window: &Window) {
@@ -88,7 +84,6 @@ async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
     });
 
     (vrc_handle, map_handle)
-
 }
 
 #[tokio::main]
@@ -121,16 +116,15 @@ async fn main() {
                 }))
                 .filter(|metadata| {
                     !metadata.target().starts_with("mio")
-                        && !metadata.target().starts_with("reqwest") && !metadata.target().starts_with("btleplug")
+                        && !metadata.target().starts_with("reqwest")
+                        && !metadata.target().starts_with("btleplug")
                 })
                 .max_file_size(500_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))
                 .build(),
-    ).manage(DEVICE_MANAGER.get().unwrap().clone())
-        .manage(vrc)
-        .manage(map)
-        .setup( move |app: &mut tauri::App| {
-            let app_handle = app.handle();
+        )
+        .setup(move |app: &mut tauri::App| {
+            let handle = app.handle().clone();
 
             let default_panic = take_hook();
             set_hook(Box::new(move |info| {
@@ -144,22 +138,24 @@ async fn main() {
             lock.refresh_caches();
             drop(lock);
 
+            tauri::async_runtime::spawn(async move {
+                // DeviceManager init
+                let mut manager = DeviceManager::new();
+                init_device_manager(&mut manager).await;
+                if let Err(e) = DEVICE_MANAGER.set(manager.get_handle()) {
+                    log::error!("Failed to start device manager");
+                }
+                let device_handle = manager.get_handle();
+
+                let (vrc, map) = start_async_tasks(device_handle).await;
+                handle.manage(vrc);
+                handle.manage(map);
+                handle.manage(DEVICE_MANAGER.get().unwrap().clone());
+            });
+
             log::trace!("done with tauri setup");
             Ok(())
-        });
-
-
-    let mut manager = DeviceManager::new();
-    init_device_manager(&mut manager);
-    if let Err(e) = DEVICE_MANAGER.set(manager.get_handle()) {
-        log::error!("Failed to start device manager");
-    }
-    log::trace!("Here");
-
-    let (vrc, map) = start_async_tasks(manager.get_handle()).await;
-
-    
-    plugins
+        })
         .invoke_handler(tauri::generate_handler![
             commands::get_device_list,
             commands::get_vrc_info,

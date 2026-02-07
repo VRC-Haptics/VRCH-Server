@@ -246,6 +246,7 @@ impl DeviceManager {
 
     pub async fn shutdown(&self) {
         self.shutdown.cancel();
+        ///TODO: Figure out why this does what it doess
         self.devices.iter_mut().map(|mut pair| {
             let this = pair.value_mut();
             this.disconnect()
@@ -261,7 +262,7 @@ pub async fn init_device_manager(manager: &mut DeviceManager) {
     };
 
     // initialize our device listeners
-    start_wifi_devices(&mut manager.get_handle());
+    start_wifi_devices(&mut manager.get_handle()).await;
 
     // spawn our channel manager
     let clone = manager.shutdown.clone();
