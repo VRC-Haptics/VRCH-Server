@@ -12,7 +12,7 @@ use crate::mapping::{
 };
 use crate::mapping::{InputEventMessage, MapHandle};
 use crate::osc::server::OscServer;
-use crate::state::{self, Config, cache};
+use crate::state::{self, cache, Config};
 use crate::vrc::parsing::OscInfo;
 
 // module dependencies
@@ -20,16 +20,16 @@ use cache_node::CacheNode;
 use config::GameMap;
 use dashmap::DashMap;
 use discovery::start_filling_available_parameters;
+use hazarc::{ArcBorrow, AtomicArc};
 use osc_query::OscQueryServer;
 use parsing::remove_version;
-use hazarc::{AtomicArc, ArcBorrow};
 
 use rosc::OscMessage;
-use std::{
-    net::Ipv4Addr,
-    sync::{Arc, Mutex},
+use std::{net::Ipv4Addr, sync::Arc};
+use tokio::sync::{
+    mpsc::{channel, Receiver, Sender},
+    Mutex,
 };
-use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 /// struct exposed to the UI.
 ///
@@ -67,12 +67,16 @@ pub struct VrcHandle {
 }
 
 impl VrcHandle {
-    pub async fn send_osc_msg_rcv(&self, msg: OscMessage) {
-        self.tx.send(MsgToMainVrc::OscMessageRecieved(msg)).await;
+    pub fn send_osc_msg_rcv(&self, msg: OscMessage) {
+        self.tx.blocking_send(MsgToMainVrc::OscMessageRecieved(msg));
     }
 
-    pub fn send(&self, msg: MsgToMainVrc) {
+    pub fn blocking_send(&self, msg: MsgToMainVrc) {
         self.tx.blocking_send(msg);
+    }
+
+    pub async fn send(&self, msg: MsgToMainVrc) {
+        self.tx.send(msg).await;
     }
 
     pub fn get_info(&self) -> ArcBorrow<VrcInfo> {
@@ -124,7 +128,10 @@ impl VrcGame {
     pub async fn new(map_handle: MapHandle, api: &'static Mutex<ApiManager>) -> VrcGame {
         let (tx, rx) = channel(10);
         let info = Arc::new(AtomicArc::new(VrcInfo::default().into()));
-        let handle = VrcHandle { tx: tx.clone(), info: Arc::clone(&info) };
+        let handle = VrcHandle {
+            tx: tx.clone(),
+            info: Arc::clone(&info),
+        };
         let param_cache = Arc::new(DashMap::new());
         let param_avail = Arc::new(DashMap::new());
 
@@ -143,7 +150,7 @@ impl VrcGame {
 
         // Start the thread that handles finding available vrc parameters
         // (High latency server)
-        start_filling_available_parameters(vrc.get_handle(), api, param_avail);
+        start_filling_available_parameters(vrc.get_handle(), api, param_avail).await;
 
         //create the low-latency server.
         let handle_rcv = handle.clone();
@@ -158,7 +165,7 @@ impl VrcGame {
         // if the server wasn't able to capture the port start advertising the port it was bound to.
         if port_used != recieving_port {
             let mut osc_server = OscQueryServer::new(recieving_port);
-            osc_server.start();
+            osc_server.start().await;
             log::warn!("Not using VRC dedicated ports, expect slower operations.");
         }
 
@@ -179,7 +186,7 @@ impl VrcGame {
             };
 
             match msg {
-                // called at high velocity. 
+                // called at high velocity.
                 MsgToMainVrc::RefreshMap => {
                     let cfg = cfg_cache.load();
                     self.refresh_map(cfg, &self.map);
@@ -210,6 +217,7 @@ impl VrcGame {
                         }
 
                         // push changes to
+                        self.handle.send(MsgToMainVrc::RefreshMap).await;
                     } else {
                         log::warn!("empty message recieved: {:?}", msg);
                     }
@@ -218,7 +226,8 @@ impl VrcGame {
                     log::debug!("New avatar: {avi:?}");
                     //clear current input nodes
                     self.map
-                        .send_event(InputEventMessage::RemoveWithTags(vec![VRC_TAG.into()]));
+                        .send_event(InputEventMessage::RemoveWithTags(vec![VRC_TAG.into()]))
+                        .await;
 
                     let nodes = to_inputs(&avi);
                     self.avatar = Some(avi);
@@ -230,7 +239,7 @@ impl VrcGame {
                                 .await;
                         }
                     }
-                },
+                }
                 MsgToMainVrc::VrcDisconnected => {
                     log::warn!("Vrc Disconnected");
                     self.avatar = None;
@@ -256,7 +265,7 @@ impl VrcGame {
         if let Some(int_node) = self.parameter_cache.get(&OscPath(INTENSITY_PATH.into())) {
             cfg_int = int_node.raw_last();
             if (cfg.mapping_menu.intensity - cfg_int).abs() > 0.01 {
-                collect.push(|d: &mut Config| {d.mapping_menu.intensity = cfg_int});
+                collect.push(|d: &mut Config| d.mapping_menu.intensity = cfg_int);
             }
         }
 
@@ -295,7 +304,6 @@ impl VrcGame {
             // blocks till it sends.
             map.mark_dirty_blocking();
         }
-
     }
 
     /// Purges the parameter cache.

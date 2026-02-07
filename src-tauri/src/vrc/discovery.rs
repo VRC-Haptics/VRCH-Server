@@ -1,19 +1,17 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
-use super::{Avatar, GameMap, OscPath, VrcHandle, PREFAB_PREFIX, MsgToMainVrc};
+use super::{Avatar, GameMap, MsgToMainVrc, OscPath, VrcHandle, PREFAB_PREFIX};
 use crate::api::ApiManager;
 use crate::vrc::AVATAR_ID_PATH;
-use crate::{mapping::input_node::InputType, InputMap, VrcGame};
 
+use dashmap::DashMap;
 use libloading::Library;
 use std::collections::HashSet;
 use std::path::Path;
-use std::sync::mpsc;
+use std::sync::Arc;
 use std::sync::OnceLock;
-use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
-
-use dashmap::DashMap;
+use tokio::sync::{mpsc, Mutex};
 
 type PortCallback = unsafe extern "C" fn(u16);
 type StartListener = unsafe extern "C" fn(PortCallback);
@@ -23,10 +21,9 @@ static PORT_SENDER: OnceLock<Mutex<Option<mpsc::Sender<u16>>>> = OnceLock::new()
 
 unsafe extern "C" fn dispatch_port(port: u16) {
     if let Some(lock) = PORT_SENDER.get() {
-        if let Ok(guard) = lock.lock() {
-            if let Some(sender) = guard.as_ref() {
-                let _ = sender.send(port);
-            }
+        let guard = lock.blocking_lock();
+        if let Some(sender) = guard.as_ref() {
+            let _ = sender.send(port);
         }
     }
 }
@@ -64,14 +61,11 @@ pub async fn start_filling_available_parameters(
                 }
             };
 
-        let receiver = {
-            let (tx, rx) = mpsc::channel::<u16>();
+        let mut receiver = {
+            let (tx, rx) = mpsc::channel::<u16>(2);
             let storage = PORT_SENDER.get_or_init(|| Mutex::new(None));
-            if let Ok(mut guard) = storage.lock() {
-                *guard = Some(tx);
-            } else {
-                log::error!("Failed to acquire port sender storage lock");
-            }
+            let mut guard = storage.lock().await;
+            *guard = Some(tx);
             rx
         };
 
@@ -79,17 +73,12 @@ pub async fn start_filling_available_parameters(
             start(dispatch_port);
         }
 
-        while let Ok(port) = receiver.recv() {
+        while let Some(port) = receiver.recv().await {
             log::debug!("VRC discovery library reported port: {}", port);
 
-            run_vrc_http_polling(
-                port,
-                &params,
-                vrc.clone(),
-                &api,
-            );
+            run_vrc_http_polling(port, &params, vrc.clone(), &api).await;
 
-            vrc.send(MsgToMainVrc::VrcDisconnected);
+            vrc.send(MsgToMainVrc::VrcDisconnected).await;
         }
 
         unsafe {
@@ -97,9 +86,9 @@ pub async fn start_filling_available_parameters(
         }
 
         if let Some(lock) = PORT_SENDER.get() {
-            if let Ok(mut guard) = lock.lock() {
-                *guard = None;
-            }
+            let mut guard = lock.blocking_lock();
+
+            *guard = None;
         }
     });
 }
@@ -165,23 +154,23 @@ fn update_params_from_text(
 ///
 /// * `params` - The available OSC parameters.
 /// * `avatar` - The shared avatar configuration.
-fn create_avatar(
+async fn create_avatar(
     params: &DashMap<OscPath, OscInfo>,
     new_id: String,
     api: &Mutex<ApiManager>,
 ) -> Avatar {
     // Attempt to load the new configuration using OSC parameters.
-    let configs = load_configs(params, api);
+    let configs = load_configs(params, api).await;
     let names = configs
-            .iter()
-            .map(|conf| conf.meta.map_name.clone())
-            .collect();
+        .iter()
+        .map(|conf| conf.meta.map_name.clone())
+        .collect();
     log::info!("Updated avatar with new configuration");
 
     Avatar {
         id: new_id,
         prefab_names: names,
-        configs: configs
+        configs: configs,
     }
 }
 
@@ -195,12 +184,12 @@ fn create_avatar(
 ///
 /// * `Some(GameMap)` if configurations were successfully loaded and merged.
 /// * `None` if no configs were found or loaded.
-fn load_configs(params: &DashMap<OscPath, OscInfo>, api: &Mutex<ApiManager>) -> Vec<GameMap> {
+async fn load_configs(params: &DashMap<OscPath, OscInfo>, api: &Mutex<ApiManager>) -> Vec<GameMap> {
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
-            let mut lock = api.lock().expect("Unable to obtain api lock");
-            match lock.load_map(prefab.0, prefab.1, prefab.2) {
+            let mut lock = api.blocking_lock();
+            match lock.load_map(prefab.0, prefab.1, prefab.2).await {
                 Ok(map) => configs.push(map),
                 Err(err) => match err {
                     other => {
@@ -227,7 +216,7 @@ fn load_configs(params: &DashMap<OscPath, OscInfo>, api: &Mutex<ApiManager>) -> 
 /// * `port` - The port on which the VRC HTTP server is running.
 /// * `params` - A reference to the DashMap holding OSC parameter data.
 /// * `avatar` - A shared, thread-safe reference to the current avatar configuration.
-fn run_vrc_http_polling(
+async fn run_vrc_http_polling(
     port: u16,
     params: &DashMap<OscPath, OscInfo>,
     vrc: VrcHandle,
@@ -250,15 +239,9 @@ fn run_vrc_http_polling(
                         continue;
                     };
 
-                    let new_id = id_path
-                        .value
-                        .first()
-                        .unwrap()
-                        .clone()
-                        .string()
-                        .unwrap();
+                    let new_id = id_path.value.first().unwrap().clone().string().unwrap();
 
-                    let new_avatar = create_avatar(params, new_id, &api);
+                    let new_avatar = create_avatar(params, new_id, &api).await;
                     vrc.send(MsgToMainVrc::NewAvatar(new_avatar));
                 }
             }

@@ -28,7 +28,7 @@ impl WifiConnManager {
         let on_receive = move |msg: OscMessage| {
             //if heartbeat
             if msg.addr == hrtbt_addr {
-                tx.send(WifiTickSignal::NewHeartBeat(Instant::now()));
+                tx.blocking_send(WifiTickSignal::NewHeartBeat(Instant::now()));
 
             // command was sent
             } else if msg.addr == "/command" {
@@ -36,13 +36,13 @@ impl WifiConnManager {
                     // if confirmation that we reset something, invalidate config
                     if cmd_str.contains(" set to ") {
                         log::trace!("Recieved set to command: {:?}", cmd_str);
-                        tx.send(WifiTickSignal::ResetConfig);
+                        tx.blocking_send(WifiTickSignal::ResetConfig);
                         return;
                     }
 
                     // if a response to our get-platform command
                     if cmd_str.contains("PLATFORM") {
-                        tx.send(WifiTickSignal::NewIdentifier(
+                        tx.blocking_send(WifiTickSignal::NewIdentifier(
                             ESP32Model::from_platform_string(&cmd_str),
                         ));
                         return;
@@ -50,7 +50,7 @@ impl WifiConnManager {
 
                     match serde_json::from_str::<WifiConfig>(cmd_str) {
                         Ok(command) => {
-                            tx.send(WifiTickSignal::NewConfig(command));
+                            tx.blocking_send(WifiTickSignal::NewConfig(Box::new(command)));
                         }
                         Err(e) => {
                             log::error!(
@@ -61,10 +61,10 @@ impl WifiConnManager {
                     }
                 }
             } else if msg.addr == "/ping" {
-                tx.send(WifiTickSignal::PingConfirmation);
+                tx.blocking_send(WifiTickSignal::PingConfirmation);
             } else if msg.addr == "/log" {
                 if let Some(s) = msg.args.first().and_then(|arg| arg.clone().string()) {
-                    tx.send(WifiTickSignal::NewDeviceLog(s));
+                    tx.blocking_send(WifiTickSignal::NewDeviceLog(s));
                 }
             } else {
                 log::error!(

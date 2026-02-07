@@ -97,7 +97,7 @@ pub async fn start_udp() {
     tokio::task::spawn(async {
         loop {
             tokio::time::sleep(Duration::from_secs(1)).await;
-            clean_subscribers();
+            clean_subscribers().await;
         }
     });
 }

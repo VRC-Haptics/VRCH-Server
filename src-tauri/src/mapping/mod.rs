@@ -40,14 +40,18 @@ pub struct MapHandle {
 
 impl MapHandle {
     pub fn mark_dirty_blocking(&self) {
-        self.event_sender.blocking_send(InputEventMessage::MarkMapDirty);
+        self.event_sender
+            .blocking_send(InputEventMessage::MarkMapDirty);
     }
 
     /// clones snapshot of map state
     pub fn get_state(&self) -> MapInfo {
         let nodes = self.input_nodes.read().clone();
         let events = self.active_events.read().clone();
-        MapInfo { nodes: nodes, events: events }
+        MapInfo {
+            nodes: nodes,
+            events: events,
+        }
     }
 
     pub async fn send_event(
@@ -65,11 +69,11 @@ impl MapHandle {
     }
 
     /// collects the outputs of function f, for each node that has the given tag
-    /// 
+    ///
     /// Similar to `has_tag`
     pub fn has_tag_mut<F, T>(&self, tag: &String, fun: F) -> Vec<T>
-    where 
-        F: Fn(&mut InputNode) -> T,    
+    where
+        F: Fn(&mut InputNode) -> T,
     {
         let mut gather = vec![];
         let mut nodes = self.input_nodes.write();
@@ -83,8 +87,8 @@ impl MapHandle {
 
     /// collects the outputs of function f, for each node that has the given tag
     pub fn has_tag<F, T>(&self, tag: String, fun: F) -> Vec<T>
-    where 
-        F: Fn(&InputNode) -> T,    
+    where
+        F: Fn(&InputNode) -> T,
     {
         let mut gather = vec![];
         let nodes = self.input_nodes.read();
@@ -125,7 +129,7 @@ impl Clone for MapHandle {
         Self {
             event_sender: self.event_sender.clone(),
             input_nodes: Arc::clone(&self.input_nodes),
-            active_events: Arc::clone(&self.active_events),      
+            active_events: Arc::clone(&self.active_events),
         }
     }
 }
@@ -153,7 +157,7 @@ impl MappingDevice {
     /// updates the buffer based on the referenced input nodes.
     ///
     /// NOTE: This does not update the remote device, to force an update remember to use the `crate::devices::Device` trait as specified
-    /// 
+    ///
     /// TODO: Actually take into account device level mapping settings.
     pub fn update_buffer(&self, in_nodes: &Vec<InputNode>, settings: &PerDevice) {
         let mut buf = self.outputs.write();
@@ -262,16 +266,16 @@ impl InputMap {
         let tx_events = self.event_send.clone();
         tokio::spawn(async move {
             loop {
-                let mut nodes = in_nodes.write();
-                let mut events = events.write();
-                events.retain_mut(|event| {
-                    let finished = event.tick(&mut nodes);
-                    !finished
-                });
-                drop(nodes);
-                drop(events);
-                tx_events.send(InputEventMessage::MarkMapDirty);
-                tokio::time::sleep(Duration::from_millis(10));
+                {
+                    let mut nodes = in_nodes.write();
+                    let mut events = events.write();
+                    events.retain_mut(|event| {
+                        let finished = event.tick(&mut nodes);
+                        !finished
+                    });
+                }
+                let _ = tx_events.send(InputEventMessage::MarkMapDirty).await;
+                tokio::time::sleep(Duration::from_millis(10)).await;
             }
         });
 
@@ -326,8 +330,9 @@ impl InputMap {
         let mut cache = state::cache();
         let devices = self.devices.lock();
         let in_nodes = self.input_nodes.read();
-        for device in devices.iter() { // could be done in parallel here. but few devices means not effeicnet (probably)
-            let settings  = state::get_device_cache(&mut cache, &device.id);
+        for device in devices.iter() {
+            // could be done in parallel here. but few devices means not effeicnet (probably)
+            let settings = state::get_device_cache(&mut cache, &device.id);
             device.update_buffer(&in_nodes, &settings);
             self.manager.with_device(&device.id, |d| d.buffer_updated());
         }

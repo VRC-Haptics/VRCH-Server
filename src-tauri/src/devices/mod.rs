@@ -84,7 +84,7 @@ pub trait Device {
 }
 
 /// Commands a HapticDevice can invoke from the DeviceManager
-enum DeviceMessage {
+pub enum DeviceMessage {
     Remove(DeviceId),
     /// Marks the device info for this ID as dirty, will update all subscribers.
     InfoDirty(DeviceId),
@@ -200,54 +200,10 @@ impl DeviceManager {
         DeviceHandle { devices: Arc::clone(&self.devices), subscribers: Arc::clone(&self.subscribers), device_sender: self.device_sender.clone() }
     }
 
-    pub fn register(&self, tx: mpsc::Sender<DeviceOutEvents>) {
-        let mut sub = self.subscribers.lock();
-        sub.push(tx);
-    }
-
-    pub fn get_device_channel(&self) -> mpsc::Sender<DeviceMessage> {
-        self.device_sender.clone()
-    }
-
-    /// Runs closure `fun` with device `id` as its input
-    /// TODO: Isolate per-device commands to only be from handlers.
-    /// To get INFO:
-    ///
-    /// ```
-    /// let info = manager.with_device("mac address", |d| d.info());
-    ///  
-    /// ```
-    pub fn with_device<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
-    where
-        F: Fn(&HapticDevice) -> T,
-    {
-        self.devices.get(id).map(|d| fun(&d))
-    }
-
-    pub fn with_device_mut<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
-    where
-        F: Fn(&mut HapticDevice) -> T,
-    {
-        self.devices.get_mut(id).map(|mut d| fun(&mut d))
-    }
-
-    /// gathers all devices in the map
-    pub fn devices(&self) -> Vec<DeviceId> {
-        self.devices
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect()
-    }
-
-    /// checks if a device is still here.
-    pub fn exists(&self, id: &DeviceId) -> bool {
-        self.devices.contains_key(id)
-    }
-
     pub async fn shutdown(&self) {
         self.shutdown.cancel();
-        ///TODO: Figure out why this does what it doess
-        self.devices.iter_mut().map(|mut pair| {
+        // TODO: Figure out why this does what it doess
+        let _ = self.devices.iter_mut().map(|mut pair| {
             let this = pair.value_mut();
             this.disconnect()
         });
@@ -298,19 +254,19 @@ fn handle_device_message(
             log::trace!("removing wifi device: {:?}", id);
             map.remove(&id);
             for sub in lock.iter() {
-                sub.try_send(DeviceOutEvents::RemovedDevice(id.clone()));
+                let _ = sub.try_send(DeviceOutEvents::RemovedDevice(id.clone()));
             }
         }
         DeviceMessage::Register(d) => {
             let id = d.get_id();
             map.insert(id.clone(), d);
             for sub in lock.iter() {
-                sub.try_send(DeviceOutEvents::NewDevice(id.clone()));
+                let _ = sub.try_send(DeviceOutEvents::NewDevice(id.clone()));
             }
         }
         DeviceMessage::InfoDirty(id) => {
             for sub in lock.iter() {
-                sub.try_send(DeviceOutEvents::DeviceInfoDirty(id.clone()));
+                let _ = sub.try_send(DeviceOutEvents::DeviceInfoDirty(id.clone()));
             }
         }
     };

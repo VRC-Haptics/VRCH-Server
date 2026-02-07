@@ -25,14 +25,17 @@ use vrc::VrcGame;
 use commands::*;
 use once_cell::sync::OnceCell;
 use std::panic::{set_hook, take_hook};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
+use tokio::sync::Mutex;
 
 use crate::devices::DeviceHandle;
 use crate::{ble::start_ble, mapping::MapHandle, state::start_config_save, vrc::VrcHandle};
+
+use console_subscriber;
 
 // Provides a unified interface for interacting with external api's
 pub static API_MANAGER: LazyLock<Mutex<ApiManager>> =
@@ -88,6 +91,7 @@ async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
 
 #[tokio::main]
 async fn main() {
+    console_subscriber::init();
     tauri::async_runtime::set(tokio::runtime::Handle::current());
 
     // init logging and stuff first
@@ -134,12 +138,13 @@ async fn main() {
                 default_panic(info);
             }));
 
-            let mut lock = API_MANAGER.lock().unwrap();
-            lock.refresh_caches();
-            drop(lock);
-
             tauri::async_runtime::spawn(async move {
-                // DeviceManager init
+                // Lock API_MANAGER inside the spawned task
+                {
+                    let mut api = API_MANAGER.lock().await;
+                    api.refresh_caches().await;
+                } // Guard dropped here, lock released
+                  // DeviceManager init
                 let mut manager = DeviceManager::new();
                 init_device_manager(&mut manager).await;
                 if let Err(e) = DEVICE_MANAGER.set(manager.get_handle()) {

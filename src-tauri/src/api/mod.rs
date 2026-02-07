@@ -1,17 +1,18 @@
 use crate::vrc::config::GameMap;
 use std::fs;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
+use tokio::sync::Mutex;
 use walkdir::WalkDir;
 
-use tauri_plugin_http::reqwest::blocking::get;
+use tauri_plugin_http::reqwest::get;
 
 pub struct ApiManager {
     pub config_folder: String,
     pub base_url: String,
     pub remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>,
     pub local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
-    refresh_handle: Option<std::thread::JoinHandle<()>>,
+    refresh_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 /// Represents the config files that are available for retrieval via API.
@@ -50,7 +51,7 @@ impl ApiManager {
 
     /// Refreshes all caches asynchronously in a separate thread.
     /// Returns immediately. Check is_refreshing() to see if refresh is still in progress, or `self.wait_for_refresh()` to block until completed
-    pub fn refresh_caches(&mut self) {
+    pub async fn refresh_caches(&mut self) {
         // If a refresh is already in progress, don't start another one
         if self.is_refreshing() {
             log::debug!("Cache refresh already in progress, skipping new refresh");
@@ -62,26 +63,24 @@ impl ApiManager {
         let local_maps = Arc::clone(&self.local_maps);
         let remote_maps = Arc::clone(&self.remote_maps);
 
-        let handle = std::thread::spawn(move || {
+        let handle = tokio::spawn(async move {
             log::debug!("Starting async cache refresh");
 
             // Refresh local index
-            Self::refresh_local_index_thread(config_folder, local_maps.clone());
+            Self::refresh_local_index_thread(config_folder, local_maps.clone()).await;
 
             // Refresh remote index
-            Self::refresh_remote_index_thread(base_url, remote_maps.clone());
+            Self::refresh_remote_index_thread(base_url, remote_maps.clone()).await;
 
             // Log refreshed values
-            if let Ok(local) = local_maps.lock() {
-                log::trace!("Local Cache: {:?} Maps", local.len());
-            }
+            let local = local_maps.lock().await;
+            log::trace!("Local Cache: {:?} Maps", local.len());
 
-            if let Ok(remote) = remote_maps.lock() {
-                if let Some(ref maps) = *remote {
-                    log::trace!("Remote Cache: {:?} Maps", maps.len());
-                } else {
-                    log::error!("Empty Remote Cache");
-                }
+            let remote = remote_maps.lock().await;
+            if let Some(ref maps) = *remote {
+                log::trace!("Remote Cache: {:?} Maps", maps.len());
+            } else {
+                log::error!("Empty Remote Cache");
             }
 
             log::debug!("Async cache refresh completed");
@@ -99,34 +98,32 @@ impl ApiManager {
     }
 
     /// Waits for any ongoing cache refresh to complete
-    pub fn wait_for_refresh(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn wait_for_refresh(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(handle) = self.refresh_handle.take() {
-            handle.join().map_err(|_| "Thread panicked")?;
+            handle.await.map_err(|_| "Thread panicked")?;
         }
         Ok(())
     }
 
     /// Refreshes all cache types (expensive and network blocking)
-    pub fn refresh_caches_blocking(&mut self) {
-        self.refresh_local_index();
-        self.refresh_remote_index();
+    pub async fn refresh_caches_blocking(&mut self) {
+        self.refresh_local_index().await;
+        self.refresh_remote_index().await;
 
         // log refreshed values.
-        if let Ok(local) = self.local_maps.lock() {
-            log::trace!("Local Cache: {:?} Maps", local.len());
-        }
+        let local = self.local_maps.lock().await;
+        log::trace!("Local Cache: {:?} Maps", local.len());
 
-        if let Ok(remote) = self.remote_maps.lock() {
-            if let Some(ref maps) = *remote {
-                log::trace!("Remote Cache: {:?} Maps", maps.len());
-            } else {
-                log::error!("Empty Remote Cache");
-            }
+        let remote = self.remote_maps.lock().await;
+        if let Some(ref maps) = *remote {
+            log::trace!("Remote Cache: {:?} Maps", maps.len());
+        } else {
+            log::error!("Empty Remote Cache");
         }
     }
 
     /// Thread-safe version of refresh_local_index for use in async refresh
-    fn refresh_local_index_thread(
+    async fn refresh_local_index_thread(
         config_folder: String,
         local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
     ) {
@@ -162,25 +159,23 @@ impl ApiManager {
         }
 
         // Update the shared state
-        if let Ok(mut maps) = local_maps.lock() {
-            *maps = new_local_maps;
-        }
+        let mut maps = local_maps.lock().await;
+        *maps = new_local_maps;
     }
 
     /// Thread-safe version of refresh_remote_index for use in async refresh
-    fn refresh_remote_index_thread(
+    async fn refresh_remote_index_thread(
         base_url: String,
         remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>,
     ) {
-        match get(base_url.clone() + "catalog.json") {
+        match get(base_url.clone() + "catalog.json").await {
             Ok(res) => {
                 log::trace!("Retrieved remote index with status: {:?}", res.status());
-                match res.text() {
+                match res.text().await {
                     Ok(text) => match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
                         Ok(updated_index) => {
-                            if let Ok(mut maps) = remote_maps.lock() {
-                                *maps = Some(updated_index);
-                            }
+                            let mut maps = remote_maps.lock().await;
+                            *maps = Some(updated_index);
                         }
                         Err(err) => {
                             log::error!("Unable to parse returned response: {}\n{}", err, &text);
@@ -199,7 +194,7 @@ impl ApiManager {
 
     // Loads the requested GameMap and returns it.
     /// Searches Local storage first, if no locally cached value is found it is retrieved
-    pub fn load_map(
+    pub async fn load_map(
         &mut self,
         author: String,
         name: String,
@@ -207,45 +202,41 @@ impl ApiManager {
     ) -> Result<GameMap, ApiRetrievalError> {
         // Look for local maps
         let should_refresh = {
-            if let Ok(local_maps) = self.local_maps.lock() {
-                for local in local_maps.iter() {
-                    if name == local.name && author == local.author {
-                        if local.version == version {
-                            // if we can't load the desired map refresh the index and recursively try again.
-                            if let Ok(content) = fs::read_to_string(&local.path) {
-                                if let Ok(map) = serde_json::from_str::<GameMap>(&content) {
-                                    return Ok(map);
-                                } else {
-                                    return Err(ApiRetrievalError::BadResponseFromServer(format!(
-                                        "Failed to parse local map file: {:?}",
-                                        local.path
-                                    )));
-                                }
-                            } else {
-                                return Err(ApiRetrievalError::UnableToRetrieve(format!(
-                                    "Failed to read local map file: {:?}",
-                                    local.path
-                                )));
-                            }
-                        } // TODO: try to resolve versions
-                    }
-                }
-                false
-            } else {
-                true // If we can't lock, trigger a refresh
-            }
-        }; // Lock is dropped here
-
-        if should_refresh {
-            self.refresh_local_index();
-            // Try once more after refresh
-            if let Ok(local_maps) = self.local_maps.lock() {
-                for local in local_maps.iter() {
-                    if name == local.name && author == local.author && local.version == version {
+            let local_maps = self.local_maps.lock().await;
+            for local in local_maps.iter() {
+                if name == local.name && author == local.author {
+                    if local.version == version {
+                        // if we can't load the desired map refresh the index and recursively try again.
                         if let Ok(content) = fs::read_to_string(&local.path) {
                             if let Ok(map) = serde_json::from_str::<GameMap>(&content) {
                                 return Ok(map);
+                            } else {
+                                return Err(ApiRetrievalError::BadResponseFromServer(format!(
+                                    "Failed to parse local map file: {:?}",
+                                    local.path
+                                )));
                             }
+                        } else {
+                            return Err(ApiRetrievalError::UnableToRetrieve(format!(
+                                "Failed to read local map file: {:?}",
+                                local.path
+                            )));
+                        }
+                    } // TODO: try to resolve versions
+                }
+            }
+            false
+        }; // Lock is dropped here
+
+        if should_refresh {
+            self.refresh_local_index().await;
+            // Try once more after refresh
+            let local_maps = self.local_maps.lock().await;
+            for local in local_maps.iter() {
+                if name == local.name && author == local.author && local.version == version {
+                    if let Ok(content) = fs::read_to_string(&local.path) {
+                        if let Ok(map) = serde_json::from_str::<GameMap>(&content) {
+                            return Ok(map);
                         }
                     }
                 }
@@ -253,27 +244,26 @@ impl ApiManager {
         }
 
         // try to retrieve remote
-        if let Ok(remote_maps_guard) = self.remote_maps.lock() {
-            if let Some(ref remote_maps) = *remote_maps_guard {
-                for remote in remote_maps.iter() {
-                    if name == remote.name && author == remote.author {
-                        let request_url = self.base_url.clone() + &remote.url;
-                        // if we can't load the desired map refresh the index and recursively try again.
-                        if let Ok(content) = get(&request_url) {
-                            if let Ok(map) = content.json::<GameMap>() {
-                                return Ok(map);
-                            } else {
-                                return Err(ApiRetrievalError::BadResponseFromServer(format!(
-                                    "Bad map received from server. Author:{}, name:{}, version:{}",
-                                    remote.author, remote.name, remote.version
-                                )));
-                            }
+        let remote_maps_guard = self.remote_maps.lock().await;
+        if let Some(ref remote_maps) = *remote_maps_guard {
+            for remote in remote_maps.iter() {
+                if name == remote.name && author == remote.author {
+                    let request_url = self.base_url.clone() + &remote.url;
+                    // if we can't load the desired map refresh the index and recursively try again.
+                    if let Ok(content) = get(&request_url).await {
+                        if let Ok(map) = content.json::<GameMap>().await {
+                            return Ok(map);
                         } else {
-                            return Err(ApiRetrievalError::UnableToRetrieve(format!(
-                                "Error Retrieving: {}",
-                                request_url
+                            return Err(ApiRetrievalError::BadResponseFromServer(format!(
+                                "Bad map received from server. Author:{}, name:{}, version:{}",
+                                remote.author, remote.name, remote.version
                             )));
                         }
+                    } else {
+                        return Err(ApiRetrievalError::UnableToRetrieve(format!(
+                            "Error Retrieving: {}",
+                            request_url
+                        )));
                     }
                 }
             }
@@ -287,7 +277,7 @@ impl ApiManager {
 
     /// Re-indexes the local config files.
     /// Each config file is "probably" valid, it atleast has each of the needed fields.
-    pub fn refresh_local_index(&mut self) {
+    pub async fn refresh_local_index(&mut self) {
         // Find already locally cached maps.
         let mut new_local_maps = HashSet::new();
 
@@ -322,23 +312,21 @@ impl ApiManager {
             }
         }
 
-        if let Ok(mut maps) = self.local_maps.lock() {
-            *maps = new_local_maps;
-        }
+        let mut maps = self.local_maps.lock().await;
+        *maps = new_local_maps;
     }
 
     /// Calls to refresh files available on the remote index.
     /// Fills self.available_maps with result.
-    pub fn refresh_remote_index(&mut self) {
-        match get(self.base_url.clone() + "catalog.json") {
+    pub async fn refresh_remote_index(&mut self) {
+        match get(self.base_url.clone() + "catalog.json").await {
             Ok(res) => {
                 log::trace!("Retrieved remote index with status: {:?}", res.status());
-                match res.text() {
+                match res.text().await {
                     Ok(text) => match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
                         Ok(updated_index) => {
-                            if let Ok(mut maps) = self.remote_maps.lock() {
-                                *maps = Some(updated_index);
-                            }
+                            let mut maps = self.remote_maps.lock().await;
+                            *maps = Some(updated_index);
                         }
                         Err(err) => {
                             log::error!("Unable to parse returned response: {}\n{}", err, &text);
