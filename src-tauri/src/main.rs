@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![warn(unused_extern_crates)]
+// Keep Futures from being left un-awaited. Use crate::log_err for convenient handling.
+#![deny(unused_must_use)]
 
 // make local modules available
 pub mod api;
@@ -36,6 +38,35 @@ use crate::devices::DeviceHandle;
 use crate::{ble::start_ble, mapping::MapHandle, state::start_config_save, vrc::VrcHandle};
 
 use console_subscriber;
+
+#[macro_export]
+/// Handles an unhandled result by printing if it failed. Optionally add context after the input to use this message instead of the default.
+/// 
+/// # Usage:
+/// ```
+/// pub fn returns_result() -> Result<(), String> {
+///     Err("Unique Error");
+/// }
+/// 
+/// log_err(returns_result());
+/// -> "Lazily handled error: Unique Error"
+/// 
+/// log_err(returns_result(), "Error peforming action");
+/// -> "Error performing action: Unique Error"
+/// 
+/// ``` 
+macro_rules! log_err {
+    ($expr:expr) => {
+        if let Err(e) = $expr {
+            log::warn!("Lazily handled error: {e:?}");
+        }
+    };
+    ($expr:expr, $($arg:tt)+) => {
+        if let Err(e) = $expr {
+            log::warn!("{}: {e:?}", format_args!($($arg)+));
+        }
+    };
+}
 
 // Provides a unified interface for interacting with external api's
 pub static API_MANAGER: LazyLock<Mutex<ApiManager>> =
@@ -77,7 +108,7 @@ async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
     });
 
     // TODO: Move into device manager init.
-    start_ble(Duration::from_secs(1)).await;
+    log_err!(start_ble(Duration::from_secs(1)).await);
 
     //start_apps
     let mut vrc = VrcGame::new(map_handle.clone(), &API_MANAGER).await;

@@ -10,6 +10,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::mpsc::{self, error::SendError};
+use crate::log_err;
 
 use event::Event;
 //use global_map::InputMap;
@@ -40,8 +41,7 @@ pub struct MapHandle {
 
 impl MapHandle {
     pub fn mark_dirty_blocking(&self) {
-        self.event_sender
-            .blocking_send(InputEventMessage::MarkMapDirty);
+        log_err!(self.event_sender.blocking_send(InputEventMessage::MarkMapDirty));
     }
 
     /// clones snapshot of map state

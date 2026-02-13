@@ -11,6 +11,7 @@ use tokio::sync::{OnceCell, RwLock, mpsc};
 use tokio::time;
 use uuid::{Uuid, uuid};
 use dashmap::DashMap;
+use crate::log_err;
 
 static IS_SCANNING: AtomicBool = AtomicBool::new(false);
 static BLE_ADAPTER: RwLock<Option<Arc<Adapter>>> = RwLock::const_new(None);
@@ -224,7 +225,7 @@ async fn start_ble_scan(timeout: Option<Duration>) -> Result<(), BleError> {
         if let Some(timeout) = timeout {
             tokio::task::spawn(async move {
                 time::sleep(timeout).await;
-                adapter.stop_scan().await;
+                log_err!(adapter.stop_scan().await);
                 IS_SCANNING.store(false, Ordering::SeqCst);
             });
         }

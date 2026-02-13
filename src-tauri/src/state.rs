@@ -1,7 +1,10 @@
+use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use directories::ProjectDirs;
 use hazarc::{AtomicArc, Cache};
 use serde::{Deserialize, Serialize};
 use std::{
+    sync::Mutex,
     fs,
     path::PathBuf,
     sync::{
@@ -12,34 +15,44 @@ use std::{
 };
 
 use crate::{
-    devices::DeviceId,
-    mapping::interp::{GaussianState, InterpAlgo},
+    devices::DeviceId, log_err, mapping::interp::{GaussianState, InterpAlgo}
 };
 
 // not intended to be accessed publicly. Use functions below
-static CONFIG: LazyLock<Arc<AtomicArc<Config>>> =
-    LazyLock::new(|| Arc::new(AtomicArc::new(load_config().unwrap_or_default().into())));
+static PER_DEVICE: LazyLock<Mutex<Vec<Arc<ArcSwap<PerDevice>>>>> = LazyLock::new(|| {
+    let mut list = Vec::new();
+    let cfg = CONFIG.load();
+    cfg.saved_devices.iter().map(|d| {
+        list.push(ArcSwap::new(Arc::new(d.clone())));
+    });
+
+    Mutex::new(list)
+});
+static CONFIG: LazyLock<AtomicArc<Config>> =
+    LazyLock::new(|| AtomicArc::new(load_config().unwrap_or_default().into()));
 static DIRTY: AtomicBool = AtomicBool::new(false);
 
 /// starts persisting our config to disk. Spawns new task.
 pub async fn start_config_save(save_delay: Duration) {
-    let _ = CONFIG.load(); // make sure it is intialized early.
+    let _ = CONFIG.load(); // make sure it is intialized early.'
+    log_err!(PER_DEVICE.lock()); // make sure we can load devices.
 
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(save_delay).await;
             if DIRTY.swap(false, Ordering::Relaxed) {
-                save_config(&CONFIG.load());
+                // TODO: Push saved devices to our CONFIG field.
+                save_config();
             }
         }
     });
 }
 
-/// retrieves a clone of the given field. 
-/// 
+/// retrieves a clone of the given field.
+///
 /// This value is owned and doesn't update atomically.
 pub fn clone_field<F, T>(f: F) -> T
-where 
+where
     F: FnOnce(&Config) -> &T,
     T: Clone,
 {
@@ -62,7 +75,7 @@ where
 ///
 /// NOTE: It is still not super cheap to write to this value.
 pub fn cache() -> Cache<AtomicArc<Config>> {
-    Cache::new(CONFIG.load().into_owned().into())
+    Cache::new(*CONFIG)
 }
 
 /// Runs function F on the config to produce changes. THIS CLONES THE WHOLE CONFIG, BE AWARE OF THIS.
@@ -76,25 +89,33 @@ pub fn update(f: impl FnOnce(&mut Config)) {
     DIRTY.store(true, Ordering::Relaxed);
 }
 
-/// Swaps the current config for the given one. 
-/// 
+/// Swaps the current config for the given one.
+///
 /// This is non-trivial and should be considered as such.
 pub fn swap(conf: Config) {
     CONFIG.store(conf.into());
     DIRTY.store(true, Ordering::Relaxed)
 }
 
-pub fn get_device_cache(cache: &mut Cache<AtomicArc<Config>>, id: &DeviceId) -> PerDevice {
-    cache.load()
-        .saved_devices
+pub fn get_device_conf(id: &DeviceId) -> ArcSwap<PerDevice> { 
+    let Ok(mut lock) = PER_DEVICE.lock() else {
+        log::error!("Unable to lock device settings");
+        panic!("Lock Error");
+    };
+
+    let Some(this) = lock
         .iter()
-        .find(|d| d.id == *id)
-        .cloned()
-        .unwrap_or_else(|| {
-            let new = PerDevice::default(id.clone());
-            update(|cfg| cfg.saved_devices.push(new.clone()));
-            new
-        })
+        .find(|d| d.load().id == *id) else {
+            let Some(existing) = lock.iter().find(|d| d.load().id == id ) else {
+                let new = ArcSwap::new(Arc::new(PerDevice::default(id)));
+                lock.push(new.);
+                return;
+            };
+
+            existing.store(Arc::new(PerDevice::default(id)));
+        };
+
+
 }
 
 /// Handles device setting device fields, initializes to default values if none found.
@@ -123,7 +144,10 @@ pub fn update_device_field(id: &DeviceId, f: impl FnOnce(&mut PerDevice)) {
 pub struct Config {
     pub wifi_device_timeout: f32,
     pub mapping_menu: StandardMenu,
-    pub saved_devices: Vec<PerDevice>,
+    /// Stale data, intended for persisting to disk.
+    ///
+    /// see `PER_DEVICE` for live data.
+    saved_devices: Vec<PerDevice>,
     pub vrc_settings: VrcSettings,
 }
 
@@ -180,7 +204,7 @@ pub struct VrcSettings {
     pub sample_cache: usize,
 
     /// Takes an average of all data recieved within this past time frame.
-    /// 
+    ///
     /// Smooths motor acceleration.
     pub smoothing_time: Duration,
 }
@@ -217,10 +241,11 @@ fn load_config() -> Option<Config> {
     serde_json::from_str(&data).ok()
 }
 
-fn save_config(config: &Config) {
+fn save_config() {
+    let config = CONFIG.load();
     let path = config_path();
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let _ = fs::write(path, serde_json::to_string_pretty(config).unwrap());
+    let _ = fs::write(path, serde_json::to_string_pretty(&config).unwrap());
 }

@@ -242,7 +242,7 @@ async fn run_vrc_http_polling(
                     let new_id = id_path.value.first().unwrap().clone().string().unwrap();
 
                     let new_avatar = create_avatar(params, new_id, &api).await;
-                    vrc.send(MsgToMainVrc::NewAvatar(new_avatar));
+                    vrc.send(MsgToMainVrc::NewAvatar(new_avatar)).await;
                 }
             }
             Err(err) => {

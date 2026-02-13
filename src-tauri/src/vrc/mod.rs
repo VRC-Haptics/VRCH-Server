@@ -14,6 +14,7 @@ use crate::mapping::{InputEventMessage, MapHandle};
 use crate::osc::server::OscServer;
 use crate::state::{self, cache, Config};
 use crate::vrc::parsing::OscInfo;
+use crate::log_err;
 
 // module dependencies
 use cache_node::CacheNode;
@@ -68,15 +69,15 @@ pub struct VrcHandle {
 
 impl VrcHandle {
     pub fn send_osc_msg_rcv(&self, msg: OscMessage) {
-        self.tx.blocking_send(MsgToMainVrc::OscMessageRecieved(msg));
+        log_err!(self.tx.blocking_send(MsgToMainVrc::OscMessageRecieved(msg)));
     }
 
     pub fn blocking_send(&self, msg: MsgToMainVrc) {
-        self.tx.blocking_send(msg);
+        log_err!(self.tx.blocking_send(msg));
     }
 
     pub async fn send(&self, msg: MsgToMainVrc) {
-        self.tx.send(msg).await;
+        log_err!(self.tx.send(msg).await);
     }
 
     pub fn get_info(&self) -> ArcBorrow<VrcInfo> {
@@ -114,6 +115,7 @@ pub struct VrcGame {
 }
 
 /// I hate naming things
+#[derive(Debug)]
 pub enum MsgToMainVrc {
     /// Pushes our cache to the map state.
     RefreshMap,
@@ -126,6 +128,7 @@ pub enum MsgToMainVrc {
 
 impl VrcGame {
     pub async fn new(map_handle: MapHandle, api: &'static Mutex<ApiManager>) -> VrcGame {
+        log::trace!("Starting VRC");
         let (tx, rx) = channel(10);
         let info = Arc::new(AtomicArc::new(VrcInfo::default().into()));
         let handle = VrcHandle {
@@ -155,12 +158,13 @@ impl VrcGame {
         //create the low-latency server.
         let handle_rcv = handle.clone();
         let on_receive = move |msg: OscMessage| {
+            log::trace!("Got recieve: {msg:?}");
             handle_rcv.send_osc_msg_rcv(msg);
         };
 
         let mut recieving_port = 9001;
         let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
-        let port_used = vrc_server.start();
+        let port_used = vrc_server.start().await;
 
         // if the server wasn't able to capture the port start advertising the port it was bound to.
         if port_used != recieving_port {
@@ -178,6 +182,7 @@ impl VrcGame {
 
     /// Main event loop that handles VRC communications.
     pub async fn run(&mut self) {
+        log::trace!("Running VRC");
         let mut cfg_cache = cache();
         loop {
             let Some(msg) = self.rx.recv().await else {
@@ -185,7 +190,10 @@ impl VrcGame {
                 return;
             };
 
+            log::trace!("VrcMessage: {msg:?}");
+
             match msg {
+
                 // called at high velocity.
                 MsgToMainVrc::RefreshMap => {
                     let cfg = cfg_cache.load();
@@ -225,18 +233,18 @@ impl VrcGame {
                 MsgToMainVrc::NewAvatar(avi) => {
                     log::debug!("New avatar: {avi:?}");
                     //clear current input nodes
-                    self.map
+                    log_err!(self.map
                         .send_event(InputEventMessage::RemoveWithTags(vec![VRC_TAG.into()]))
-                        .await;
+                        .await);
 
                     let nodes = to_inputs(&avi);
                     self.avatar = Some(avi);
 
                     if !nodes.is_empty() {
                         for node in nodes {
-                            self.map
+                            log_err!(self.map
                                 .send_event(InputEventMessage::InsertNode(node))
-                                .await;
+                                .await);
                         }
                     }
                 }

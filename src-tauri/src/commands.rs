@@ -1,10 +1,11 @@
 // local modules
 use crate::{devices::{
-    Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, HapticDevice, //update::{Firmware, UpdateMethod}
+    Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, //update::{Firmware, UpdateMethod}
 }, mapping::{MapHandle, MapInfo}, state, vrc::{VrcHandle, VrcInfo}};
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::{InputEventMessage, InputMap, NodeId};
+use crate::log_err;
 
 use crate::{
     util::math::Vec3,
@@ -128,7 +129,7 @@ pub fn play_point(
     )
     .expect("unable to create play point event");
 
-    map.send_event_blocking(InputEventMessage::StartEvent(event));
+    log_err!(map.send_event_blocking(InputEventMessage::StartEvent(event)));
     return Ok(());
 }
 

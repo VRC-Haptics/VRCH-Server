@@ -1,7 +1,8 @@
 use std::fmt;
-use std::net::{Ipv4Addr, UdpSocket};
+use std::net::Ipv4Addr;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use tokio::net::UdpSocket;
 
 use rosc::{OscMessage, OscPacket};
 use tokio::sync::mpsc;
@@ -47,10 +48,10 @@ impl OscServer {
     }
 
     /// Starts a server listening in a new thread.
-    pub fn start(&mut self) -> u16 {
+    pub async fn start(&mut self) -> u16 {
         let mut used_port = self.port;
         let addr = format!("{}:{}", self.address, self.port);
-        let socket = match UdpSocket::bind(&addr) {
+        let socket = match UdpSocket::bind(&addr).await {
             Ok(s) => s,
             Err(_) => {
                 // The desired port is not available. Look for a fallback.
@@ -59,7 +60,7 @@ impl OscServer {
                 {
                     used_port = free_port;
                     let addr = format!("{}:{}", self.address, free_port);
-                    UdpSocket::bind(&addr).unwrap() //assume we will be able to bind to thisone
+                    UdpSocket::bind(&addr).await.unwrap() //assume we will be able to bind to thisone
                 } else {
                     log::error!("Unable to connect to bhaptics port");
                     return 0;
@@ -73,7 +74,7 @@ impl OscServer {
         let (tx, mut rx) = mpsc::channel(1);
         self.close_handle = Some(tx);
 
-        thread::spawn(move || {
+        tokio::spawn(async move {
             log::trace!(
                 "Spawned UDP OSC Server on: {}",
                 socket.local_addr().unwrap()
@@ -81,27 +82,20 @@ impl OscServer {
 
             let mut buf = [0u8; rosc::decoder::MTU];
             loop {
-                // Check for stop signal
-                if let Ok(_) = rx.try_recv() {
-                    log::info!("Stopping server thread.");
-                    break;
-                }
-
-                match socket.recv_from(&mut buf) {
-                    Ok((size, _src)) => {
-                        if let Ok((left_over, packet)) = rosc::decoder::decode_udp(&buf[..size]) {
-                            if !left_over.is_empty() {
-                                log::trace!(
-                                    "leftover bytes: {} on socket: {}",
-                                    String::from_utf8_lossy(left_over),
-                                    socket.local_addr().unwrap().to_string()
-                                );
-                            }
-                            handle_packet(packet, &on_receive, &filter_prefix);
-                        }
+                tokio::select! {
+                    _ = rx.recv() => {
+                        log::info!("Stopping server thread.");
+                        break;
                     }
-                    Err(e) => {
-                        log::error!("Error receiving packet: {:?}", e);
+                    result = socket.recv_from(&mut buf) => {
+                        match result {
+                            Ok((size, _src)) => {
+                                // ... handle packet
+                            }
+                            Err(e) => {
+                                log::error!("Error receiving packet: {:?}", e);
+                            }
+                        }
                     }
                 }
             }

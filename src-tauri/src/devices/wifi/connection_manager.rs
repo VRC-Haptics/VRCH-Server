@@ -8,6 +8,7 @@ use crate::devices::wifi::config::WifiConfig;
 use crate::devices::wifi::WifiTickSignal;
 use crate::devices::ESP32Model;
 use crate::osc::server::OscServer;
+use crate::log_err;
 
 /// handles the wifi device's connection. Sending, Recieving, killing etc.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -28,7 +29,7 @@ impl WifiConnManager {
         let on_receive = move |msg: OscMessage| {
             //if heartbeat
             if msg.addr == hrtbt_addr {
-                tx.blocking_send(WifiTickSignal::NewHeartBeat(Instant::now()));
+                log_err!(tx.blocking_send(WifiTickSignal::NewHeartBeat(Instant::now())));
 
             // command was sent
             } else if msg.addr == "/command" {
@@ -36,21 +37,21 @@ impl WifiConnManager {
                     // if confirmation that we reset something, invalidate config
                     if cmd_str.contains(" set to ") {
                         log::trace!("Recieved set to command: {:?}", cmd_str);
-                        tx.blocking_send(WifiTickSignal::ResetConfig);
+                        log_err!(tx.blocking_send(WifiTickSignal::ResetConfig));
                         return;
                     }
 
                     // if a response to our get-platform command
                     if cmd_str.contains("PLATFORM") {
-                        tx.blocking_send(WifiTickSignal::NewIdentifier(
+                        log_err!(tx.blocking_send(WifiTickSignal::NewIdentifier(
                             ESP32Model::from_platform_string(&cmd_str),
-                        ));
+                        )));
                         return;
                     }
 
                     match serde_json::from_str::<WifiConfig>(cmd_str) {
                         Ok(command) => {
-                            tx.blocking_send(WifiTickSignal::NewConfig(Box::new(command)));
+                            log_err!(tx.blocking_send(WifiTickSignal::NewConfig(Box::new(command))));
                         }
                         Err(e) => {
                             log::error!(
@@ -61,10 +62,10 @@ impl WifiConnManager {
                     }
                 }
             } else if msg.addr == "/ping" {
-                tx.blocking_send(WifiTickSignal::PingConfirmation);
+                log_err!(tx.blocking_send(WifiTickSignal::PingConfirmation));
             } else if msg.addr == "/log" {
                 if let Some(s) = msg.args.first().and_then(|arg| arg.clone().string()) {
-                    tx.blocking_send(WifiTickSignal::NewDeviceLog(s));
+                    log_err!(tx.blocking_send(WifiTickSignal::NewDeviceLog(s)));
                 }
             } else {
                 log::error!(
@@ -76,7 +77,7 @@ impl WifiConnManager {
         };
 
         let mut server = OscServer::new(*recv_port, Ipv4Addr::UNSPECIFIED, on_receive);
-        server.start();
+        server.start().await;
         WifiConnManager {
             recv_port: recv_port.to_owned(),
             server: Some(server),
