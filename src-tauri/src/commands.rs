@@ -19,6 +19,7 @@ use tauri::Manager;
 use tokio::time::Duration;
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_device_esp_model(
     id: String,
     devices: tauri::State<'_, DeviceHandle>,
@@ -39,6 +40,7 @@ pub fn start_device_update(
 }*/
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_tags_radius(
     tag: String,
     radius: f32,
@@ -52,6 +54,7 @@ pub fn set_tags_radius(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_node_radius(
     id: String,
     radius: f32,
@@ -68,6 +71,7 @@ const EPSILON: f32 = 0.001;
 
 /// Swaps the haptic node indices on the given device id
 #[tauri::command]
+#[specta::specta]
 pub fn swap_conf_nodes(
     device_id: String,
     pos1: Vec3,
@@ -110,6 +114,7 @@ pub fn swap_conf_nodes(
 
 /// Plays the specified point for the duration in seconds at the power percentage of intensity.
 #[tauri::command]
+#[specta::specta]
 pub fn play_point(
     feedback_location: (f32, f32, f32), // xyz location to insert point
     power: f32,                         // the power percentage to play 1 = no change
@@ -134,6 +139,7 @@ pub fn play_point(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_device_list(dev: tauri::State<'_, DeviceHandle>) -> Vec<(DeviceId, Option<DeviceInfo>)> {
     let mut devices = vec![];
     let ids = dev.devices();
@@ -145,6 +151,7 @@ pub fn get_device_list(dev: tauri::State<'_, DeviceHandle>) -> Vec<(DeviceId, Op
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> VrcInfo {
     let vrc_info = vrc.get_info();
     VrcInfo::clone(vrc_info.as_ref())
@@ -152,11 +159,13 @@ pub fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> VrcInfo {
 
 /// Gets the core haptics map that is used to drive feedback.
 #[tauri::command]
+#[specta::specta]
 pub fn get_core_map(map: tauri::State<'_, MapHandle>) -> MapInfo {
     map.get_state()
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn upload_device_map(
     id: String,
     config_json: String,
@@ -188,6 +197,7 @@ pub async fn upload_device_map(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_device_multiplier(
     device_id: String,
     multiplier: f32,
@@ -196,6 +206,7 @@ pub async fn update_device_multiplier(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_device_offset(
     device_id: String,
     offset: f32,
@@ -204,17 +215,20 @@ pub async fn update_device_offset(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_vrc_velocity_multiplier(vel_multiplier: f32) {
     state::update(|c| c.vrc_settings.velocity_mult = vel_multiplier);
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_vrc_distance_weight(distance_weight: f32) {
     state::update(|c| c.vrc_settings.velocity_ratio = 1.0 - distance_weight);
 }
 
 /// Handles setting our app to launch instead of the bHapticsPlayer
 #[tauri::command]
+#[specta::specta]
 pub async fn bhaptics_launch_vrch() {
     // Launch the sidecar with the set argument.
     let path = dunce::canonicalize(r".\sidecars\elevated-register.exe").unwrap();
@@ -238,6 +252,7 @@ pub async fn bhaptics_launch_vrch() {
 
 /// Handles resetting bhaptics to be the default player
 #[tauri::command]
+#[specta::specta]
 pub async fn bhaptics_launch_default() {
     // Launch the sidecar with the "reset" argument.
     let path = dunce::canonicalize(r".\sidecars\elevated-register.exe").unwrap();

@@ -35,7 +35,7 @@ use tauri_plugin_log::{Target, TargetKind};
 use tokio::sync::Mutex;
 
 use crate::devices::DeviceHandle;
-use crate::{ble::start_ble, mapping::MapHandle, state::start_config_save, vrc::VrcHandle};
+use crate::{ble::start_ble, mapping::MapHandle, state::{save_config, UpdateEvent, boot_tx, UPDATE_RX}, vrc::VrcHandle};
 
 use console_subscriber;
 
@@ -100,7 +100,6 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcGame>>) {
 }*/
 
 async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
-    start_config_save(Duration::from_secs(1)).await;
     // initialize input map.
     let (mut input_map, map_handle) = InputMap::new(manager).await;
     tokio::spawn(async move {
@@ -125,8 +124,33 @@ async fn main() {
     console_subscriber::init();
     tauri::async_runtime::set(tokio::runtime::Handle::current());
 
+    let invoke_handler = {
+        let builder = tauri_specta::Builder::new()
+            .commands(commands::get_device_list,
+            commands::get_vrc_info,
+            commands::get_core_map,
+            commands::upload_device_map,
+            commands::update_device_multiplier,
+            commands::update_device_offset,
+            commands::update_vrc_distance_weight,
+            commands::update_vrc_velocity_multiplier,
+            bhaptics_launch_default,
+            bhaptics_launch_vrch,
+            commands::play_point,
+            commands::swap_conf_nodes,
+            commands::set_tags_radius,
+            commands::set_node_radius,
+            commands::get_device_esp_model,);
+ 
+ 
+        #[cfg(debug_assertions)] // Only export on non-release builds
+        let builder = builder.path("../src/bindings.ts");
+ 
+        builder.build().unwrap()
+    };
+
     // init logging and stuff first
-    let plugins = tauri::Builder::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_serialplugin::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             println!("Instance already open, shutting down.");
@@ -169,6 +193,26 @@ async fn main() {
                 default_panic(info);
             }));
 
+            // handle feeding the UI information
+            boot_tx();
+            tauri::async_runtime::spawn(async move {
+                let rx = UPDATE_RX.lock().unwrap().take().unwrap();
+                loop {
+                    match rx.recv().await {
+                        Some(msg) => {
+                            match msg {
+                                UpdateEvent::DeviceSettings(id) => return,
+                                UpdateEvent::GeneralDeviceSettings => return,
+                            }
+                        },
+                        None => {
+                            log::error!("Issue with tauri feeder");
+                        }
+                    }
+                }
+                
+            });
+
             tauri::async_runtime::spawn(async move {
                 // Lock API_MANAGER inside the spawned task
                 {
@@ -192,23 +236,7 @@ async fn main() {
             log::trace!("done with tauri setup");
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::get_device_list,
-            commands::get_vrc_info,
-            commands::get_core_map,
-            commands::upload_device_map,
-            commands::update_device_multiplier,
-            commands::update_device_offset,
-            commands::update_vrc_distance_weight,
-            commands::update_vrc_velocity_multiplier,
-            bhaptics_launch_default,
-            bhaptics_launch_vrch,
-            commands::play_point,
-            commands::swap_conf_nodes,
-            commands::set_tags_radius,
-            commands::set_node_radius,
-            commands::get_device_esp_model,
-        ])
+        .invoke_handler(invoke_handler)
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {
                 close_app(window);

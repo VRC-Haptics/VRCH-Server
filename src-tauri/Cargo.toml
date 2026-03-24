@@ -23,6 +23,7 @@ console-subscriber = "0.5"
 
 # tauri requirements
 tauri = { version = "2", features = ["devtools"] }
+tauri-specta = { version = "2.0.0-rc.21", features = ["typescript"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -71,6 +72,8 @@ directories = "6.0.0"
 enum_dispatch = "0.3.13"
 hazarc = { version = "0.1.0", features = ["serde"] }
 arc-swap = { version = "1.8.1", features = ["serde"] }
+boxcar = "0.2.14"
+specta = "1.0.5"
 
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
