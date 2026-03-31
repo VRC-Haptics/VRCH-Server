@@ -12,7 +12,7 @@ interface DisplayHapticNodesProps {
 export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selectedDevice }) => {
   const nodes: HapticNode[] =
     selectedDevice.device_type.variant === 'Wifi'
-      ? selectedDevice.device_type.value.connection_manager?.config?.node_map ?? []
+      ? selectedDevice.device_type.value.config?.node_map ?? []
       : [];
 
   const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null);

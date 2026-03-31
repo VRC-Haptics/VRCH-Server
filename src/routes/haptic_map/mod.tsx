@@ -139,7 +139,7 @@ export default function InputNodesViewer() {
         })}
         {/* Device nodes */}
         {devices.flatMap((device) => {
-          const nodeMap = device?.device_type?.value?.connection_manager?.config?.node_map ?? [];
+          const nodeMap = device.device_type.value.config?.node_map ?? [];
           return nodeMap.map((node, idx) => {
             const key = `dev-${device.id}-${idx}`;
             return (
