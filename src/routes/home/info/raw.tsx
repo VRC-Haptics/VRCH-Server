@@ -47,7 +47,7 @@ export default function RawDeviceInfo({ device }: RawDeviceInfoProps) {
 
           <h2>Haptic Map</h2>
           <div className="ml-4">
-            <p><strong>Interpolation Algorithm:</strong> {device.factors.interp_algo.variant}</p>
+            <p><strong>Interpolation Algorithm:</strong> {device.factors.interp_algo.algo}</p>
           </div>
 
           <h2>Device Type</h2>
