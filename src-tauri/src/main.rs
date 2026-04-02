@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![warn(unused_extern_crates)]
+#![feature(debug_closure_helpers)] // needed for tauri-specta pinning a rc specta release
 // Keep Futures from being left un-awaited. Use crate::log_err for convenient handling.
 #![deny(unused_must_use)]
 
@@ -32,38 +33,46 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
+use specta_typescript::Typescript;
+use tauri_specta::*;
 use tokio::sync::Mutex;
 
 use crate::devices::DeviceHandle;
-use crate::{ble::start_ble, mapping::MapHandle, state::{save_config, UpdateEvent, boot_tx, UPDATE_RX}, vrc::VrcHandle};
+use crate::state::UPDATE_TX;
+use crate::{
+    ble::start_ble,
+    mapping::MapHandle,
+    state::{save_config, UpdateEvent, UPDATE_RX},
+    vrc::VrcHandle,
+};
 
 use console_subscriber;
 
 #[macro_export]
 /// Handles an unhandled result by printing if it failed. Optionally add context after the input to use this message instead of the default.
-/// 
+///
 /// # Usage:
 /// ```
 /// pub fn returns_result() -> Result<(), String> {
 ///     Err("Unique Error");
 /// }
-/// 
+///
 /// log_err(returns_result());
 /// -> "Lazily handled error: Unique Error"
-/// 
+///
 /// log_err(returns_result(), "Error peforming action");
 /// -> "Error performing action: Unique Error"
-/// 
-/// ``` 
+///
+/// ```
 macro_rules! log_err {
     ($expr:expr) => {
         if let Err(e) = $expr {
-            log::warn!("Lazily handled error: {e:?}");
+            log::warn!("[{}:{}] Lazily handled error: {e:?}", file!(), line!());
         }
     };
     ($expr:expr, $($arg:tt)+) => {
         if let Err(e) = $expr {
-            log::warn!("{}: {e:?}", format_args!($($arg)+));
+            log::warn!("[{}:{}] {}: {e:?}", file!(), line!(), format_args!($($arg)+));
         }
     };
 }
@@ -124,11 +133,13 @@ async fn main() {
     console_subscriber::init();
     tauri::async_runtime::set(tokio::runtime::Handle::current());
 
-    let invoke_handler = {
-        let builder = tauri_specta::Builder::new()
-            .commands(commands::get_device_list,
+    let builder = tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(tauri_specta::collect_commands![
+            commands::get_device_list,
             commands::get_vrc_info,
             commands::get_core_map,
+            commands::set_vrc,
+            commands::set_device_info,
             commands::upload_device_map,
             commands::update_device_multiplier,
             commands::update_device_offset,
@@ -140,14 +151,13 @@ async fn main() {
             commands::swap_conf_nodes,
             commands::set_tags_radius,
             commands::set_node_radius,
-            commands::get_device_esp_model,);
- 
- 
-        #[cfg(debug_assertions)] // Only export on non-release builds
-        let builder = builder.path("../src/bindings.ts");
- 
-        builder.build().unwrap()
-    };
+            commands::get_device_esp_model
+        ]);
+
+    #[cfg(debug_assertions)] // Only export on non-release builds
+    builder
+        .export(Typescript::default(), "../src/bindings.ts")
+        .expect("Failed to export typescript bindings");
 
     // init logging and stuff first
     tauri::Builder::default()
@@ -182,7 +192,10 @@ async fn main() {
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))
                 .build(),
         )
+        .invoke_handler(builder.invoke_handler())
         .setup(move |app: &mut tauri::App| {
+            builder.mount_events(app);
+
             let handle = app.handle().clone();
 
             let default_panic = take_hook();
@@ -192,26 +205,6 @@ async fn main() {
                 log::logger().flush(); // flush added info.
                 default_panic(info);
             }));
-
-            // handle feeding the UI information
-            boot_tx();
-            tauri::async_runtime::spawn(async move {
-                let rx = UPDATE_RX.lock().unwrap().take().unwrap();
-                loop {
-                    match rx.recv().await {
-                        Some(msg) => {
-                            match msg {
-                                UpdateEvent::DeviceSettings(id) => return,
-                                UpdateEvent::GeneralDeviceSettings => return,
-                            }
-                        },
-                        None => {
-                            log::error!("Issue with tauri feeder");
-                        }
-                    }
-                }
-                
-            });
 
             tauri::async_runtime::spawn(async move {
                 // Lock API_MANAGER inside the spawned task
@@ -223,7 +216,7 @@ async fn main() {
                 let mut manager = DeviceManager::new();
                 init_device_manager(&mut manager).await;
                 if let Err(e) = DEVICE_MANAGER.set(manager.get_handle()) {
-                    log::error!("Failed to start device manager");
+                    log::error!("Failed to start device manager: {:?}", e);
                 }
                 let device_handle = manager.get_handle();
 
@@ -236,7 +229,6 @@ async fn main() {
             log::trace!("done with tauri setup");
             Ok(())
         })
-        .invoke_handler(invoke_handler)
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {
                 close_app(window);

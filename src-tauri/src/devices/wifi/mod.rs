@@ -9,10 +9,9 @@ use std::{
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::devices::{
-    wifi::{config::WifiConfig, connection_manager::WifiConnManager},
-    DeviceHandle, ESP32Model,
-};
+use crate::{devices::{
+    DeviceHandle, ESP32Model, wifi::{config::WifiConfig, connection_manager::WifiConnManager}
+}, log_err, state::{self, PerDevice}};
 use crate::mapping::haptic_node::HapticNode;
 use crate::util::next_free_port;
 use udp::{broadcast::start_listen_broadcast, send_udp};
@@ -27,6 +26,7 @@ pub async fn start_wifi_devices(manager: &mut DeviceHandle) {
     start_listen_broadcast(manager).await;
 }
 
+#[derive(Debug)]
 pub struct WifiDevice {
     name: String,
     mac: String,
@@ -37,6 +37,7 @@ pub struct WifiDevice {
     connection: WifiConnManager,
 }
 
+#[derive(Debug)]
 pub struct WifiDeviceState {
     output: Arc<RwLock<Vec<f32>>>,
     push_map: bool,
@@ -65,7 +66,7 @@ impl Default for WifiDeviceState {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 pub struct WifiDeviceInfo {
     pub nodes: Vec<HapticNode>,
     pub remote_addr: SocketAddr,
@@ -73,6 +74,8 @@ pub struct WifiDeviceInfo {
     pub mac: String,
     pub rssi: usize,
     pub esp_model: ESP32Model,
+    pub offset: f32,
+    pub intensity: f32,
 }
 
 impl WifiDevice {
@@ -104,6 +107,7 @@ impl WifiDevice {
                         let Some(event) = event else { break };
                         match event {
                             WifiTickSignal::NewDeviceLog(log) => {
+                                log::trace!("New log: {:?}", log);
                                 let mut lock = state_clone.lock();
                                 lock.logs.push(log);
                             }
@@ -121,6 +125,7 @@ impl WifiDevice {
                                 let _ = tx_clone.send(DeviceMessage::InfoDirty(id_clone.clone())).await;
                             }
                             WifiTickSignal::ResetConfig => {
+                                log::trace!("Reset config");
                                 {
                                 let mut lock = state_clone.lock();
                                 lock.config = None;
@@ -128,6 +133,7 @@ impl WifiDevice {
                                 let _ = tx_clone.send(DeviceMessage::InfoDirty(id_clone.clone())).await;
                             },
                             WifiTickSignal::NewIdentifier(ident) => {
+                                log::trace!("recieved ident");
                                 let mut lock = state_clone.lock();
                                 lock.identifier = Some(ident);
                             },
@@ -179,6 +185,8 @@ impl WifiDevice {
             mac: self.mac.clone(),
             rssi: 0,
             esp_model: ESP32Model::Unknown,
+            intensity: 1.0,
+            offset: 0.0,
         }
     }
 
@@ -233,7 +241,7 @@ async fn tick(
 
         match state.been_pinged {
             Some(i) => {
-                let since_pinged = state.last_heartbeat.saturating_duration_since(i);
+                let since_pinged = Instant::now().duration_since(i);
                 let diff = state.last_heartbeat.elapsed();
                 let ttl = Duration::from_secs(3);
                 if diff > ttl && since_pinged > ttl || cancel.is_cancelled() {
@@ -246,7 +254,6 @@ async fn tick(
             }
             None => {
                 state.been_pinged = Some(Instant::now());
-                log::info!("Pinging Board");
                 let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
                     addr: "/ping".to_string(),
                     args: vec![OscType::Int(recieve_port.into())],
@@ -305,21 +312,23 @@ async fn tick(
                 args: vec![OscType::String(hex)],
             })).unwrap();
             TickAction::Drive(bytes)
-        } else if state.config.is_none() {
-            log::trace!("Config not found:");
-            TickAction::None
         }else {
             TickAction::None
         }
     }; // lock dropped
 
     match action {
-        TickAction::PushMap(buf) => {let _ = send_udp(&buf, addr).await;},
-        TickAction::Query(buf) => {let _ = send_udp(&buf, addr).await;},
-        TickAction::Drive(buf) => {let _ = send_udp(&buf, addr).await;},
+        TickAction::PushMap(buf) => {log_err!(send_udp(&buf, addr).await)},
+        TickAction::Query(buf) => {log_err!(send_udp(&buf, addr).await)},
+        TickAction::Drive(buf) => {log_err!(send_udp(&buf, addr).await)},
+        TickAction::Ping(buf ) => {
+            log::trace!("Port: {:?}", addr.port());
+            let mut new = addr.clone();
+            new.set_port(1027);
+            log_err!(send_udp(&buf, &new).await)
+        },
         TickAction::Kill |
-        TickAction::None |
-        TickAction::Ping(_) => {}
+        TickAction::None => {},
     }
 }
 
@@ -358,6 +367,8 @@ impl Device for WifiDevice {
     /// Please note this causes internal locking and while minor,
     /// should be limited where possible
     fn info(&self) -> DeviceInfo {
+        let (_, cfg) = state::get_device(&DeviceId(self.mac.clone()));
+        let local = cfg.load();
         let state = self.live_state.lock();
         let info = WifiDeviceInfo {
             nodes: state.nodes.clone(),
@@ -366,6 +377,8 @@ impl Device for WifiDevice {
             mac: self.mac.clone(),
             rssi: 0,
             esp_model: ESP32Model::Unknown,
+            intensity: local.intensity,
+            offset: local.offset,
         };
         DeviceInfo::Wifi(info)
     }
@@ -374,6 +387,12 @@ impl Device for WifiDevice {
     fn update_info(&self, new: DeviceInfo) {
         match new {
             DeviceInfo::Wifi(inf) => {
+                let (_, cfg) = state::get_device(&DeviceId(self.mac.clone()));
+                let mut local = PerDevice::clone(&cfg.load());
+                local.intensity = inf.intensity;
+                local.offset = inf.offset;
+                cfg.swap(Arc::new(local));
+
                 let mut state = self.live_state.lock();
                 if let Some( ref mut conf) = &mut state.config {
                     conf.node_map = inf.nodes.clone();
@@ -381,7 +400,7 @@ impl Device for WifiDevice {
                 }
                 state.nodes = inf.nodes;
                 state.push_map = true; // signal to persist to device
-                let _ = self.manager.blocking_send(DeviceMessage::InfoDirty(self.get_id())); // tell map our info has changed
+                log_err!(self.manager.try_send(DeviceMessage::InfoDirty(self.get_id()))); // tell map our info has changed
             } 
             _ => log::warn!("Updated with wrong info type on wifi device: {:?}=>{:?}", self.name, self.mac),
         }

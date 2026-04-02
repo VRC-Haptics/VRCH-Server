@@ -1,11 +1,9 @@
-import { createContext, useState, useEffect, useContext, Dispatch, SetStateAction } from 'react';
-import { invoke } from "@tauri-apps/api/core";
-import { ReactNode } from 'react';
-import { Device } from '../utils/commonClasses';
+import { createContext, useState, useEffect, useContext, Dispatch, SetStateAction, ReactNode } from 'react';
+import { commands, DeviceInfo } from '../bindings';
 
 interface DeviceContextValue {
-  devices: Device[];
-  setDevices: Dispatch<SetStateAction<Device[]>>;
+  devices: DeviceInfo[];
+  setDevices: Dispatch<SetStateAction<DeviceInfo[]>>;
 }
 
 export const DeviceContext = createContext<DeviceContextValue>({
@@ -16,34 +14,30 @@ export const DeviceContext = createContext<DeviceContextValue>({
 export const useDeviceContext = () => useContext(DeviceContext);
 
 export const DeviceProvider = ({ children }: { children: ReactNode }) => {
-  //real state
-  const [internalDevices, setInternalDevices] = useState<Device[]>([]);
-
-  // Wrap the original setter
-  const setDevices = async (valueOrUpdater: SetStateAction<Device[]>) => {
-    setInternalDevices(valueOrUpdater);
-  };
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
 
   useEffect(() => {
     let active = true;
-    const loop = async () => {
+    const poll = async () => {
       while (active) {
         try {
-          const devs = await invoke<Device[]>("get_device_list");
-          setInternalDevices(devs);
+          const devs = await commands.getDeviceList();
+          const infos = devs
+            .map(([_id, info]) => info)
+            .filter((info): info is DeviceInfo => info !== null);
+          setDevices(infos);
         } catch (err) {
           console.error("fetchDevices error:", err);
         }
-        // wait 500ms before next iteration
         await new Promise((r) => setTimeout(r, 500));
       }
     };
-    loop();
+    poll();
     return () => { active = false; };
   }, []);
 
   return (
-    <DeviceContext.Provider value={{ devices: internalDevices, setDevices }}>
+    <DeviceContext.Provider value={{ devices, setDevices }}>
       {children}
     </DeviceContext.Provider>
   );

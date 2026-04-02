@@ -1,7 +1,7 @@
 // local modules
 use crate::{devices::{
     Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, //update::{Firmware, UpdateMethod}
-}, mapping::{MapHandle, MapInfo}, state, vrc::{VrcHandle, VrcInfo}};
+}, mapping::{MapHandle, MapInfo}, state::{self, Config, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::{InputEventMessage, InputMap, NodeId};
@@ -153,8 +153,28 @@ pub fn get_device_list(dev: tauri::State<'_, DeviceHandle>) -> Vec<(DeviceId, Op
 #[tauri::command]
 #[specta::specta]
 pub fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> VrcInfo {
-    let vrc_info = vrc.get_info();
-    VrcInfo::clone(vrc_info.as_ref())
+    vrc.get_info()
+}
+
+#[tauri::command]
+#[specta::specta]
+/// sets all vrc relevant info. It is all behind an arcswap so it is the same cost to set all or one of them.
+pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
+    let shared = &state::get_config().vrc_settings;
+    let mut new = VrcSettings::clone(&shared.load());
+    new.velocity_mult = mult;
+    new.velocity_ratio = ratio;
+    new.sample_cache = samples;
+    new.smoothing_time = smooth_s;
+
+    shared.swap(Arc::new(new));
+}
+
+#[tauri::command]
+#[specta::specta]
+/// handles persisting and splitting out individual states to where they need to go.
+pub fn set_device_info(dev: tauri::State<'_, DeviceHandle>, id: DeviceId, inf: DeviceInfo) {
+    dev.with_device_mut(&id, |f| f.update_info(inf));
 }
 
 /// Gets the core haptics map that is used to drive feedback.
@@ -199,31 +219,47 @@ pub async fn upload_device_map(
 #[tauri::command]
 #[specta::specta]
 pub async fn update_device_multiplier(
-    device_id: String,
+    device_id: DeviceId,
     multiplier: f32,
 )  {
-    state::update_device_field(&device_id.into(), |d| d.intensity = multiplier);
+    let (_, dev) = state::get_device(&device_id);
+    let guard = dev.load();
+    let mut new = PerDevice::clone(&guard);
+    new.intensity = multiplier;
+    state::update_device(Arc::new(new));
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn update_device_offset(
-    device_id: String,
+    device_id: DeviceId,
     offset: f32,
 ) {
-    state::update_device_field(&device_id.into(), |d| d.offset = offset);
+    let (_, dev) = state::get_device(&device_id);
+    let guard = dev.load();
+    let mut new = PerDevice::clone(&guard);
+    new.offset = offset;
+    state::update_device(Arc::new(new));
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn update_vrc_velocity_multiplier(vel_multiplier: f32) {
-    state::update(|c| c.vrc_settings.velocity_mult = vel_multiplier);
+    let vrc = &state::get_config().vrc_settings;
+    let guard = vrc.load();
+    let mut new = VrcSettings::clone(&guard);
+    new.velocity_mult = vel_multiplier;
+    vrc.store(Arc::new(new));
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn update_vrc_distance_weight(distance_weight: f32) {
-    state::update(|c| c.vrc_settings.velocity_ratio = 1.0 - distance_weight);
+    let vrc = &state::get_config().vrc_settings;
+    let guard = vrc.load();
+    let mut new = VrcSettings::clone(&guard);
+    new.velocity_mult = 1. - distance_weight;
+    vrc.store(Arc::new(new));
 }
 
 /// Handles setting our app to launch instead of the bHapticsPlayer

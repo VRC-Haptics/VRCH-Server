@@ -14,6 +14,7 @@ use tokio::{
 
 pub mod broadcast;
 
+#[derive(Debug)]
 pub enum UdpError {
     GenericTokio(tokio::io::Error),
 }

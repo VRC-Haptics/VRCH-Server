@@ -12,7 +12,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   const { devices } = useDeviceContext();
 
   function createInfo(device_id: string) {
-    const device = devices.find((d) => d.id === device_id);
+    const device = devices.find((d) => d.value.mac === device_id);
 
     if (device != null) {
       return (
@@ -20,13 +20,13 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
           id="DeviceInfoCard"
           className="max-w-full max-h-full overflow-auto"
         >
-          <DeviceOffset selectedDevice={device}></DeviceOffset>
+          <DeviceOffset deviceId = {device_id} selectedDevice={device}></DeviceOffset>
           <div className="h-2"></div>
-          <DisplayHapticNodes selectedDevice={device}></DisplayHapticNodes>
+          <DisplayHapticNodes deviceId = {device_id} selectedDevice={device}></DisplayHapticNodes>
           <div className="h-2"></div>
           <DeviceJsonUpload device={device}></DeviceJsonUpload>
           <div className="h-2"></div>
-          <RawDeviceInfo device={device} />
+          <RawDeviceInfo deviceId = {device_id} device={device} />
         </div>
       );
     }

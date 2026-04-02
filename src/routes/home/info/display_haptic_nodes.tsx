@@ -1,19 +1,15 @@
 import React from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
-import { Device, HapticNode } from '../../../utils/commonClasses';
-import { Vec3 } from '../../../utils/global_map';
+import { DeviceInfo, DeviceId, HapticNode, Vec3, commands } from '../../../bindings';
 
 interface DisplayHapticNodesProps {
-  selectedDevice: Device;
+  deviceId: DeviceId;
+  selectedDevice: DeviceInfo;
 }
 
-export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selectedDevice }) => {
-  const nodes: HapticNode[] =
-    selectedDevice.device_type.variant === 'Wifi'
-      ? selectedDevice.device_type.value.connection_manager?.config?.node_map ?? []
-      : [];
+export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId, selectedDevice }) => {
+  const nodes: HapticNode[] = selectedDevice.value.nodes;
 
   const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null);
   const [selectedIndices, setSelectedIndices] = React.useState<number[]>([]);
@@ -27,42 +23,31 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
     });
   };
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
     if (selectedIndices.length < 1) return;
     const node = nodes[selectedIndices[0]];
-    invoke('play_point', {
-      feedbackLocation: [-node.x, node.y, node.z] as [number, number, number],
-      power: 1.0 * selectedDevice.factors.sens_mult,
-      duration: 0.2,
-    }).catch(err => console.error('play_point invoke failed:', err));
+    const result = await commands.playPoint([-node.x, node.y, node.z], 1.0, 0.2);
+    if (result.status === "error") console.error("play_point failed:", result.error);
   };
 
   const handleClear = () => setSelectedIndices([]);
   const handleRecenter = () => controlsRef.current?.reset();
-  const handleSwap = () => {
-    if (selectedIndices.length !== 2) return;
-    // create vec3
-    const node_1: Vec3 = { x: -nodes[selectedIndices[0]].x, y: nodes[selectedIndices[0]].y, z: nodes[selectedIndices[0]].z };
-    const node_2: Vec3 = { x: -nodes[selectedIndices[1]].x, y: nodes[selectedIndices[1]].y, z: nodes[selectedIndices[1]].z };
 
-    invoke('swap_conf_nodes', {
-      deviceId: selectedDevice.id,
-      pos1: node_1,
-      pos2: node_2,
-    }).catch(err => console.error('swap_conf_nodes invoke failed:', err));
+  const handleSwap = async () => {
+    if (selectedIndices.length !== 2) return;
+    const n1 = nodes[selectedIndices[0]];
+    const n2 = nodes[selectedIndices[1]];
+    const pos1: Vec3 = { x: -n1.x, y: n1.y, z: n1.z };
+    const pos2: Vec3 = { x: -n2.x, y: n2.y, z: n2.z };
+    const result = await commands.swapConfNodes(deviceId, pos1, pos2);
+    if (result.status === "error") console.error("swap_conf_nodes failed:", result.error);
   };
 
   return (
     <div id="DisplayHapticNodes" className="min-w-full">
-      {/* DaisyUI collapse ▾  (closed by default) */}
       <div className="collapse collapse-arrow bg-base-300 rounded-box">
-        {/* The <input> toggles open/closed; leave it unchecked for “closed by default”. */}
         <input type="checkbox" className="peer" />
-
-        <div className="collapse-title text-md font-bold">
-          Edit Nodes
-        </div>
-
+        <div className="collapse-title text-md font-bold">Edit Nodes</div>
         <div className="collapse-content">
           <div className="max-w-full h-96 outline outline-2 outline-current">
             <Canvas className="w-full h-full" camera={{ position: [0, 2, 2], fov: 60 }}>
@@ -81,17 +66,10 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ selected
                   <sphereGeometry args={[0.02, 16, 16]} />
                   <meshStandardMaterial color={selectedIndices.includes(idx) ? 'red' : 'blue'} />
                   {hoveredIdx === idx && (
-                    <Html
-                      style={{
-                        pointerEvents: 'none',
-                        whiteSpace: 'nowrap',
-                        fontSize: '12px',
-                        background: '#000',
-                        color: '#fff',
-                        padding: '2px 4px',
-                        borderRadius: '4px',
-                      }}
-                    >
+                    <Html style={{
+                      pointerEvents: 'none', whiteSpace: 'nowrap', fontSize: '12px',
+                      background: '#000', color: '#fff', padding: '2px 4px', borderRadius: '4px',
+                    }}>
                       {node.groups.join(', ')}:{idx}
                     </Html>
                   )}

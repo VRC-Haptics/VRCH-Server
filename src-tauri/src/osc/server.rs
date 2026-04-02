@@ -90,7 +90,18 @@ impl OscServer {
                     result = socket.recv_from(&mut buf) => {
                         match result {
                             Ok((size, _src)) => {
-                                // ... handle packet
+                                match rosc::decoder::decode_udp(&buf[..size]) {
+                                    Ok((_, packet)) => {
+                                        handle_packet(packet, &on_receive, &filter_prefix);
+                                    }
+                                    Err(e) => {
+                                        if let rosc::OscError::BadPacket(_) = e {
+                                            continue;
+                                        }
+                                        log::error!("Failed to decode OSC packet: {:?}", e);
+                                    }
+                                }
+
                             }
                             Err(e) => {
                                 log::error!("Error receiving packet: {:?}", e);

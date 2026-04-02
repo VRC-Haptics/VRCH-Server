@@ -12,9 +12,10 @@ use crate::mapping::{
 };
 use crate::mapping::{InputEventMessage, MapHandle};
 use crate::osc::server::OscServer;
-use crate::state::{self, cache, Config};
+use crate::state::{self, Config, StandardMenu, VrcSettings};
+use arc_swap::Cache;
 use crate::vrc::parsing::OscInfo;
-use crate::log_err;
+use crate::{log_err, vrc};
 
 // module dependencies
 use cache_node::CacheNode;
@@ -35,12 +36,14 @@ use tokio::sync::{
 /// struct exposed to the UI.
 ///
 /// Seperates serializable with under the hood specifications.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 pub struct VrcInfo {
     pub is_connected: bool,
     pub in_port: Option<u16>,
     pub out_port: Option<u16>,
     pub avatar: Option<Avatar>,
+    pub velocity_ratio: f32,
+    pub velocity_mult: f32,
 }
 
 impl Default for VrcInfo {
@@ -50,6 +53,8 @@ impl Default for VrcInfo {
             in_port: None,
             out_port: None,
             avatar: None,
+            velocity_ratio: 0.5,
+            velocity_mult: 0.5,
         }
     }
 }
@@ -58,6 +63,7 @@ impl Default for VrcInfo {
 // I think having trailing "/" references the contents of the path, not all the children paths.
 pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";
 pub const INTENSITY_PATH: &str = "/avatar/parameters/haptic/global/intensity";
+pub const ENABLE_PATH: &str = "/avatar/parameters/haptic/global/enable";
 pub const AVATAR_ID_PATH: &str = "/avatar/change";
 pub const VRC_TAG: &str = "VRC";
 
@@ -69,18 +75,26 @@ pub struct VrcHandle {
 
 impl VrcHandle {
     pub fn send_osc_msg_rcv(&self, msg: OscMessage) {
-        log_err!(self.tx.blocking_send(MsgToMainVrc::OscMessageRecieved(msg)));
+        log_err!(self.tx.try_send(MsgToMainVrc::OscMessageRecieved(msg)));
     }
 
     pub fn blocking_send(&self, msg: MsgToMainVrc) {
-        log_err!(self.tx.blocking_send(msg));
+        log_err!(self.tx.try_send(msg));
     }
 
     pub async fn send(&self, msg: MsgToMainVrc) {
         log_err!(self.tx.send(msg).await);
     }
 
-    pub fn get_info(&self) -> ArcBorrow<VrcInfo> {
+    pub fn get_info(&self) -> VrcInfo {
+        let settings = state::get_config().vrc_settings.load();
+        let mut new = VrcInfo::clone(&self.info.load());
+        new.velocity_ratio = settings.velocity_ratio;
+        new.velocity_mult = settings.velocity_mult;
+        new
+    }
+
+    pub fn get_info_ref(&self) -> ArcBorrow<VrcInfo> {
         self.info.load()
     }
 }
@@ -109,7 +123,7 @@ pub struct VrcGame {
     rx: Receiver<MsgToMainVrc>,
     map: MapHandle,
     /// The OSC server we recieve updates from
-    osc_server: Option<OscServer>,
+    osc_server: OscServer,
     /// Spawns our own OSCQuery advertising
     query_server: Option<OscQueryServer>,
 }
@@ -129,7 +143,7 @@ pub enum MsgToMainVrc {
 impl VrcGame {
     pub async fn new(map_handle: MapHandle, api: &'static Mutex<ApiManager>) -> VrcGame {
         log::trace!("Starting VRC");
-        let (tx, rx) = channel(10);
+        let (tx, rx) = channel(50);
         let info = Arc::new(AtomicArc::new(VrcInfo::default().into()));
         let handle = VrcHandle {
             tx: tx.clone(),
@@ -138,11 +152,20 @@ impl VrcGame {
         let param_cache = Arc::new(DashMap::new());
         let param_avail = Arc::new(DashMap::new());
 
+        //create the low-latency server.
+        let handle_rcv = handle.clone();
+        let on_receive = move |msg: OscMessage| {
+            handle_rcv.send_osc_msg_rcv(msg);
+        };
+        let mut recieving_port = 9001;
+        let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
+        let port_used = vrc_server.start().await;
+
         // Instantiate
         let vrc = VrcGame {
             ui_info: info,
             handle: handle.clone(),
-            osc_server: None,
+            osc_server: vrc_server,
             query_server: None,
             avatar: None,
             rx: rx,
@@ -154,17 +177,6 @@ impl VrcGame {
         // Start the thread that handles finding available vrc parameters
         // (High latency server)
         start_filling_available_parameters(vrc.get_handle(), api, param_avail).await;
-
-        //create the low-latency server.
-        let handle_rcv = handle.clone();
-        let on_receive = move |msg: OscMessage| {
-            log::trace!("Got recieve: {msg:?}");
-            handle_rcv.send_osc_msg_rcv(msg);
-        };
-
-        let mut recieving_port = 9001;
-        let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
-        let port_used = vrc_server.start().await;
 
         // if the server wasn't able to capture the port start advertising the port it was bound to.
         if port_used != recieving_port {
@@ -183,21 +195,19 @@ impl VrcGame {
     /// Main event loop that handles VRC communications.
     pub async fn run(&mut self) {
         log::trace!("Running VRC");
-        let mut cfg_cache = cache();
+        let mut settings = Cache::new(&state::get_config().vrc_settings);
         loop {
             let Some(msg) = self.rx.recv().await else {
                 log::warn!("Shutting down vrc game");
                 return;
             };
 
-            log::trace!("VrcMessage: {msg:?}");
-
             match msg {
 
                 // called at high velocity.
                 MsgToMainVrc::RefreshMap => {
-                    let cfg = cfg_cache.load();
-                    self.refresh_map(cfg, &self.map);
+
+                    self.refresh_map(&self.map, &settings.load());
                 }
                 MsgToMainVrc::OscMessageRecieved(msg) => {
                     // remove VRC Fury tagging if needed
@@ -205,6 +215,7 @@ impl VrcGame {
 
                     // if there is a value push it to our cache.
                     if let Some(arg) = msg.args.first() {
+                        let cfg = settings.load();
                         // if we have a cache going otherwise build it.
                         if let Some(mut cache) =
                             self.parameter_cache.get_mut(&OscPath(addr.clone()))
@@ -215,8 +226,8 @@ impl VrcGame {
                                 OscPath(addr),
                                 CacheNode::new(
                                     arg.to_owned(),
-                                    state::clone_field(|c| &c.vrc_settings.sample_cache),
-                                    state::clone_field(|c| &c.vrc_settings.smoothing_time),
+                                    cfg.sample_cache.clone(),
+                                    cfg.smoothing_time.clone(),
                                     0.2,
                                     1.0,
                                     1.0,
@@ -225,7 +236,7 @@ impl VrcGame {
                         }
 
                         // push changes to
-                        self.handle.send(MsgToMainVrc::RefreshMap).await;
+                        self.refresh_map(&self.map, cfg);
                     } else {
                         log::warn!("empty message recieved: {:?}", msg);
                     }
@@ -258,7 +269,7 @@ impl VrcGame {
     }
 
     /// Propogates our cached values to changes on the input map.
-    fn refresh_map(&self, cfg: &Config, map: &MapHandle) {
+    fn refresh_map(&self, map: &MapHandle, settings: &VrcSettings) {
         let Some(avatar) = self.avatar.as_ref() else {
             return;
         };
@@ -267,22 +278,48 @@ impl VrcGame {
             return;
         };
 
-        // update menu items (VERY CURSED)
-        let mut collect = vec![];
-        let mut cfg_int = 0.0;
-        if let Some(int_node) = self.parameter_cache.get(&OscPath(INTENSITY_PATH.into())) {
-            cfg_int = int_node.raw_last();
-            if (cfg.mapping_menu.intensity - cfg_int).abs() > 0.01 {
-                collect.push(|d: &mut Config| d.mapping_menu.intensity = cfg_int);
-            }
-        }
+        // update menu items and only push when needed
+        let int_node = self.parameter_cache.get(&OscPath(INTENSITY_PATH.into()));
+        let en_node = self.parameter_cache.get(&OscPath(ENABLE_PATH.into()));
+        match (int_node, en_node) {
+            (Some(int), Some(en)) =>  {
+                let intensity = int.raw_last().clamp(0.0, 1.0);
+                let enable = en.raw_last();
+                let enable = enable > 0.5; 
 
-        if !collect.is_empty() {
-            let mut new = Config::clone(cfg);
-            for f in collect {
-                f(&mut new);
+                let menu = state::get_config().mapping_menu.load();
+                if menu.intensity - intensity < 0.05 || enable != menu.enable {
+                    let mut new = StandardMenu::clone(&menu);
+                    new.intensity = intensity;
+                    new.enable = enable;
+                    state::get_config().mapping_menu.store(new.into());
+                }
+            },
+            (int, en) => {
+                if int.is_none() && en.is_none() {
+                    return;
+                }
+
+                if let Some(intensity) = int {
+                    let intensity = intensity.raw_last().clamp(0.0, 1.0);
+                    let menu = state::get_config().mapping_menu.load();
+                    if menu.intensity - intensity < 0.05 {
+                        let mut new = StandardMenu::clone(&menu);
+                        new.intensity = intensity;
+                        state::get_config().mapping_menu.store(new.into());
+                    }
+                }
+
+                if let Some(enable) = en {
+                    let en = enable.raw_last() > 0.5;
+                    let menu = state::get_config().mapping_menu.load();
+                    if menu.enable != en {
+                        let mut new = StandardMenu::clone(&menu);
+                        new.enable = en;
+                        state::get_config().mapping_menu.store(new.into());
+                    }
+                }
             }
-            state::swap(new);
         }
 
         // update input nodes
@@ -300,11 +337,13 @@ impl VrcGame {
                         }
 
                         // update our cache node, then read output to our nodes.
-                        cache_node.set_position_weight(1.0 - cfg.vrc_settings.velocity_ratio);
-                        cache_node.set_velocity_mult(cfg.vrc_settings.velocity_mult);
+                        cache_node.set_position_weight(1.0 - settings.velocity_ratio);
+                        cache_node.set_velocity_mult(settings.velocity_mult);
                         cache_node.set_contact_scale(1.0);
                         n.set_intensity(cache_node.latest());
                     });
+                } else {
+                    log::warn!("node in config but not found in map: {:?}", node);
                 }
             } // for loop
 
@@ -358,7 +397,7 @@ fn to_inputs(avi: &Avatar) -> Vec<InputNode> {
     nodes
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 /// Abstraction over raw VRC parameters.
 ///
 /// Represents all relevant *Descriptive* data. Does not contain any relevant high-speed or low latency datat.

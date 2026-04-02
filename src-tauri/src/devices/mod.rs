@@ -26,6 +26,7 @@ use crate::{
 pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
 
 #[enum_dispatch]
+#[derive(Debug)]
 /// All Haptic Devices implement the `Device` trait
 /// and are not garunteed to provide anything else.
 ///
@@ -36,7 +37,7 @@ pub enum HapticDevice {
 }
 
 /// Info container for each device type
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceInfo {
     Wifi(WifiDeviceInfo),
@@ -79,7 +80,7 @@ pub trait Device {
     fn buffer_updated(&self);
     /// Allows this device to interact with the DeviceManager directly.
     async fn set_manager_channel(&mut self, tx: mpsc::Sender<DeviceMessage>);
-    /// Initiates this devices shutdown process, this should include sending a remove request over the socket.
+    /// Initiates this devices shutdown process, this should include sending a remove request over the manager_channel.
     fn disconnect(&mut self);
 }
 
@@ -101,6 +102,7 @@ pub enum DeviceOutEvents {
     DeviceInfoDirty(DeviceId),
 }
 
+#[derive(Debug)]
 /// can be freely cloned, provides cheap access to individual devices.
 pub struct DeviceHandle {
     devices: Arc<DashMap<DeviceId, HapticDevice>>,
@@ -273,7 +275,7 @@ fn handle_device_message(
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, specta::Type)]
 pub struct DeviceId(pub String);
 
 impl Deref for DeviceId {
@@ -297,7 +299,7 @@ impl From<&str> for DeviceId {
 }
 
 /// The firmware type returned from the device.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize,specta::Type)]
 pub enum ESP32Model {
     /// All original ESP32 variants
     ESP32,

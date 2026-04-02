@@ -18,7 +18,7 @@ use crate::{
 
 // not intended to be accessed publicly. Use functions below
 static CONFIG: LazyLock<Config> = LazyLock::new(|| load_config().unwrap_or_default().into());
-static UPDATE_TX: LazyLock<Sender<UpdateEvent>> = LazyLock::new(|| {
+pub static UPDATE_TX: LazyLock<Sender<UpdateEvent>> = LazyLock::new(|| {
     let (tx, rx) = channel(10);
     *UPDATE_RX.lock().unwrap() = Some(rx);
     tx
@@ -28,10 +28,6 @@ static UPDATE_TX: LazyLock<Sender<UpdateEvent>> = LazyLock::new(|| {
 pub static UPDATE_RX: Mutex<Option<Receiver<UpdateEvent>>> = Mutex::new(None);
 static DIRTY: AtomicBool = AtomicBool::new(false);
 
-/// refreshes UPDATE_RX and UDPATE_TX
-pub fn boot_tx() {
-    let _ = UPDATE_TX;
-}
 
 /// Heavy function, persists a snapshot of our config to the disk.
 pub fn save_config() {
@@ -57,7 +53,7 @@ pub enum UpdateEvent {
 
 /// returns bare static reference to global app configuration (state)
 pub fn get_config() -> &'static Config {
-    &CONFIG
+    &*CONFIG
 }
 
 /// Main method for retrieving a read-only view of a device configuration.
@@ -65,19 +61,19 @@ pub fn get_config() -> &'static Config {
 /// Returns;
 /// Saved device index,
 /// static reference to device.
-pub fn get_device(id: DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
+pub fn get_device(id: &DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
     let Some(existing) = CONFIG
         .devices
         .states
         .iter()
-        .find(|(_, d)| d.load().id == id)
+        .find(|(_, d)| d.load().id == *id)
     else {
         let _ = update_device(Arc::new(PerDevice::default(id.clone())));
         return CONFIG
             .devices
             .states
             .iter()
-            .find(|(_, d)| d.load().id == id)
+            .find(|(_, d)| d.load().id == *id)
             .expect("device still not in saved_devices");
     };
     existing
@@ -101,9 +97,9 @@ pub fn update_device(state: Arc<PerDevice>) -> usize {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// Hub for individual app states
 ///
-/// This is never intended to be changed at runtime and references to the children are of static lifetime.
+/// This is never intended to be moved at runtime and references to the children are of static lifetime.
 pub struct Config {
-    pub mapping_menu: StandardMenu,
+    pub mapping_menu: ArcSwap<StandardMenu>,
     pub devices: Devices,
     pub vrc_settings: ArcSwap<VrcSettings>,
 }
@@ -112,6 +108,7 @@ pub struct Config {
 #[derive(Debug)]
 pub struct Devices {
     pub wifi_device_timeout: ArcSwap<f32>,
+    /// Inner ArcSwap allows for device settings to be updated, without changing static lifetime.
     pub states: AppendVec<ArcSwap<PerDevice>>,
 }
 
@@ -187,8 +184,8 @@ impl Default for Config {
                 wifi_device_timeout: ArcSwap::new(Arc::new(3.0)),
                 states: AppendVec::new(),
             },
-            mapping_menu: StandardMenu::default(),
-            vrc_settings: VrcSettings::default(),
+            mapping_menu: ArcSwap::new(Arc::new(StandardMenu::default())),
+            vrc_settings: ArcSwap::new(Arc::new(VrcSettings::default())),
         }
     }
 }

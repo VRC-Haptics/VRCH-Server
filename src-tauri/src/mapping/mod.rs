@@ -9,7 +9,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
-use tokio::sync::mpsc::{self, error::SendError};
+use tokio::sync::mpsc::{self, error::{TrySendError, SendError}};
 use crate::log_err;
 
 use event::Event;
@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Snapshot of map state.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, specta::Type)]
 pub struct MapInfo {
     nodes: Vec<InputNode>,
     events: Vec<Event>,
@@ -41,7 +41,7 @@ pub struct MapHandle {
 
 impl MapHandle {
     pub fn mark_dirty_blocking(&self) {
-        log_err!(self.event_sender.blocking_send(InputEventMessage::MarkMapDirty));
+        log_err!(self.event_sender.try_send(InputEventMessage::MarkMapDirty));
     }
 
     /// clones snapshot of map state
@@ -64,8 +64,8 @@ impl MapHandle {
     pub fn send_event_blocking(
         &self,
         msg: InputEventMessage,
-    ) -> Result<(), SendError<InputEventMessage>> {
-        self.event_sender.blocking_send(msg)
+    ) -> Result<(), TrySendError<InputEventMessage>> {
+        self.event_sender.try_send(msg)
     }
 
     /// collects the outputs of function f, for each node that has the given tag
@@ -327,13 +327,12 @@ impl InputMap {
 
     /// pushes updates from map to devices
     fn update_devices(&self) {
-        let mut cache = state::cache();
         let devices = self.devices.lock();
         let in_nodes = self.input_nodes.read();
         for device in devices.iter() {
             // could be done in parallel here. but few devices means not effeicnet (probably)
-            let settings = state::get_device_cache(&mut cache, &device.id);
-            device.update_buffer(&in_nodes, &settings);
+            let (_, settings) = state::get_device(&device.id);
+            device.update_buffer(&in_nodes, &settings.load());
             self.manager.with_device(&device.id, |d| d.buffer_updated());
         }
     }
@@ -395,7 +394,7 @@ pub enum InputEventMessage {
 
 /// Descriptors for location groups.
 /// Allows for segmented Interpolation
-#[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter)]
+#[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter, specta::Type)]
 pub enum NodeGroup {
     Head,
     UpperArmRight,
@@ -417,7 +416,7 @@ pub enum NodeGroup {
     All,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash, specta::Type)]
 /// Id unique to the node it references.
 /// if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
 pub struct NodeId(pub String);

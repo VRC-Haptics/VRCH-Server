@@ -31,7 +31,7 @@ export default function ConnectedDevices({
         <div className="h-max rounded-md px-2 py-1">No Devices Detected</div>
       ) : (
         devices.map((device) => {
-          const isSelected = selectedDevice === device.id;
+          const isSelected = selectedDevice === device.value.mac;
           const deviceClass = clsx(
             "h-max rounded-md px-2 py-1  hover:bg-base-200",
             isSelected
@@ -42,15 +42,15 @@ export default function ConnectedDevices({
           return (
             <>
             <div
-              key={device.id}
+              key={device.value.mac}
               className={deviceClass}
-              title={device.id + "@" + device.id}
+              title={device.value.mac + "@" + device.value.mac}
               onClick={() => {
-                onSelectDevice(device.id);
-                setSelectedDevice(device.id);
+                onSelectDevice(device.value.mac);
+                setSelectedDevice(device.value.mac);
               }}
             >
-              {device.name}
+              {device.value.name}
             </div>
             <div className="h-0.5"/></>
           );
