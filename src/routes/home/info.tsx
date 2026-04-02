@@ -35,7 +35,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   return (
     <div
       id="infoPageContainer"
-      className="bg-base-200 rounded-md p-2 min-w-0 min-h-0 overflow-hidden h-full flex flex-col"
+      className="bg-base-200 rounded-md p-2 min-w-0 min-h-0 overflow-hidden h-full flex flex-col flex-1"
     >
       <div className="font-bold bg-base-300 rounded-md px-2 py-1 h-min">
         <h1>Device Info</h1>

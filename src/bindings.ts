@@ -48,6 +48,37 @@ export type Avatar = {
 	configs: GameMap[],
 };
 
+/**
+ *  A node cached by vrc, is an intermdieary between an `InputNode`.
+ *  
+ *  Provides simple 
+ */
+export type CacheNode = {
+	/**
+	 *  Ring buffer of values we have recieved.
+	 *  Front items are the most recent.
+	 */
+	values: ([SpectaOscType, {
+	duration_since_epoch: number,
+	duration_since_unix_epoch: number,
+}])[],
+	/**
+	 *  contains the OscType that this CacheNode accepts.
+	 *  The payload should be considered the default value if the cache is empty.
+	 */
+	osc_type: SpectaOscType,
+	// the max_len of entries we will keep track of.
+	max_len: number,
+	// The state of haptics returned from this node.
+	smoothing_time: {
+		secs: number,
+		nanos: number,
+	},
+	position_weight: number,
+	vel_mult: number,
+	contact_scale: number,
+};
+
 // Metadata from the json config
 export type ConfMetadata = {
 	map_name: string,
@@ -225,6 +256,37 @@ export type NodeGroup = "Head" | "UpperArmRight" | "UpperArmLeft" | "LowerArmRig
  *  if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
  */
 export type NodeId = string;
+
+export type OscAccessLevel = "Refused" | "OnlyRead" | "OnlyWrite" | "Full";
+
+export type OscInfo = {
+	full_path: OscPath,
+	access: OscAccessLevel,
+	value: SpectaOscType[],
+	description: string | null,
+};
+
+/**
+ *  Simple wrapper for the String class.
+ *  Represnts a full OscPath without any elements stripped,
+ *  other than the VRC Fury naming.
+ */
+export type OscPath = string;
+
+export type SpectaOscType = ({ Int: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Float: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ String: string }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; Time?: never } | ({ Long: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Midi?: never; String?: never; Time?: never } | ({ Double: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Char: string }) & { Array?: never; Blob?: never; Bool?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Bool: boolean }) & { Array?: never; Blob?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | "Nil" | "Inf" | ({ Blob: number[] }) & { Array?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Time: {
+	seconds: number,
+	fractional: number,
+} }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never } | ({ Color: {
+	r: number,
+	g: number,
+	b: number,
+	a: number,
+} }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Midi: {
+	port: number,
+	status: number,
+	data1: number,
+	data2: number,
+} }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; String?: never; Time?: never } | ({ Array: SpectaOscType[] }) & { Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never };
 
 /**
  *  The bone that the node is parented to in the prefab.
@@ -587,6 +649,8 @@ export type VrcInfo = {
 	avatar: Avatar | null,
 	velocity_ratio: number,
 	velocity_mult: number,
+	cached: ([OscPath, CacheNode])[],
+	available: OscInfo[],
 };
 
 export type WifiDeviceInfo = {

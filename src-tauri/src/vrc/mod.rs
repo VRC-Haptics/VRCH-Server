@@ -12,10 +12,11 @@ use crate::mapping::{
 };
 use crate::mapping::{InputEventMessage, MapHandle};
 use crate::osc::server::OscServer;
-use crate::state::{self, Config, StandardMenu, VrcSettings};
+use crate::state::{self, StandardMenu, VrcSettings};
 use arc_swap::Cache;
+use tokio::task::JoinHandle;
 use crate::vrc::parsing::OscInfo;
-use crate::{log_err, vrc};
+use crate::{log_err};
 
 // module dependencies
 use cache_node::CacheNode;
@@ -25,8 +26,11 @@ use discovery::start_filling_available_parameters;
 use hazarc::{ArcBorrow, AtomicArc};
 use osc_query::OscQueryServer;
 use parsing::remove_version;
+use rayon::prelude::*;
 
 use rosc::OscMessage;
+use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 use std::{net::Ipv4Addr, sync::Arc};
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
@@ -44,6 +48,8 @@ pub struct VrcInfo {
     pub avatar: Option<Avatar>,
     pub velocity_ratio: f32,
     pub velocity_mult: f32,
+    pub cached: Vec<(OscPath, CacheNode)>,
+    pub available: Vec<OscInfo>,
 }
 
 impl Default for VrcInfo {
@@ -55,6 +61,8 @@ impl Default for VrcInfo {
             avatar: None,
             velocity_ratio: 0.5,
             velocity_mult: 0.5,
+            cached: Vec::new(),
+            available: Vec::new(),
         }
     }
 }
@@ -70,12 +78,36 @@ pub const VRC_TAG: &str = "VRC";
 /// Implements cheap clone, is threadsafe.
 pub struct VrcHandle {
     tx: Sender<MsgToMainVrc>,
+    osc_buffer: Arc<std::sync::Mutex<Vec<OscMessage>>>,
+    flush_scheduled: Arc<std::sync::atomic::AtomicBool>,
     info: Arc<AtomicArc<VrcInfo>>,
 }
 
 impl VrcHandle {
     pub fn send_osc_msg_rcv(&self, msg: OscMessage) {
-        log_err!(self.tx.try_send(MsgToMainVrc::OscMessageRecieved(msg)));
+        {
+            let mut guard = self.osc_buffer.lock().unwrap();
+            guard.push(msg);
+        }
+
+        // Schedule a flush if one isn't already pending
+        if !self.flush_scheduled.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            let handle = self.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                handle.flush_osc();
+                handle.flush_scheduled.store(false, std::sync::atomic::Ordering::Release);
+            });
+        }
+    }
+
+    fn flush_osc(&self) {
+        let batch = {
+            let mut guard = self.osc_buffer.lock().unwrap();
+            if guard.is_empty() { return; }
+            std::mem::take(&mut *guard)
+        };
+        let _ = self.tx.try_send(MsgToMainVrc::OscBatch(batch));
     }
 
     pub fn blocking_send(&self, msg: MsgToMainVrc) {
@@ -103,12 +135,15 @@ impl Clone for VrcHandle {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
+            osc_buffer: Arc::clone(&self.osc_buffer),
+            flush_scheduled: Arc::clone(&self.flush_scheduled),
             info: Arc::clone(&self.info),
         }
     }
 }
 
 pub struct VrcGame {
+    recv_port: u16,
     ui_info: Arc<AtomicArc<VrcInfo>>,
     handle: VrcHandle,
     /// Holds data from http server about the given avatar
@@ -134,7 +169,7 @@ pub enum MsgToMainVrc {
     /// Pushes our cache to the map state.
     RefreshMap,
     /// message is recieved from the OSC server
-    OscMessageRecieved(OscMessage),
+    OscBatch(Vec<OscMessage>),
     /// A new avatar configuration was detected
     NewAvatar(Avatar),
     VrcDisconnected,
@@ -148,6 +183,8 @@ impl VrcGame {
         let handle = VrcHandle {
             tx: tx.clone(),
             info: Arc::clone(&info),
+            flush_scheduled: Arc::new(AtomicBool::new(false)),
+            osc_buffer: Arc::new(std::sync::Mutex::new(vec![])),
         };
         let param_cache = Arc::new(DashMap::new());
         let param_avail = Arc::new(DashMap::new());
@@ -157,12 +194,13 @@ impl VrcGame {
         let on_receive = move |msg: OscMessage| {
             handle_rcv.send_osc_msg_rcv(msg);
         };
-        let mut recieving_port = 9001;
+        let recieving_port = 9001;
         let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::LOCALHOST, on_receive);
         let port_used = vrc_server.start().await;
 
         // Instantiate
         let vrc = VrcGame {
+            recv_port: port_used,
             ui_info: info,
             handle: handle.clone(),
             osc_server: vrc_server,
@@ -209,40 +247,14 @@ impl VrcGame {
 
                     self.refresh_map(&self.map, &settings.load());
                 }
-                MsgToMainVrc::OscMessageRecieved(msg) => {
-                    // remove VRC Fury tagging if needed
-                    let addr = remove_version(&msg.addr);
+                MsgToMainVrc::OscBatch(batch) => {
+                    let cfg = settings.load();
+                    self.process_osc_batch(&batch, cfg);
 
-                    // if there is a value push it to our cache.
-                    if let Some(arg) = msg.args.first() {
-                        let cfg = settings.load();
-                        // if we have a cache going otherwise build it.
-                        if let Some(mut cache) =
-                            self.parameter_cache.get_mut(&OscPath(addr.clone()))
-                        {
-                            let _ = cache.update(arg.to_owned());
-                        } else {
-                            self.parameter_cache.insert(
-                                OscPath(addr),
-                                CacheNode::new(
-                                    arg.to_owned(),
-                                    cfg.sample_cache.clone(),
-                                    cfg.smoothing_time.clone(),
-                                    0.2,
-                                    1.0,
-                                    1.0,
-                                ),
-                            );
-                        }
-
-                        // push changes to
-                        self.refresh_map(&self.map, cfg);
-                    } else {
-                        log::warn!("empty message recieved: {:?}", msg);
-                    }
+                    self.refresh_map(&self.map, cfg);
+                    self.update_info();
                 }
                 MsgToMainVrc::NewAvatar(avi) => {
-                    log::debug!("New avatar: {avi:?}");
                     //clear current input nodes
                     log_err!(self.map
                         .send_event(InputEventMessage::RemoveWithTags(vec![VRC_TAG.into()]))
@@ -258,14 +270,58 @@ impl VrcGame {
                                 .await);
                         }
                     }
+                    self.update_info();
                 }
                 MsgToMainVrc::VrcDisconnected => {
                     log::warn!("Vrc Disconnected");
                     self.avatar = None;
                     self.available_parameters.clear();
+                    self.update_info();
                 }
             }
         }
+    }
+
+    /// clones all our info into a new instance that will be swapped out.
+    fn update_info(&mut self) {
+        let current = &self.ui_info;
+        let changed = VrcInfo {
+            is_connected: !self.available_parameters.is_empty(),
+            in_port: Some(self.recv_port),
+            out_port: Some(0),
+            available: self.available_parameters.iter().map(|entry| entry.value().clone()).collect(),
+            avatar: self.avatar.clone(),
+            velocity_mult: 0.0, // these will be filled out by touching the state in the handle function
+            velocity_ratio: 0.0,
+            cached: self.parameter_cache.iter()
+    .map(|entry| (entry.key().clone(), entry.value().clone()))
+    .collect(),
+        };
+
+        current.swap(Arc::new(changed));
+    }
+
+    fn process_osc_batch(&self, batch: &[OscMessage], cfg: &VrcSettings) {
+        // DashMap supports concurrent writes — process in parallel
+        batch.par_iter().for_each(|msg| {
+            let addr = remove_version(&msg.addr);
+            let Some(arg) = msg.args.first() else { return };
+
+            let key = OscPath(addr);
+            if let Some(mut cache) = self.parameter_cache.get_mut(&key) {
+                let _ = cache.update(arg.to_owned().into());
+            } else {
+                self.parameter_cache.insert(
+                    key,
+                    CacheNode::new(
+                        arg.to_owned(),
+                        cfg.sample_cache.clone(),
+                        cfg.smoothing_time.clone(),
+                        0.2, 1.0, 1.0,
+                    ),
+                );
+            }
+        });
     }
 
     /// Propogates our cached values to changes on the input map.
@@ -410,7 +466,7 @@ pub struct Avatar {
     configs: Vec<GameMap>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash, specta::Type)]
 /// Simple wrapper for the String class.
 /// Represnts a full OscPath without any elements stripped,
 /// other than the VRC Fury naming.

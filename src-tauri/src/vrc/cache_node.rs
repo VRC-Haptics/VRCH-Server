@@ -3,17 +3,19 @@ use std::collections::VecDeque;
 use std::mem::discriminant;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
 
+use crate::wrappers::SpectaOscType;
+
 /// A node cached by vrc, is an intermdieary between an `InputNode`.
 /// 
 /// Provides simple 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 pub struct CacheNode {
     /// Ring buffer of values we have recieved.
     /// Front items are the most recent.
-    values: VecDeque<(OscType, SystemTime)>,
+    values: VecDeque<(SpectaOscType, SystemTime)>,
     /// contains the OscType that this CacheNode accepts.
     /// The payload should be considered the default value if the cache is empty.
-    osc_type: OscType,
+    osc_type: SpectaOscType,
     /// the max_len of entries we will keep track of.
     max_len: usize,
     /// The state of haptics returned from this node.
@@ -37,10 +39,10 @@ impl CacheNode {
         contact_scale: f32,
     ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
-        values.push_front((value_type.clone(), UNIX_EPOCH));
+        values.push_front((SpectaOscType::from(value_type.clone()), UNIX_EPOCH));
         CacheNode {
             values,
-            osc_type: value_type,
+            osc_type: value_type.into(),
             max_len: max_entries,
             smoothing_time: smoothing_time,
             position_weight: position_weight,
@@ -74,7 +76,7 @@ impl CacheNode {
         let (latest_value, latest_time) = self.values.front().unwrap();
         let (old_value, old_time) = &self.values[1];
         // (percentage / second) * second = new delta
-        let velocity = self.value_delta(latest_value, &old_value)
+        let velocity = self.value_delta(latest_value.into(), &old_value)
             / latest_time.duration_since(*old_time).unwrap().as_secs_f32();
         let seconds_since_last = SystemTime::now()
             .duration_since(*latest_time)
@@ -147,7 +149,7 @@ impl CacheNode {
     }
 
     /// Pushes an update to the cached values with the current time as a timestamp.
-    pub fn update(&mut self, value: OscType) -> Result<(), WrongNodeTypeError> {
+    pub fn update(&mut self, value: SpectaOscType) -> Result<(), WrongNodeTypeError> {
         if discriminant(&self.osc_type) != discriminant(&value) {
             return Err(WrongNodeTypeError {
                 entered: value,
@@ -198,13 +200,13 @@ impl CacheNode {
 
     /// Trys to parse OscType into a delta value in f32.
     /// uses the order: `value-val_late`.
-    fn value_delta(&self, value: &OscType, val_late: &OscType) -> f32 {
+    fn value_delta(&self, value: &SpectaOscType, val_late: &SpectaOscType) -> f32 {
         match value {
-            OscType::Float(float) => float - val_late.clone().float().unwrap(),
-            OscType::Int(int) => (int - val_late.clone().int().unwrap()) as f32,
-            OscType::Double(double) => (double - val_late.clone().double().unwrap()) as f32,
-            OscType::Long(long) => (long - val_late.clone().long().unwrap()) as f32,
-            OscType::Bool(bool) => {
+            SpectaOscType::Float(float) => float - val_late.clone().float().unwrap(),
+            SpectaOscType::Int(int) => (int - val_late.clone().int().unwrap()) as f32,
+            SpectaOscType::Double(double) => (double - val_late.clone().double().unwrap()) as f32,
+            SpectaOscType::Long(long) => (long - val_late.clone().long().unwrap()) as f32,
+            SpectaOscType::Bool(bool) => {
                 if *bool == val_late.clone().bool().unwrap() {
                     0.0
                 } else {
@@ -218,8 +220,8 @@ impl CacheNode {
 
 /// The wrong node type was inserted into this node.
 pub struct WrongNodeTypeError {
-    entered: OscType,
-    expected: OscType,
+    entered: SpectaOscType,
+    expected: SpectaOscType,
 }
 
 /// An Error occured during retrieval from cache.

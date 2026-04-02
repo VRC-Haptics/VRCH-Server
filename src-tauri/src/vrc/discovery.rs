@@ -23,7 +23,7 @@ unsafe extern "C" fn dispatch_port(port: u16) {
     if let Some(lock) = PORT_SENDER.get() {
         let guard = lock.blocking_lock();
         if let Some(sender) = guard.as_ref() {
-            let _ = sender.send(port);
+            let _ = sender.blocking_send(port);
         }
     }
 }
@@ -98,8 +98,8 @@ pub async fn start_filling_available_parameters(
 /// # Arguments
 ///
 /// * `url` - The URL to fetch.
-fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
-    reqwest::blocking::get(url)?.text()
+async fn fetch_http_response(url: &str) -> Result<String, reqwest::Error> {
+    reqwest::get(url).await?.text().await
 }
 
 /// Parses the given text to extract OSC nodes and updates the provided parameters map.
@@ -188,7 +188,7 @@ async fn load_configs(params: &DashMap<OscPath, OscInfo>, api: &Mutex<ApiManager
     let mut configs = vec![];
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
-            let mut lock = api.blocking_lock();
+            let mut lock = api.try_lock().expect("Couldn't get lock");
             match lock.load_map(prefab.0, prefab.1, prefab.2).await {
                 Ok(map) => configs.push(map),
                 Err(err) => match err {
@@ -226,7 +226,7 @@ async fn run_vrc_http_polling(
     log::debug!("Started polling HTTP.");
 
     loop {
-        match fetch_http_response(&url) {
+        match fetch_http_response(&url).await {
             Ok(text) => {
                 // Update OSC parameters based on the incoming HTTP response.
                 let (present_parameters, new_avi) = update_params_from_text(&text, params);
@@ -239,9 +239,10 @@ async fn run_vrc_http_polling(
                         continue;
                     };
 
-                    let new_id = id_path.value.first().unwrap().clone().string().unwrap();
+                    let mid = id_path.value.first().unwrap().clone();
+                    let new_id = mid.string().unwrap();
 
-                    let new_avatar = create_avatar(params, new_id, &api).await;
+                    let new_avatar = create_avatar(params, new_id.to_string(), &api).await;
                     vrc.send(MsgToMainVrc::NewAvatar(new_avatar)).await;
                 }
             }
@@ -277,12 +278,15 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
                 let name = parts[1].to_string();
                 let author = parts[0].to_string();
 
-                let num_str = parts[2].strip_prefix('v').expect("no v in version entry.");
+                let num_str = parts[2].strip_prefix('v').unwrap_or("0");
 
                 // parse the remainder as an i32
                 let version = num_str
                     .parse::<u32>()
-                    .expect(&format!("Could not parse verison number: {:?}", key_str));
+                    .unwrap_or_else(|_|{ 
+                        log::error!("Could not parse verison number: {:?}", key_str);
+                        0
+                    });
 
                 // sometimes I hate this language
                 log::info!("Avatar has prefab: {:?}", (&author, &name, &version));

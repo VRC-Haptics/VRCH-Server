@@ -1,5 +1,5 @@
 import { FC } from "react";
-import { ConfNode } from "../../../utils/vrc_info_classes";
+import { ConfNode } from "../../../bindings";
 
 interface HapticNodesSummaryProps {
   nodes: ConfNode[];

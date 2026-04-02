@@ -124,6 +124,10 @@ export default function VrcInfoCard() {
           <span>{vrcInfo.out_port ?? "—"}</span>
         </div>
 
+        <div className="col-span-2 text-sm md:text-base mt-2">
+          <OscSummary vrcInfo={vrcInfo} />
+        </div>
+
         {vrcInfo.avatar && (
           <div className="mt-6">
             <h3 className="text-lg font-semibold">Avatar</h3>
@@ -146,9 +150,6 @@ export default function VrcInfoCard() {
                     <span>{conf.meta.map_version}</span>
                     <span className="font-medium">Author:</span>
                     <span>{conf.meta.map_author}</span>
-                    <div className="col-span-2 text-sm md:text-base mt-2">
-                      <OscSummary vrcInfo={vrcInfo} />
-                    </div>
                     <div className="col-span-2 mt-2">
                       <HapticNodesSummary nodes={conf.nodes} />
                     </div>

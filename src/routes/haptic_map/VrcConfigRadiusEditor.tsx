@@ -152,8 +152,8 @@ export default function VrcConfigRadiusEditor() {
               step={0.001}
               value={(
                 (() => {
-                  const id = node.address as string;
-                  const globalR = globalMap.input_nodes?.[id]?.radius;
+                  const id = node.address;
+                  const globalR = globalMap?.nodes.find((val) =>{ val.id === id})?.radius;
                   const base = typeof globalR === "number" ? globalR : node.radius;
                   return radii[idx] ?? base;
                 })()
@@ -164,7 +164,7 @@ export default function VrcConfigRadiusEditor() {
             <span className="w-10 text-right tabular-nums text-xs">
               {(() => {
                 const id = node.address as string;
-                const globalR = globalMap.input_nodes?.[id]?.radius;
+                const globalR = globalMap?.nodes.find((val) =>{ val.id === id})?.radius;
                 const base = typeof globalR === "number" ? globalR : node.radius;
                 const val = radii[idx] ?? base;
                 return (typeof val === "number" ? val : 0).toFixed(3);

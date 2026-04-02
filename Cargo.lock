@@ -5903,6 +5903,7 @@ checksum = "f320c7dd82008b6958f43f6257c95319c407d1c17ade43686e50ea520c28bb26"
 dependencies = [
  "paste",
  "rustc_version",
+ "serde_json",
  "specta-macros",
 ]
 
@@ -7480,6 +7481,7 @@ dependencies = [
  "once_cell",
  "oyasumivr_oscquery",
  "parking_lot",
+ "rayon",
  "regex",
  "reqwest 0.12.28",
  "rosc",

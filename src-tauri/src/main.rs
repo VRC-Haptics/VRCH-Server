@@ -15,6 +15,7 @@ pub mod mapping;
 pub mod osc;
 pub mod state;
 pub mod util;
+pub(crate) mod wrappers;
 mod vrc;
 
 // local modules

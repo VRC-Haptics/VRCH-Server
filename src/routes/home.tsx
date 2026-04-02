@@ -15,8 +15,10 @@ export default function Home() {
   return (
     <>
       <DeviceProvider>
-        <ConnectedDevices onSelectDevice={handleSelectDevice} />
-        <InfoPage selectedDevice={selectedDevice} />
+        <div className="flex gap-2 min-h-0 min-w-0 flex-1">
+          <ConnectedDevices onSelectDevice={handleSelectDevice} />
+          <InfoPage selectedDevice={selectedDevice} />
+        </div>
       </DeviceProvider>
       <VrcProvider>
         <GameSettings/>
