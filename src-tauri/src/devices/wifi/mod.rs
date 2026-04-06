@@ -290,8 +290,6 @@ async fn tick(
             log::trace!("Pushing config to device: {addr:?}");
             TickAction::PushMap(build_set_map(&conf.node_map))
         } else if state.config.is_none() && state.been_query.is_none() {
-            // NOTE: your original code has a bug here — you check is_none()
-            // then immediately unwrap() been_query. Fix the logic.
             state.been_query = Some(Instant::now());
             let msg = encoder::encode(&OscPacket::Message(OscMessage {
                 addr: "/command".to_string(),

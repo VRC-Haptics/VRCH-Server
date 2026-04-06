@@ -51,7 +51,7 @@ export type Avatar = {
 /**
  *  A node cached by vrc, is an intermdieary between an `InputNode`.
  *  
- *  Provides simple 
+ *  Provides simple methods for extracting values
  */
 export type CacheNode = {
 	/**

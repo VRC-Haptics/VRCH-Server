@@ -4,13 +4,19 @@ pub mod haptic_node;
 pub mod input_node;
 pub mod interp;
 
+use crate::log_err;
 use parking_lot::{Mutex, RwLock};
 use std::{
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
-use tokio::sync::mpsc::{self, error::{TrySendError, SendError}};
-use crate::log_err;
+use tokio::sync::{
+    mpsc::{
+        self,
+        error::{SendError, TrySendError},
+    },
+    Notify,
+};
 
 use event::Event;
 //use global_map::InputMap;
@@ -37,11 +43,13 @@ pub struct MapHandle {
     event_sender: mpsc::Sender<InputEventMessage>,
     input_nodes: Arc<RwLock<Vec<InputNode>>>,
     active_events: Arc<RwLock<Vec<Event>>>,
+    map_dirty: Arc<Notify>,
 }
 
 impl MapHandle {
+    // mark_dirty_blocking becomes a simple atomic store
     pub fn mark_dirty_blocking(&self) {
-        log_err!(self.event_sender.try_send(InputEventMessage::MarkMapDirty));
+        self.map_dirty.notify_one();
     }
 
     /// clones snapshot of map state
@@ -130,6 +138,7 @@ impl Clone for MapHandle {
             event_sender: self.event_sender.clone(),
             input_nodes: Arc::clone(&self.input_nodes),
             active_events: Arc::clone(&self.active_events),
+            map_dirty: self.map_dirty.clone(),
         }
     }
 }
@@ -158,17 +167,17 @@ impl MappingDevice {
     ///
     /// NOTE: This does not update the remote device, to force an update remember to use the `crate::devices::Device` trait as specified
     ///
-    /// TODO: Actually take into account device level mapping settings.
     pub fn update_buffer(&self, in_nodes: &Vec<InputNode>, settings: &PerDevice) {
         let mut buf = self.outputs.write();
         if buf.len() != self.nodes.len() {
-            log::warn!(
+            log::trace!(
                 "Buffer not equal node length: buf:{}, nodes: {}",
                 buf.len(),
                 self.nodes.len()
             );
-            settings.interp_algo.interp(&self.nodes, &mut buf, in_nodes);
+            return;
         }
+        settings.interp_algo.interp(&self.nodes, &mut buf, in_nodes, settings);
     }
 }
 
@@ -186,7 +195,7 @@ pub struct InputMap {
     event_recv: mpsc::Receiver<InputEventMessage>,
     event_send: mpsc::Sender<InputEventMessage>,
     /// Whether input mapping has changed in a way that should require device output updates
-    map_state_updated: AtomicBool,
+    map_dirty: Arc<Notify>,
 }
 
 impl InputMap {
@@ -195,6 +204,7 @@ impl InputMap {
         let (tx, rx) = mpsc::channel(10);
         let input_nodes = Arc::new(RwLock::new(Vec::new()));
         let events = Arc::new(RwLock::new(Vec::new()));
+        let dirty_flag = Arc::new(Notify::new());
 
         let map = Self {
             active_events: events.clone(),
@@ -203,13 +213,14 @@ impl InputMap {
             devices: Arc::new(Mutex::new(Vec::new())),
             event_recv: rx,
             event_send: tx.clone(),
-            map_state_updated: AtomicBool::new(false),
+            map_dirty: Arc::clone(&dirty_flag),
         };
 
         let handle = MapHandle {
             event_sender: tx,
             input_nodes: input_nodes,
             active_events: events,
+            map_dirty: dirty_flag,
         };
 
         return (map, handle);
@@ -263,7 +274,7 @@ impl InputMap {
         // handle our 100hz event ticks
         let events = self.active_events.clone();
         let in_nodes = self.input_nodes.clone();
-        let tx_events = self.event_send.clone();
+        let dirty_event_clone = self.map_dirty.clone();
         tokio::spawn(async move {
             loop {
                 {
@@ -274,7 +285,7 @@ impl InputMap {
                         !finished
                     });
                 }
-                let _ = tx_events.send(InputEventMessage::MarkMapDirty).await;
+                dirty_event_clone.notify_one();
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         });
@@ -282,44 +293,47 @@ impl InputMap {
         // register for device events last to hopefully stop big race conditions.
         self.manager.register(dev_tx);
 
-        // occupy this task with recieving messages.
         loop {
-            match self.event_recv.recv().await {
-                Some(msg) => match msg {
-                    InputEventMessage::MarkMapDirty => {
-                        self.update_devices();
-                    }
-                    InputEventMessage::InsertNode(node) => {
-                        let mut nodes = self.input_nodes.write();
-                        if !nodes.iter().any(|f| f.get_id() == node.get_id()) {
-                            nodes.push(node);
+            tokio::select! {
+                msg = self.event_recv.recv() => {
+                    match msg {
+                        Some(msg) => match msg {
+                            InputEventMessage::InsertNode(node) => {
+                                let mut nodes = self.input_nodes.write();
+                                if !nodes.iter().any(|f| f.get_id() == node.get_id()) {
+                                    nodes.push(node);
+                                }
+                            }
+                            InputEventMessage::UpdateNode(id, int, radius) => {
+                                let mut nodes = self.input_nodes.write();
+                                let Some(node) = nodes.iter_mut().find(|d| *d.get_id() == id) else {
+                                    log::warn!("Tried to update node that doesn't exist with id: {id:?}");
+                                    return;
+                                };
+                                node.intensity = int.unwrap_or(node.intensity);
+                                node.radius = radius.unwrap_or(node.radius);
+                            }
+                            InputEventMessage::RemoveWithTags(tags) => {
+                                let mut nodes = self.input_nodes.write();
+                                for tag in tags {
+                                    nodes.retain(|n| !n.tags.contains(&tag));
+                                }
+                            }
+                            InputEventMessage::StartEvent(e) => self.start_event(e),
+                            InputEventMessage::StartEvents(mut e) => self.start_events(&mut e),
+                            InputEventMessage::CancelAllWithTags(t) => {
+                                let num = self.cancel_tags(&t);
+                                log::trace!("Canceled {num} events with tags: {:?}", t);
+                            }
+                        },
+                        None => {
+                            log::warn!("All channels dropped for map input. Restart required");
+                            break;
                         }
                     }
-                    InputEventMessage::UpdateNode(id, int, radius) => {
-                        let mut nodes = self.input_nodes.write();
-                        let Some(node) = nodes.iter_mut().find(|d| *d.get_id() == id) else {
-                            log::warn!("Tried to update node that doesn't exist with id: {id:?}");
-                            continue;
-                        };
-                        node.intensity = int.unwrap_or(node.radius);
-                        node.radius = radius.unwrap_or(node.intensity);
-                    }
-                    InputEventMessage::RemoveWithTags(tags) => {
-                        let mut nodes = self.input_nodes.write();
-                        for tag in tags {
-                            nodes.retain(|n| !n.tags.contains(&tag));
-                        }
-                    }
-                    InputEventMessage::StartEvent(e) => self.start_event(e),
-                    InputEventMessage::StartEvents(mut e) => self.start_events(&mut e),
-                    InputEventMessage::CancelAllWithTags(t) => {
-                        let num = self.cancel_tags(&t);
-                        log::trace!("Canceled {num} events with tags: {:?}", t);
-                    }
-                },
-                None => {
-                    log::warn!("All channels dropped for map input. Restar required");
-                    break;
+                }
+                _ = self.map_dirty.notified() => {
+                    self.update_devices();
                 }
             }
         }
@@ -388,13 +402,13 @@ pub enum InputEventMessage {
     StartEvents(Vec<Event>),
     /// cancels all events with tags in string
     CancelAllWithTags(Vec<String>),
-    /// Will push input map contents to device buffers.
-    MarkMapDirty,
 }
 
 /// Descriptors for location groups.
 /// Allows for segmented Interpolation
-#[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter, specta::Type)]
+#[derive(
+    PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter, specta::Type,
+)]
 pub enum NodeGroup {
     Head,
     UpperArmRight,

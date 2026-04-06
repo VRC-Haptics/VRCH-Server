@@ -243,6 +243,7 @@ async fn run_vrc_http_polling(
                     let new_id = mid.string().unwrap();
 
                     let new_avatar = create_avatar(params, new_id.to_string(), &api).await;
+                    vrc.send(MsgToMainVrc::FlushCache).await;
                     vrc.send(MsgToMainVrc::NewAvatar(new_avatar)).await;
                 }
             }

@@ -166,6 +166,7 @@ pub struct VrcGame {
 /// I hate naming things
 #[derive(Debug)]
 pub enum MsgToMainVrc {
+    FlushCache,
     /// Pushes our cache to the map state.
     RefreshMap,
     /// message is recieved from the OSC server
@@ -254,6 +255,9 @@ impl VrcGame {
                     self.refresh_map(&self.map, cfg);
                     self.update_info();
                 }
+                MsgToMainVrc::FlushCache => {
+                    self.purge_cache();
+                }
                 MsgToMainVrc::NewAvatar(avi) => {
                     //clear current input nodes
                     log_err!(self.map
@@ -317,7 +321,7 @@ impl VrcGame {
                         arg.to_owned(),
                         cfg.sample_cache.clone(),
                         cfg.smoothing_time.clone(),
-                        0.2, 1.0, 1.0,
+                        1.0-cfg.velocity_ratio, cfg.velocity_mult, 1.0,
                     ),
                 );
             }
@@ -351,11 +355,8 @@ impl VrcGame {
                     state::get_config().mapping_menu.store(new.into());
                 }
             },
+            (None, None) => {}, // both are zero
             (int, en) => {
-                if int.is_none() && en.is_none() {
-                    return;
-                }
-
                 if let Some(intensity) = int {
                     let intensity = intensity.raw_last().clamp(0.0, 1.0);
                     let menu = state::get_config().mapping_menu.load();
@@ -375,6 +376,7 @@ impl VrcGame {
                         state::get_config().mapping_menu.store(new.into());
                     }
                 }
+
             }
         }
 
@@ -386,21 +388,29 @@ impl VrcGame {
                 {
                     // update node if already created
                     let id = NodeId(node.address.clone());
-                    map.with_node_mut(&id, |n| {
+
+                    let res = map.with_node_mut(&id, |n| {
                         if node.is_external_address {
                             n.set_intensity(cache_node.raw_last());
                             return;
                         }
 
                         // update our cache node, then read output to our nodes.
+                        if cache_node.position_weight != settings.velocity_ratio {
+                            log::trace!("new ratio: {}", settings.velocity_ratio);
+                        }
                         cache_node.set_position_weight(1.0 - settings.velocity_ratio);
                         cache_node.set_velocity_mult(settings.velocity_mult);
                         cache_node.set_contact_scale(1.0);
+
                         n.set_intensity(cache_node.latest());
                     });
-                } else {
-                    log::warn!("node in config but not found in map: {:?}", node);
-                }
+
+                    if res.is_none() {
+                        log::trace!("This option none: {id:?}");
+                    }
+                    
+                } // we only get a value in cache when it has been modified. It is non-error to not have it yet.
             } // for loop
 
             // tell map we are done messing with it

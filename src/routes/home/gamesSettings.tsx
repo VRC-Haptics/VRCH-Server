@@ -151,7 +151,7 @@ export default function VrcInfoCard() {
                     <span className="font-medium">Author:</span>
                     <span>{conf.meta.map_author}</span>
                     <div className="col-span-2 mt-2">
-                      <HapticNodesSummary nodes={conf.nodes} />
+                      <HapticNodesSummary nodes={vrcInfo.avatar!.configs.flatMap(c => c.nodes)} />
                     </div>
                   </>
                 );

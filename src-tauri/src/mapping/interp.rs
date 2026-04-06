@@ -1,13 +1,13 @@
 use enum_dispatch::enum_dispatch;
 
-use crate::mapping::input_node::InputType;
+use crate::{mapping::input_node::InputType, state::PerDevice};
 
 use super::{haptic_node::HapticNode, input_node::InputNode};
 
 #[enum_dispatch(InterpAlgo)]
 pub trait Interpolate {
     /// Implementations need to take into account that all lengths could be different.
-    fn interp(&self, haptic_nodes: &[HapticNode], output: &mut[f32], in_nodes: &[InputNode]);
+    fn interp(&self, haptic_nodes: &[HapticNode], output: &mut[f32], in_nodes: &[InputNode], settings: &PerDevice);
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -120,9 +120,15 @@ impl GaussianState {
 }
 
 impl Interpolate for GaussianState {
-    fn interp(&self, haptic_nodes: &[HapticNode], output: &mut[f32], in_nodes: &[InputNode]) {
+    fn interp(&self, haptic_nodes: &[HapticNode], output: &mut[f32], in_nodes: &[InputNode], settings: &PerDevice) {
         for (i, node) in haptic_nodes.iter().enumerate() {
-            output[i] = self.single_node(node, in_nodes);
+            // offset = 0.5, intensity = 0.5, input = 1.0 gives 0.75. Offset gives deadzone, and intensity limits final intensity.
+            let raw = self.single_node(node, in_nodes);
+            output[i] = if raw > 0.0 {
+                settings.offset + (1.0 - settings.offset) * settings.intensity * raw
+            } else {
+                0.0
+            };
         }
     }
 }

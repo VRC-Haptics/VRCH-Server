@@ -7,7 +7,7 @@ use crate::wrappers::SpectaOscType;
 
 /// A node cached by vrc, is an intermdieary between an `InputNode`.
 /// 
-/// Provides simple 
+/// Provides simple methods for extracting values
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 pub struct CacheNode {
     /// Ring buffer of values we have recieved.

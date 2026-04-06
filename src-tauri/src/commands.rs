@@ -258,7 +258,7 @@ pub async fn update_vrc_distance_weight(distance_weight: f32) {
     let vrc = &state::get_config().vrc_settings;
     let guard = vrc.load();
     let mut new = VrcSettings::clone(&guard);
-    new.velocity_mult = 1. - distance_weight;
+    new.velocity_ratio = 1. - distance_weight;
     vrc.store(Arc::new(new));
 }
 
