@@ -13,7 +13,7 @@ export default function Home() {
   };
 
   return (
-    <>
+    <div className="flex gap-2 min-h-0 min-w-0 flex-1 w-full">
       <DeviceProvider>
         <div className="flex gap-2 min-h-0 min-w-0 flex-1">
           <ConnectedDevices onSelectDevice={handleSelectDevice} />
@@ -21,8 +21,10 @@ export default function Home() {
         </div>
       </DeviceProvider>
       <VrcProvider>
-        <GameSettings/>
+        <div className="w-80 flex-shrink-0 min-h-0 overflow-auto">
+          <GameSettings />
+        </div>
       </VrcProvider>
-    </>
+    </div>
   );
 }

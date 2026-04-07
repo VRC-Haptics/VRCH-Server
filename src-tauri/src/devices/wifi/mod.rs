@@ -396,6 +396,7 @@ impl Device for WifiDevice {
                     conf.node_map = inf.nodes.clone();
                     
                 }
+                state.output.write().resize(inf.nodes.len(), 0.0);
                 state.nodes = inf.nodes;
                 state.push_map = true; // signal to persist to device
                 log_err!(self.manager.try_send(DeviceMessage::InfoDirty(self.get_id()))); // tell map our info has changed

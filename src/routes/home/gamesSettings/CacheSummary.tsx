@@ -61,11 +61,11 @@ const OscSummary: FC<OscSummaryProps> = ({ vrcInfo }) => {
             Cached Parameters: {vrcInfo.cached.length}
           </div>
 
-          <div className="collapse-content">
-            <ul className="list-disc ml-4 mt-1 space-y-1 text-xs md:text-sm max-h-40 overflow-y-auto pr-2">
+          <div className="collapse-content max-h-40 overflow-y-auto">
+            <ul className="list-disc ml-4 mt-1 space-y-1 text-xs md:text-sm pr-2">
               {cached.map(({ path, displayValue, ageMs }) => (
                 <li key={path} className="break-words">
-                  <span className="font-mono">{path}</span>{" = "}
+                  <span className="font-mono">{path.replace(/^\/avatar\/parameters\//, "")}</span>{" = "}
                   <span className="font-semibold">{displayValue}</span>
                   {" "}
                   <span className="opacity-60">

@@ -26,7 +26,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
   const handlePlay = async () => {
     if (selectedIndices.length < 1) return;
     const node = nodes[selectedIndices[0]];
-    const result = await commands.playPoint([-node.x, node.y, node.z], 1.0, 0.2);
+    const result = await commands.playPoint([-node.x, node.y, node.z], 1.0, 2.0);
     if (result.status === "error") console.error("play_point failed:", result.error);
   };
 

@@ -125,7 +125,7 @@ impl Interpolate for GaussianState {
             // offset = 0.5, intensity = 0.5, input = 1.0 gives 0.75. Offset gives deadzone, and intensity limits final intensity.
             let raw = self.single_node(node, in_nodes);
             output[i] = if raw > 0.0 {
-                settings.offset + (1.0 - settings.offset) * settings.intensity * raw
+                settings.offset + (settings.intensity - settings.offset) * raw
             } else {
                 0.0
             };
