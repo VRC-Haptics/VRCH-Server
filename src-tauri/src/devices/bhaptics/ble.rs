@@ -56,9 +56,7 @@ pub async fn send(idx: usize, data: &[u8], char: &Characteristic) -> Result<(), 
 async fn connect(per: &Peripheral) -> Result<BTreeSet<Characteristic>, BleError> {
     per.connect().await?;
     per.discover_services().await?;
-    let chars = per.characteristics();
-    CONNECTED_DEVICES.push(Some(Arc::new(per.clone())).into());
-    Ok(chars)
+    Ok(per.characteristics())
 }
 
 #[derive(Debug, Clone)]
@@ -122,6 +120,7 @@ pub async fn start_ble(
                                             if let Some(addr) = addr {
                                                 log_err!(local_dev.send(DeviceMessage::Remove(addr.to_string().into())).await);
                                             }
+                                            disconnect(idx).await;
                                         },
                                         _ => log_err!(e)
                                     }
@@ -142,6 +141,8 @@ pub async fn start_ble(
                                                     })
                                                 };
                                                 if already_connected {
+                                                    log::trace!("ALready filled slot");
+                                                    log::trace!("{:?}", CONNECTED_DEVICES);
                                                     continue;
                                                 }
                                                 if let Some(prop) = try_get_properties(&p).await {

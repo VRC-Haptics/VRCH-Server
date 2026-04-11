@@ -6,6 +6,7 @@ import { useDeviceContext } from "../../context/DevicesContext";
 import StandardModel from "./standard";
 import VrcConfigRadiusEditor from "./VrcConfigRadiusEditor";
 import NodeFilterOverlay, { type NodeFilter } from "./NodeFilterOverlay";
+import { getDeviceId, getDeviceName } from "../common";
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
@@ -141,7 +142,7 @@ export default function InputNodesViewer() {
         {devices.flatMap((device) => {
           const nodeMap = device?.value?.nodes ?? [];
           return nodeMap.map((node, idx) => {
-            const key = `dev-${device.value.mac}-${idx}`;
+            const key = `dev-${getDeviceId(device)}-${idx}`;
             return (
               <mesh
                 key={key}
@@ -163,7 +164,7 @@ export default function InputNodesViewer() {
                       borderRadius: "4px",
                     }}
                   >
-                    <div>{device.value.name + ": " + idx + "\n"}</div>
+                    <div>{getDeviceName(device) + ": " + idx + "\n"}</div>
                     <span>
                       ({node.x}, {node.y}, {node.z})
                     </span>

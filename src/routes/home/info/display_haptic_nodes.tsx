@@ -26,7 +26,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
   const handlePlay = async () => {
     if (selectedIndices.length < 1) return;
     const node = nodes[selectedIndices[0]];
-    const result = await commands.playPoint([-node.x, node.y, node.z], 1.0, 2.0);
+    const result = await commands.playPoint([node.x, node.y, node.z], 1.0, 2.0);
     if (result.status === "error") console.error("play_point failed:", result.error);
   };
 
@@ -37,8 +37,8 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
     if (selectedIndices.length !== 2) return;
     const n1 = nodes[selectedIndices[0]];
     const n2 = nodes[selectedIndices[1]];
-    const pos1: Vec3 = { x: -n1.x, y: n1.y, z: n1.z };
-    const pos2: Vec3 = { x: -n2.x, y: n2.y, z: n2.z };
+    const pos1: Vec3 = { x: n1.x, y: n1.y, z: n1.z };
+    const pos2: Vec3 = { x: n2.x, y: n2.y, z: n2.z };
     const result = await commands.swapConfNodes(deviceId, pos1, pos2);
     if (result.status === "error") console.error("swap_conf_nodes failed:", result.error);
   };
@@ -58,7 +58,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
               {nodes.map((node, idx) => (
                 <mesh
                   key={idx}
-                  position={[node.x, node.y, node.z]}
+                  position={[-node.x, node.y, node.z]}
                   onClick={e => { e.stopPropagation(); handleSelect(idx); }}
                   onPointerOver={() => setHoveredIdx(idx)}
                   onPointerOut={() => setHoveredIdx(null)}
