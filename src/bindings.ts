@@ -15,11 +15,13 @@ export const commands = {
 }) => __TAURI_INVOKE<void>("set_vrc", { mult, ratio, samples, smoothS }),
 	// handles persisting and splitting out individual states to where they need to go.
 	setDeviceInfo: (id: DeviceId, inf: DeviceInfo) => __TAURI_INVOKE<void>("set_device_info", { id, inf }),
+	getRepositories: () => __TAURI_INVOKE<GitRepo[]>("get_repositories"),
+	setRepositories: (repos: GitRepo[]) => __TAURI_INVOKE<void>("set_repositories", { repos }),
+	getWifiTimeout: () => __TAURI_INVOKE<number>("get_wifi_timeout"),
+	setWifiTimeout: (timeout: number) => __TAURI_INVOKE<void>("set_wifi_timeout", { timeout }),
 	uploadDeviceMap: (id: string, configJson: string) => typedError<null, string>(__TAURI_INVOKE("upload_device_map", { id, configJson })),
 	updateDeviceMultiplier: (deviceId: DeviceId, multiplier: number) => __TAURI_INVOKE<void>("update_device_multiplier", { deviceId, multiplier }),
 	updateDeviceOffset: (deviceId: DeviceId, offset: number) => __TAURI_INVOKE<void>("update_device_offset", { deviceId, offset }),
-	updateVrcDistanceWeight: (distanceWeight: number) => __TAURI_INVOKE<void>("update_vrc_distance_weight", { distanceWeight }),
-	updateVrcVelocityMultiplier: (velMultiplier: number) => __TAURI_INVOKE<void>("update_vrc_velocity_multiplier", { velMultiplier }),
 	// Handles resetting bhaptics to be the default player
 	bhapticsLaunchDefault: () => __TAURI_INVOKE<void>("bhaptics_launch_default"),
 	// Handles setting our app to launch instead of the bHapticsPlayer
@@ -31,6 +33,8 @@ export const commands = {
 	setTagsRadius: (tag: string, radius: number) => typedError<null, null>(__TAURI_INVOKE("set_tags_radius", { tag, radius })),
 	setNodeRadius: (id: string, radius: number) => typedError<null, string>(__TAURI_INVOKE("set_node_radius", { id, radius })),
 	getDeviceEspModel: (id: string) => typedError<ESP32Model, string>(__TAURI_INVOKE("get_device_esp_model", { id })),
+	// typescript seems to throw a fit with formats here. So invoke bypasses most of this. EUUUGH
+	startDeviceUpdate: (fw: Firmware) => typedError<null, string>(__TAURI_INVOKE("start_device_update", { fw })),
 };
 
 /* Types */
@@ -74,9 +78,6 @@ export type CacheNode = {
 		secs: number,
 		nanos: number,
 	},
-	position_weight: number,
-	vel_mult: number,
-	contact_scale: number,
 };
 
 // Metadata from the json config
@@ -100,7 +101,12 @@ export type ConfNode = {
 
 export type DeviceId = string;
 
-// Info container for each device type
+/**
+ *  Info container for each device type
+ *  
+ *  An informattion that should be in all variants should be made so via the below impl.
+ *  Don't manually dip into each variant please.
+ */
 export type DeviceInfo = { variant: "Wifi"; value: WifiDeviceInfo };
 
 // The firmware type returned from the device.
@@ -167,6 +173,16 @@ export type EventEffectType =
 // Divides locations between the duration of the event and moves the node to that location.
 ({ MovingLocation: Vec3[] }) & { Location?: never; MultipleNodes?: never; SingleNode?: never; Tags?: never };
 
+// Bundle containing all user-required information to start a firmware update.
+export type Firmware = {
+	// The ID that should be used to find the device:
+	id: string,
+	// The method used to update firmware.
+	method: UpdateMethod,
+	// Raw bytes of the .bin fw file.
+	bytes: number[],
+};
+
 /**
  *  Filled with values from a config json file.
  *  Provides all information needed to fully define the avatar prefab.
@@ -174,6 +190,11 @@ export type EventEffectType =
 export type GameMap = {
 	nodes: ConfNode[],
 	meta: ConfMetadata,
+};
+
+export type GitRepo = {
+	owner: string,
+	name: string,
 };
 
 /**
@@ -272,6 +293,8 @@ export type OscInfo = {
  *  other than the VRC Fury naming.
  */
 export type OscPath = string;
+
+export type OtaPassword = string;
 
 export type SpectaOscType = ({ Int: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Float: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ String: string }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; Time?: never } | ({ Long: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Midi?: never; String?: never; Time?: never } | ({ Double: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Char: string }) & { Array?: never; Blob?: never; Bool?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Bool: boolean }) & { Array?: never; Blob?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | "Nil" | "Inf" | ({ Blob: number[] }) & { Array?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Time: {
 	seconds: number,
@@ -629,6 +652,17 @@ export type TargetBone =
  *  </summary>
  */
 "LastBone";
+
+/**
+ *  Which method to use.
+ * 
+ *  Can contain information on details that aren't automatically negotiable.
+ */
+export type UpdateMethod = 
+// over the air updatetyp. OtaPassword; authentication password (default: `Haptics-OTA`)
+({ OTA: OtaPassword }) & { Serial?: never } | 
+// Not currently supported
+({ Serial: string }) & { OTA?: never };
 
 // Minimal 3‑vector with **f32** components for high‑throughput numeric geometry.
 export type Vec3 = {

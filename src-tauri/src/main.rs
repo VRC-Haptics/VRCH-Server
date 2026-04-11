@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![warn(unused_extern_crates)]
 #![feature(debug_closure_helpers)] // needed for tauri-specta pinning a rc specta release
+#![feature(path_absolute_method)]
 // Keep Futures from being left un-awaited. Use crate::log_err for convenient handling.
 #![deny(unused_must_use)]
 
@@ -39,11 +40,9 @@ use tauri_specta::*;
 use tokio::sync::Mutex;
 
 use crate::devices::DeviceHandle;
-use crate::state::UPDATE_TX;
 use crate::{
     ble::start_ble,
     mapping::MapHandle,
-    state::{save_config, UpdateEvent, UPDATE_RX},
     vrc::VrcHandle,
 };
 
@@ -85,6 +84,7 @@ pub static DEVICE_MANAGER: OnceCell<DeviceHandle> = OnceCell::new();
 
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
+    state::save_config();
     log::trace!("Shutdown bhaptics server");
     //cleanup vrc TODO:
 }
@@ -134,6 +134,9 @@ async fn main() {
     console_subscriber::init();
     tauri::async_runtime::set(tokio::runtime::Handle::current());
 
+    let _ = state::get_config();
+    state::init_save_loop().await;
+
     let builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_device_list,
@@ -141,18 +144,21 @@ async fn main() {
             commands::get_core_map,
             commands::set_vrc,
             commands::set_device_info,
+            commands::get_repositories,
+            commands::set_repositories,
+            commands::get_wifi_timeout,
+            commands::set_wifi_timeout,
             commands::upload_device_map,
             commands::update_device_multiplier,
             commands::update_device_offset,
-            commands::update_vrc_distance_weight,
-            commands::update_vrc_velocity_multiplier,
             bhaptics_launch_default,
             bhaptics_launch_vrch,
             commands::play_point,
             commands::swap_conf_nodes,
             commands::set_tags_radius,
             commands::set_node_radius,
-            commands::get_device_esp_model
+            commands::get_device_esp_model,
+            commands::start_device_update,
         ]);
 
     #[cfg(debug_assertions)] // Only export on non-release builds

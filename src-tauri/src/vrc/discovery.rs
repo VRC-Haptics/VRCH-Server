@@ -30,7 +30,7 @@ unsafe extern "C" fn dispatch_port(port: u16) {
 
 pub async fn start_filling_available_parameters(
     vrc: VrcHandle,
-    api: &'static Mutex<ApiManager>,
+    api: &'static tokio::sync::Mutex<ApiManager>,
     params: Arc<DashMap<OscPath, OscInfo>>,
 ) {
     tokio::spawn(async move {
@@ -257,7 +257,7 @@ async fn run_vrc_http_polling(
             }
         }
         // Sleep before the next polling iteration.
-        thread::sleep(Duration::from_secs(2));
+        tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }
 

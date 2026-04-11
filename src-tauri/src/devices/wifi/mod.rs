@@ -1,4 +1,5 @@
 use super::{Device, DeviceId, DeviceInfo, DeviceMessage};
+use arc_swap::{ArcSwapAny, cache::Cache};
 use parking_lot::{Mutex, RwLock};
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use std::{
@@ -19,6 +20,7 @@ use udp::{broadcast::start_listen_broadcast, send_udp};
 mod config;
 mod connection_manager;
 mod udp;
+pub(crate) mod ota;
 
 pub async fn start_wifi_devices(manager: &mut DeviceHandle) {
     log::trace!("Starting wifi devices");
@@ -48,6 +50,7 @@ pub struct WifiDeviceState {
     nodes: Vec<HapticNode>,
     config: Option<WifiConfig>,
     last_heartbeat: Instant,
+    been_platform_query: bool,
 }
 
 impl Default for WifiDeviceState {
@@ -62,6 +65,7 @@ impl Default for WifiDeviceState {
             nodes: vec![],
             config: None,
             last_heartbeat: Instant::now(),
+            been_platform_query: false,
         }
     }
 }
@@ -226,6 +230,7 @@ enum TickAction {
     Ping(Vec<u8>),
     PushMap(Vec<u8>),
     Query(Vec<u8>),
+    QueryPlatform(Vec<u8>),
     Drive(Vec<u8>),
     None,
 }
@@ -243,7 +248,7 @@ async fn tick(
             Some(i) => {
                 let since_pinged = Instant::now().duration_since(i);
                 let diff = state.last_heartbeat.elapsed();
-                let ttl = Duration::from_secs(3);
+                let ttl = Duration::from_secs(**state::get_config().devices.wifi_device_timeout.load() as u64);
                 if diff > ttl && since_pinged > ttl || cancel.is_cancelled() {
                     cancel.cancel();
                     TickAction::Kill
@@ -277,6 +282,7 @@ async fn tick(
         TickAction::None |
         TickAction::Drive(_) |
         TickAction::PushMap(_) |
+        TickAction::QueryPlatform(_) |
         TickAction::Query(_) => {}
     }
 
@@ -297,6 +303,14 @@ async fn tick(
             })).unwrap();
             log::trace!("Query Device: {addr:?}");
             TickAction::Query(msg)
+        } else if !state.been_platform_query {
+            state.been_platform_query = true;
+            let msg = encoder::encode(&OscPacket::Message(OscMessage {
+                addr: "/command".to_string(),
+                args: vec![OscType::String("GET PLATFORM".to_string())],
+            })).unwrap();
+            log::trace!("Query platform: {addr:?}");
+            TickAction::QueryPlatform(msg)
         } else if let Some(conf) = &state.config {
             let mut hex = String::new();
             for mtr_idx in 0..conf.node_map.len() {
@@ -325,6 +339,7 @@ async fn tick(
             new.set_port(1027);
             log_err!(send_udp(&buf, &new).await)
         },
+        TickAction::QueryPlatform(buf) => {log_err!(send_udp(&buf, addr).await)},
         TickAction::Kill |
         TickAction::None => {},
     }
@@ -374,7 +389,7 @@ impl Device for WifiDevice {
             name: self.name.clone(),
             mac: self.mac.clone(),
             rssi: 0,
-            esp_model: ESP32Model::Unknown,
+            esp_model: state.identifier.clone().unwrap_or(ESP32Model::Unknown),
             intensity: local.intensity,
             offset: local.offset,
         };

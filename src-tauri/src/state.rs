@@ -18,16 +18,39 @@ use crate::{
 
 // not intended to be accessed publicly. Use functions below
 static CONFIG: LazyLock<Config> = LazyLock::new(|| load_config().unwrap_or_default().into());
-pub static UPDATE_TX: LazyLock<Sender<UpdateEvent>> = LazyLock::new(|| {
-    let (tx, rx) = channel(10);
-    *UPDATE_RX.lock().unwrap() = Some(rx);
-    tx
-});
 
-/// Only intended to be used by tauri frontend
-pub static UPDATE_RX: Mutex<Option<Receiver<UpdateEvent>>> = Mutex::new(None);
 static DIRTY: AtomicBool = AtomicBool::new(false);
 
+fn config_path() -> PathBuf {
+    ProjectDirs::from("", "", "vrch-gui")
+        .expect("no valid config directory")
+        .data_local_dir()
+        .join("memory.json")
+}
+
+fn load_config() -> Option<Config> {
+    let data = fs::read_to_string(config_path()).ok()?;
+    serde_json::from_str(&data).ok()
+}
+
+
+/// ONLY USED AT PROGRAM START. NOT A GENERAL USE FUNCTION.
+pub async fn init_save_loop() {
+    tokio::spawn(async {
+        let mut interval = tokio::time::interval(Duration::from_millis(500));
+        loop {
+            interval.tick().await;
+            if DIRTY.swap(false, std::sync::atomic::Ordering::AcqRel) {
+                save_config();
+            }
+        }
+    });
+}
+
+/// Marks that our state is dirty and needs to be persisted to disk.
+pub fn mark_dirty() {
+    DIRTY.store(true, std::sync::atomic::Ordering::Release);
+}
 
 /// Heavy function, persists a snapshot of our config to the disk.
 pub fn save_config() {
@@ -38,18 +61,6 @@ pub fn save_config() {
     let _ = fs::write(path, serde_json::to_string_pretty(&*CONFIG).unwrap());
 }
 
-/// An event marks a change **THAT HAS ALREADY BEEN COMPLETED**
-///
-/// Completely encapsulates every way the app state can change.
-/// In cases where a field in a config struct field needs to be referenced, a closure is provided that returns the value.
-///
-/// Intended to be used to emit events to the ui. Probably paired with a macro like send_update!().
-pub enum UpdateEvent {
-    /// Possibility of only being interested in one device.
-    DeviceSettings(DeviceId),
-    /// Device settings are cheap enough to just rebuild every time
-    GeneralDeviceSettings,
-}
 
 /// returns bare static reference to global app configuration (state)
 pub fn get_config() -> &'static Config {
@@ -68,13 +79,10 @@ pub fn get_device(id: &DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
         .iter()
         .find(|(_, d)| d.load().id == *id)
     else {
-        let _ = update_device(Arc::new(PerDevice::default(id.clone())));
-        return CONFIG
+        let idx = update_device(Arc::new(PerDevice::default(id.clone())));
+        return (idx.clone(), CONFIG
             .devices
-            .states
-            .iter()
-            .find(|(_, d)| d.load().id == *id)
-            .expect("device still not in saved_devices");
+            .states.get(idx).expect("The device should have just been created."))
     };
     existing
 }
@@ -102,11 +110,33 @@ pub struct Config {
     pub mapping_menu: ArcSwap<StandardMenu>,
     pub devices: Devices,
     pub vrc_settings: ArcSwap<VrcSettings>,
+    pub ui: ArcSwap<UiSettings>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct GitRepo {
+    pub owner: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+/// Handles all settings only needed for the frontend.
+pub struct UiSettings {
+    pub theme: String,
+}
+
+impl Default for UiSettings {
+    fn default() -> Self {
+        Self {
+            theme: "dark".into(),
+        }
+    }
 }
 
 /// Handles all app state underneath the Device Manager
 #[derive(Debug)]
 pub struct Devices {
+    pub ota_repositories: parking_lot::Mutex<Vec<GitRepo>>,
     pub wifi_device_timeout: ArcSwap<f32>,
     /// Inner ArcSwap allows for device settings to be updated, without changing static lifetime.
     pub states: AppendVec<ArcSwap<PerDevice>>,
@@ -127,23 +157,17 @@ impl serde::Serialize for Devices {
     where
         S: serde::Serializer,
     {
-        let Devices {
-            wifi_device_timeout,
-            states,
-        } = self;
-
         #[derive(Serialize)]
         struct Proxy {
+            pub ota_repositories: Vec<GitRepo>,
             pub wifi_device_timeout: f32,
             pub states: Vec<PerDevice>,
         }
 
         Proxy {
-            wifi_device_timeout: wifi_device_timeout.load_full().as_ref().clone(),
-            states: states
-                .iter()
-                .map(|(_, d)| d.load_full().as_ref().clone())
-                .collect(),
+            ota_repositories: self.ota_repositories.lock().clone(),
+            wifi_device_timeout: self.wifi_device_timeout.load_full().as_ref().clone(),
+            states: self.states.iter().map(|(_, d)| d.load_full().as_ref().clone()).collect(),
         }
         .serialize(serializer)
     }
@@ -156,14 +180,13 @@ impl<'de> serde::Deserialize<'de> for Devices {
     {
         #[derive(Deserialize)]
         struct Proxy {
+            #[serde(default)]
+            pub ota_repositories: parking_lot::Mutex<Vec<GitRepo>>,
             pub wifi_device_timeout: f32,
             pub states: Vec<PerDevice>,
         }
 
-        let Proxy {
-            wifi_device_timeout,
-            states,
-        } = Proxy::deserialize(deserializer)?;
+        let Proxy { ota_repositories, wifi_device_timeout, states } = Proxy::deserialize(deserializer)?;
 
         let arc_states = AppendVec::new();
         for state in states {
@@ -171,6 +194,7 @@ impl<'de> serde::Deserialize<'de> for Devices {
         }
 
         Ok(Devices {
+            ota_repositories,
             wifi_device_timeout: ArcSwap::new(Arc::new(wifi_device_timeout)),
             states: arc_states,
         })
@@ -181,11 +205,16 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             devices: Devices {
+                ota_repositories: parking_lot::Mutex::new(vec![GitRepo {
+                owner: "VRC-Haptics".into(),
+                name: "VRCH-Firmware".into(),
+            }]),
                 wifi_device_timeout: ArcSwap::new(Arc::new(3.0)),
                 states: AppendVec::new(),
             },
             mapping_menu: ArcSwap::new(Arc::new(StandardMenu::default())),
             vrc_settings: ArcSwap::new(Arc::new(VrcSettings::default())),
+            ui: ArcSwap::new(Arc::new(UiSettings::default()))
         }
     }
 }
@@ -217,6 +246,7 @@ pub struct VrcSettings {
     pub velocity_ratio: f32,
     /// the magic velocity multiplier. 1 is reasonable, if fast.
     pub velocity_mult: f32,
+    pub size: f32,
     /// Number of value entries to keep track of for velocity measurements.
     ///
     /// VRC Refreshes at 10hz max, so 10*seconds should work just fine.
@@ -234,6 +264,7 @@ impl Default for VrcSettings {
         Self {
             velocity_ratio: 0.5,
             velocity_mult: 1.0,
+            size: 1.0,
             sample_cache: 10,
             smoothing_time: Duration::from_secs_f32(0.12),
         }
@@ -247,16 +278,4 @@ pub struct PerDevice {
     pub intensity: f32,
     pub offset: f32,
     pub interp_algo: InterpAlgo,
-}
-
-fn config_path() -> PathBuf {
-    ProjectDirs::from("com", "vrch", "app")
-        .expect("no valid config directory")
-        .config_dir()
-        .join("memory.json")
-}
-
-fn load_config() -> Option<Config> {
-    let data = fs::read_to_string(config_path()).ok()?;
-    serde_json::from_str(&data).ok()
 }

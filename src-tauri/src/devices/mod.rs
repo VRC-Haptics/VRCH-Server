@@ -2,7 +2,7 @@
 pub mod serial;
 //mod traits;
 mod bhaptics;
-//pub mod update;
+pub mod update;
 pub mod wifi;
 //pub mod device;
 
@@ -37,6 +37,9 @@ pub enum HapticDevice {
 }
 
 /// Info container for each device type
+/// 
+/// An informattion that should be in all variants should be made so via the below impl.
+/// Don't manually dip into each variant please.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceInfo {
@@ -57,6 +60,14 @@ impl DeviceInfo {
             DeviceInfo::Wifi(ref mut inf) => {
                 inf.nodes = new;
             }
+        }
+    }
+
+    pub fn get_esp32(&self) -> ESP32Model {
+        match self {
+            DeviceInfo::Wifi(wif) => {
+                wif.esp_model.clone()
+            }   
         }
     }
 }

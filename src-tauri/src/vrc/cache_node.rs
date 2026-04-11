@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::mem::discriminant;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
 
+use crate::state::VrcSettings;
 use crate::wrappers::SpectaOscType;
 
 /// A node cached by vrc, is an intermdieary between an `InputNode`.
@@ -20,9 +21,6 @@ pub struct CacheNode {
     max_len: usize,
     /// The state of haptics returned from this node.
     smoothing_time: Duration,
-    pub position_weight: f32,
-    pub vel_mult: f32,
-    contact_scale: f32,
 }
 
 impl CacheNode {
@@ -34,9 +32,6 @@ impl CacheNode {
         value_type: OscType,
         max_entries: usize,
         smoothing_time: Duration,
-        position_weight: f32,
-        velocity_multiplier: f32,
-        contact_scale: f32,
     ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
         values.push_front((SpectaOscType::from(value_type.clone()), UNIX_EPOCH));
@@ -45,22 +40,7 @@ impl CacheNode {
             osc_type: value_type.into(),
             max_len: max_entries,
             smoothing_time: smoothing_time,
-            position_weight: position_weight,
-            vel_mult: velocity_multiplier,
-            contact_scale: contact_scale,
         }
-    }
-
-    pub fn set_velocity_mult(&mut self, val: f32) {
-        self.vel_mult = val;
-    }
-
-    pub fn set_position_weight(&mut self, val: f32) {
-        self.position_weight = val;
-    }
-
-    pub fn set_contact_scale(&mut self, val: f32) {
-        self.contact_scale = val;
     }
 
     pub fn raw_last(&self) -> f32 {
@@ -165,9 +145,9 @@ impl CacheNode {
     }
 
     /// Returns the velocity and position mixed values
-    pub fn latest(&self) -> f32 {
+    pub fn latest(&self, cfg: &VrcSettings) -> f32 {
         let now = SystemTime::now();
-        let limit = now.checked_sub(self.smoothing_time).unwrap_or(UNIX_EPOCH);
+        let limit = now.checked_sub(cfg.smoothing_time).unwrap_or(UNIX_EPOCH);
 
         // detect when we havent recieved the "closing zero value"
         // should stop buzzing after and having to reset.
@@ -193,8 +173,8 @@ impl CacheNode {
         let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
 
         // blend and clamp
-        ((1.0 - self.position_weight) * (vel * self.vel_mult)
-            + self.position_weight * pos * self.contact_scale)
+        ((cfg.velocity_ratio) * (vel * cfg.velocity_mult)
+            + (1. - cfg.velocity_ratio) * pos * cfg.size)
             .clamp(0.0, 1.0)
     }
 
@@ -207,7 +187,7 @@ impl CacheNode {
             SpectaOscType::Double(double) => (double - val_late.clone().double().unwrap()) as f32,
             SpectaOscType::Long(long) => (long - val_late.clone().long().unwrap()) as f32,
             SpectaOscType::Bool(bool) => {
-                if *bool == val_late.clone().bool().unwrap() {
+                if *bool == val_late.bool().unwrap_or(false) {
                     0.0
                 } else {
                     1.0

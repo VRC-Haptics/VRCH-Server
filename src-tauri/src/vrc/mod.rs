@@ -67,6 +67,8 @@ impl Default for VrcInfo {
     }
 }
 
+static CHECKING: std::sync::Mutex<f32> = std::sync::Mutex::new(0.0);
+
 // "/avatar/parameters/haptic/prefabs/<author>/<name>/<version>"
 // I think having trailing "/" references the contents of the path, not all the children paths.
 pub const PREFAB_PREFIX: &str = "/avatar/parameters/haptic/prefabs/";
@@ -298,8 +300,8 @@ impl VrcGame {
             velocity_mult: 0.0, // these will be filled out by touching the state in the handle function
             velocity_ratio: 0.0,
             cached: self.parameter_cache.iter()
-    .map(|entry| (entry.key().clone(), entry.value().clone()))
-    .collect(),
+                .map(|entry| (entry.key().clone(), entry.value().clone()))
+                .collect(),
         };
 
         current.swap(Arc::new(changed));
@@ -321,7 +323,6 @@ impl VrcGame {
                         arg.to_owned(),
                         cfg.sample_cache.clone(),
                         cfg.smoothing_time.clone(),
-                        1.0-cfg.velocity_ratio, cfg.velocity_mult, 1.0,
                     ),
                 );
             }
@@ -330,6 +331,7 @@ impl VrcGame {
 
     /// Propogates our cached values to changes on the input map.
     fn refresh_map(&self, map: &MapHandle, settings: &VrcSettings) {
+
         let Some(avatar) = self.avatar.as_ref() else {
             return;
         };
@@ -342,25 +344,25 @@ impl VrcGame {
         let int_node = self.parameter_cache.get(&OscPath(INTENSITY_PATH.into()));
         let en_node = self.parameter_cache.get(&OscPath(ENABLE_PATH.into()));
         match (int_node, en_node) {
+            (None, None) => {}, // both are zero
             (Some(int), Some(en)) =>  {
                 let intensity = int.raw_last().clamp(0.0, 1.0);
                 let enable = en.raw_last();
                 let enable = enable > 0.5; 
 
                 let menu = state::get_config().mapping_menu.load();
-                if menu.intensity - intensity < 0.05 || enable != menu.enable {
+                if (menu.intensity - intensity).abs() > 0.05 || enable != menu.enable {
                     let mut new = StandardMenu::clone(&menu);
                     new.intensity = intensity;
                     new.enable = enable;
                     state::get_config().mapping_menu.store(new.into());
                 }
             },
-            (None, None) => {}, // both are zero
             (int, en) => {
                 if let Some(intensity) = int {
                     let intensity = intensity.raw_last().clamp(0.0, 1.0);
                     let menu = state::get_config().mapping_menu.load();
-                    if menu.intensity - intensity < 0.05 {
+                    if (menu.intensity - intensity).abs() > 0.05 {
                         let mut new = StandardMenu::clone(&menu);
                         new.intensity = intensity;
                         state::get_config().mapping_menu.store(new.into());
@@ -383,8 +385,8 @@ impl VrcGame {
         // update input nodes
         for conf in &avatar.configs {
             for node in &conf.nodes {
-                if let Some(mut cache_node) =
-                    self.parameter_cache.get_mut(&OscPath(node.address.clone()))
+                if let Some(cache_node) =
+                    self.parameter_cache.get(&OscPath(node.address.clone()))
                 {
                     // update node if already created
                     let id = NodeId(node.address.clone());
@@ -395,15 +397,7 @@ impl VrcGame {
                             return;
                         }
 
-                        // update our cache node, then read output to our nodes.
-                        if cache_node.position_weight != settings.velocity_ratio {
-                            log::trace!("new ratio: {}", settings.velocity_ratio);
-                        }
-                        cache_node.set_position_weight(1.0 - settings.velocity_ratio);
-                        cache_node.set_velocity_mult(settings.velocity_mult);
-                        cache_node.set_contact_scale(1.0);
-
-                        n.set_intensity(cache_node.latest());
+                        n.set_intensity(cache_node.latest(settings));
                     });
 
                     if res.is_none() {
@@ -415,7 +409,7 @@ impl VrcGame {
 
             // tell map we are done messing with it
             // blocks till it sends.
-            map.mark_dirty_blocking();
+            map.mark_dirty();
         }
     }
 

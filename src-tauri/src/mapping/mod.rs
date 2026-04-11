@@ -48,7 +48,7 @@ pub struct MapHandle {
 
 impl MapHandle {
     // mark_dirty_blocking becomes a simple atomic store
-    pub fn mark_dirty_blocking(&self) {
+    pub fn mark_dirty(&self) {
         self.map_dirty.notify_one();
     }
 

@@ -1,7 +1,7 @@
 // local modules
 use crate::{devices::{
-    Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, //update::{Firmware, UpdateMethod}
-}, mapping::{MapHandle, MapInfo}, state::{self, Config, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
+    Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, update::Firmware, //update::{Firmware, UpdateMethod}
+}, mapping::{MapHandle, MapInfo}, state::{self, Config, Devices, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::{InputEventMessage, InputMap, NodeId};
@@ -24,20 +24,30 @@ pub fn get_device_esp_model(
     id: String,
     devices: tauri::State<'_, DeviceHandle>,
 ) -> Result<ESP32Model, String> {
-    log::error!("Device esp model detection not finished");
-    // TODO: need to have wifi devices query for this.
-    return Ok(ESP32Model::Unknown);
+    let Some(this) = devices.with_device(&id.into(), |d| d.info().get_esp32()) else {
+        return Err("unable to find device with id".to_string());
+    };
+    return Ok(this);
 }
 
-/* 
+
 #[tauri::command]
-pub fn start_device_update(
+#[specta::specta]
+/// typescript seems to throw a fit with formats here. So invoke bypasses most of this. EUUUGH
+pub async fn start_device_update(
     fw: Firmware,
     devices: tauri::State<'_, DeviceHandle>,
 ) -> Result<(), String> {
-    log::error!("Device update not yet finished");
-    Ok(())
-}*/
+    let devices = devices.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        log::trace!("Starting OTA Update");
+        devices
+            .with_device(&fw.id.clone().into(), |d| fw.do_update(d))
+            .ok_or_else(|| "unable to find device with id".to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 #[tauri::command]
 #[specta::specta]
@@ -140,6 +150,33 @@ pub fn play_point(
 
 #[tauri::command]
 #[specta::specta]
+pub fn get_repositories() -> Vec<GitRepo> {
+    state::get_config().devices.ota_repositories.lock().clone()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_repositories(repos: Vec<GitRepo>) {
+    *state::get_config().devices.ota_repositories.lock() = repos;
+    state::mark_dirty();
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_wifi_timeout(timeout: f32) {
+    log::trace!("set to: {timeout:2}");
+    state::get_config().devices.wifi_device_timeout.store(Arc::new(timeout));
+    state::mark_dirty();
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_wifi_timeout() -> f32 {
+    **state::get_config().devices.wifi_device_timeout.load()
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn get_device_list(dev: tauri::State<'_, DeviceHandle>) -> Vec<(DeviceId, Option<DeviceInfo>)> {
     let mut devices = vec![];
     let ids = dev.devices();
@@ -168,6 +205,7 @@ pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
     new.smoothing_time = smooth_s;
 
     shared.swap(Arc::new(new));
+    state::mark_dirty();
 }
 
 #[tauri::command]
@@ -209,6 +247,8 @@ pub async fn upload_device_map(
         info.set_nodes(haptic_nodes);
         d.update_info(info);
     });
+
+    state::mark_dirty();
     if res.is_none() {
         return Err(format!("No Device with id: {}", id))
     } else {
@@ -227,6 +267,7 @@ pub async fn update_device_multiplier(
     let mut new = PerDevice::clone(&guard);
     new.intensity = multiplier;
     state::update_device(Arc::new(new));
+    state::mark_dirty();
 }
 
 #[tauri::command]
@@ -240,26 +281,7 @@ pub async fn update_device_offset(
     let mut new = PerDevice::clone(&guard);
     new.offset = offset;
     state::update_device(Arc::new(new));
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn update_vrc_velocity_multiplier(vel_multiplier: f32) {
-    let vrc = &state::get_config().vrc_settings;
-    let guard = vrc.load();
-    let mut new = VrcSettings::clone(&guard);
-    new.velocity_mult = vel_multiplier;
-    vrc.store(Arc::new(new));
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn update_vrc_distance_weight(distance_weight: f32) {
-    let vrc = &state::get_config().vrc_settings;
-    let guard = vrc.load();
-    let mut new = VrcSettings::clone(&guard);
-    new.velocity_ratio = 1. - distance_weight;
-    vrc.store(Arc::new(new));
+    state::mark_dirty();
 }
 
 /// Handles setting our app to launch instead of the bHapticsPlayer
