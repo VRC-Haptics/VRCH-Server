@@ -52,6 +52,14 @@ export type Avatar = {
 	configs: GameMap[],
 };
 
+export type BhapticInfo = {
+	id: DeviceId,
+	nodes: HapticNode[],
+	model: BhapticsModel,
+};
+
+export type BhapticsModel = "TacsuitX16";
+
 /**
  *  A node cached by vrc, is an intermdieary between an `InputNode`.
  *  
@@ -107,7 +115,7 @@ export type DeviceId = string;
  *  An informattion that should be in all variants should be made so via the below impl.
  *  Don't manually dip into each variant please.
  */
-export type DeviceInfo = { variant: "Wifi"; value: WifiDeviceInfo };
+export type DeviceInfo = { variant: "Wifi"; value: WifiDeviceInfo } | { variant: "BhapticBle"; value: BhapticInfo };
 
 // The firmware type returned from the device.
 export type ESP32Model = 

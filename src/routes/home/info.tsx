@@ -3,6 +3,7 @@ import RawDeviceInfo from "./info/raw";
 import DeviceJsonUpload from "./info/upload_map";
 import { DeviceOffset } from "./info/set_offset";
 import { DisplayHapticNodes } from "./info/display_haptic_nodes";
+import { getDeviceId } from "../common";
 
 interface InfoPageProps {
   selectedDevice: string | null;
@@ -12,7 +13,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   const { devices } = useDeviceContext();
 
   function createInfo(device_id: string) {
-    const device = devices.find((d) => d.value.mac === device_id);
+    const device = devices.find((d) => getDeviceId(d) === device_id);
 
     if (device != null) {
       return (

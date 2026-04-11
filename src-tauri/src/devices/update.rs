@@ -8,7 +8,8 @@ use std::{
 /// Decides whether we have the capability of determining this devices eligibility.
 pub fn is_updateable(dtype: &HapticDevice) -> bool {
     match dtype {
-        HapticDevice::Wifi(_) => true
+        HapticDevice::Wifi(_) => true,
+        HapticDevice::BhapticBle(_) => false,
     }
 }
 
@@ -36,7 +37,9 @@ impl Firmware {
         match &dev {
             HapticDevice::Wifi(wifi) => match &self.method {
                 UpdateMethod::OTA(pass) => {
-                    let DeviceInfo::Wifi(info) = wifi.info();
+                    let DeviceInfo::Wifi(info) = wifi.info() else {
+                        return Err("Non Wifi device info.".to_string());
+                    };
                     let IpAddr::V4(ip) = info.remote_addr.ip() else {
                         return Err("Must be an IPV4 address".to_string());
                     };
@@ -55,6 +58,7 @@ impl Firmware {
                     return Err("Wrong Firmware type".to_string());
                 }
             },
+            _ => return Err("Unable to perform OTA on this device type".to_string()),
         }
 
         Ok(())

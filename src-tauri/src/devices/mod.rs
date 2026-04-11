@@ -1,7 +1,7 @@
 //mod ble;
 pub mod serial;
 //mod traits;
-mod bhaptics;
+pub mod bhaptics;
 pub mod update;
 pub mod wifi;
 //pub mod device;
@@ -17,10 +17,8 @@ use tokio_util::sync::CancellationToken;
 use wifi::{WifiDevice, WifiDeviceInfo};
 
 use crate::{
-    devices::wifi::start_wifi_devices,
-    mapping::{
-        haptic_node::HapticNode,
-    },
+    devices::{bhaptics::{BhapticBle, BhapticInfo}, wifi::start_wifi_devices},
+    mapping::haptic_node::HapticNode,
 };
 
 pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
@@ -34,6 +32,7 @@ pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
 /// and are not stable in the least.
 pub enum HapticDevice {
     Wifi(WifiDevice),
+    BhapticBle(BhapticBle),
 }
 
 /// Info container for each device type
@@ -44,6 +43,7 @@ pub enum HapticDevice {
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceInfo {
     Wifi(WifiDeviceInfo),
+    BhapticBle(BhapticInfo)
 }
 
 impl DeviceInfo {
@@ -51,13 +51,20 @@ impl DeviceInfo {
         match self {
             DeviceInfo::Wifi(inf) => {
                 return &inf.nodes;
+            },
+            DeviceInfo::BhapticBle(inf) => {
+                return &inf.nodes;
             }
         }
     }
 
+    /// updates the nodes on this info instance. Does not do anything like send them to teh device or update the configuration.
     pub fn set_nodes(&mut self, new: Vec<HapticNode>) {
         match self {
             DeviceInfo::Wifi(ref mut inf) => {
+                inf.nodes = new;
+            },
+            DeviceInfo::BhapticBle(ref mut inf) => {
                 inf.nodes = new;
             }
         }
@@ -67,7 +74,8 @@ impl DeviceInfo {
         match self {
             DeviceInfo::Wifi(wif) => {
                 wif.esp_model.clone()
-            }   
+            },
+            DeviceInfo::BhapticBle(_) => ESP32Model::Unknown,
         }
     }
 }

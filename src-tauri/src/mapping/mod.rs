@@ -387,6 +387,18 @@ fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &Mutex<Vec<Mappi
                 if device.nodes.len() != out_len {
                     log::error!("Output buffer not same length on device: {}", i.mac);
                 }
+            },
+            DeviceInfo::BhapticBle(i) => {
+                let mut lock = devices.lock();
+                let Some(device) = lock.iter_mut().find(|d| d.id == id) else {
+                    // if device not found on our list, just continue.
+                    return;
+                };
+                device.nodes = i.nodes;
+                let out_len = device.outputs.read().len();
+                if device.nodes.len() != out_len {
+                    log::error!("Output buffer not same length on device: {:?}", i.id);
+                }
             }
         }
     }

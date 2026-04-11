@@ -8,8 +8,7 @@
 
 // make local modules available
 pub mod api;
-//mod bhaptics;
-pub mod ble;
+mod bhaptics;
 mod commands;
 mod devices;
 pub mod mapping;
@@ -39,9 +38,8 @@ use specta_typescript::Typescript;
 use tauri_specta::*;
 use tokio::sync::Mutex;
 
-use crate::devices::DeviceHandle;
+use crate::devices::{DeviceHandle, bhaptics::start_ble};
 use crate::{
-    ble::start_ble,
     mapping::MapHandle,
     vrc::VrcHandle,
 };
@@ -111,13 +109,13 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcGame>>) {
 
 async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
     // initialize input map.
-    let (mut input_map, map_handle) = InputMap::new(manager).await;
+    let (mut input_map, map_handle) = InputMap::new(manager.clone()).await;
     tokio::spawn(async move {
         input_map.start().await;
     });
 
     // TODO: Move into device manager init.
-    log_err!(start_ble(Duration::from_secs(1)).await);
+    log_err!(start_ble(manager.get_device_channel(), Duration::from_secs(1)).await);
 
     //start_apps
     let mut vrc = VrcGame::new(map_handle.clone(), &API_MANAGER).await;

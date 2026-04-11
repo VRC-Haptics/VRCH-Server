@@ -76,7 +76,7 @@ pub async fn start_listen_broadcast(manager: &mut DeviceHandle) {
                             // If the device already exists, probably needs a reset
                             let fun = |d: &HapticDevice| match d {
                                 HapticDevice::Wifi(d) => d.reset_ping(),
-                                //_ => log::error!("Device type already registered is not wifi"),
+                                _ => log::error!("Device type already registered is not wifi"),
                             };
                             manager.with_device(id, &fun);
                             log::debug!("Multicast for {}, which already exists", name);
