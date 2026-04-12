@@ -1,8 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![warn(unused_extern_crates)]
-#![feature(debug_closure_helpers)] // needed for tauri-specta pinning a rc specta release
-#![feature(path_absolute_method)]
 // Keep Futures from being left un-awaited. Use crate::log_err for convenient handling.
 #![deny(unused_must_use)]
 
