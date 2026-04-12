@@ -1,22 +1,21 @@
 import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { invoke } from "@tauri-apps/api/core";
-import { defaultVrcInfo, VrcInfo } from '../utils/vrc_info_classes';
+import { commands, VrcInfo } from '../bindings';
 
 interface VrcContextValue {
-  vrcInfo: VrcInfo;
+  vrcInfo: VrcInfo | null;
 }
 
-export const VrcContext = createContext<VrcContextValue>({vrcInfo: defaultVrcInfo});
+export const VrcContext = createContext<VrcContextValue>({vrcInfo: null});
 
 export const useVrcContext = () => useContext(VrcContext);
 
 export const VrcProvider = ({ children }: { children: ReactNode}) => {
-  const [vrcInfo, setVrcInfo] = useState<VrcInfo>(defaultVrcInfo);
+  const [vrcInfo, setVrcInfo] = useState<VrcInfo | null>(null);
 
   useEffect(() => {
     const fetchVrc = async () => {
       try {
-        const newInfo = await invoke<VrcInfo>('get_vrc_info');
+        const newInfo = await commands.getVrcInfo();
         setVrcInfo(newInfo);
       } catch (error) {
         console.error("Fa;iled to fetch devices:", error);

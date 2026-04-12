@@ -3,22 +3,24 @@ use std::collections::VecDeque;
 use std::mem::discriminant;
 use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
 
-/// A node cached by vrc, allows for historically informed cache manipulation.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+use crate::state::VrcSettings;
+use crate::wrappers::SpectaOscType;
+
+/// A node cached by vrc, is an intermdieary between an `InputNode`.
+/// 
+/// Provides simple methods for extracting values
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 pub struct CacheNode {
     /// Ring buffer of values we have recieved.
     /// Front items are the most recent.
-    values: VecDeque<(OscType, SystemTime)>,
+    values: VecDeque<(SpectaOscType, SystemTime)>,
     /// contains the OscType that this CacheNode accepts.
     /// The payload should be considered the default value if the cache is empty.
-    osc_type: OscType,
+    osc_type: SpectaOscType,
     /// the max_len of entries we will keep track of.
     max_len: usize,
     /// The state of haptics returned from this node.
     smoothing_time: Duration,
-    pub position_weight: f32,
-    pub vel_mult: f32,
-    contact_scale: f32,
 }
 
 impl CacheNode {
@@ -30,33 +32,15 @@ impl CacheNode {
         value_type: OscType,
         max_entries: usize,
         smoothing_time: Duration,
-        position_weight: f32,
-        velocity_multiplier: f32,
-        contact_scale: f32,
     ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
-        values.push_front((value_type.clone(), UNIX_EPOCH));
+        values.push_front((SpectaOscType::from(value_type.clone()), UNIX_EPOCH));
         CacheNode {
             values,
-            osc_type: value_type,
+            osc_type: value_type.into(),
             max_len: max_entries,
             smoothing_time: smoothing_time,
-            position_weight: position_weight,
-            vel_mult: velocity_multiplier,
-            contact_scale: contact_scale,
         }
-    }
-
-    pub fn set_velocity_mult(&mut self, val: f32) {
-        self.vel_mult = val;
-    }
-
-    pub fn set_position_weight(&mut self, val: f32) {
-        self.position_weight = val;
-    }
-
-    pub fn set_contact_scale(&mut self, val: f32) {
-        self.contact_scale = val;
     }
 
     pub fn raw_last(&self) -> f32 {
@@ -64,7 +48,7 @@ impl CacheNode {
     }
 
     /// Returns the velocity interpreted latest value.
-    pub fn latest_interp(&self) -> f32 {
+    fn latest_interp(&self) -> f32 {
         if self.values.len() < 2 {
             return self.values.front().unwrap().0.clone().float().unwrap();
         }
@@ -72,7 +56,7 @@ impl CacheNode {
         let (latest_value, latest_time) = self.values.front().unwrap();
         let (old_value, old_time) = &self.values[1];
         // (percentage / second) * second = new delta
-        let velocity = self.value_delta(latest_value, &old_value)
+        let velocity = self.value_delta(latest_value.into(), &old_value)
             / latest_time.duration_since(*old_time).unwrap().as_secs_f32();
         let seconds_since_last = SystemTime::now()
             .duration_since(*latest_time)
@@ -94,39 +78,35 @@ impl CacheNode {
     /// The delta between `limit` and now can be seen as a smoothing time.
     ///
     /// Units: [Change Value/Second]
-    pub fn velocity_since(&self, limit: &SystemTime) -> f32 {
+    fn velocity_since(&self, limit: &SystemTime) -> f32 {
         let mut sum: f32 = 0.;
         let mut count: f32 = 0.;
 
-        // itterate from newest to oldest.
         for (index, (val, time)) in self.values.iter().enumerate() {
             if *time > *limit {
                 if let Some((older_val, older_time)) = self.values.get(index + 1) {
-                    if *older_time > *limit {
+                    // Calculate velocity even if older_time is before limit
+                    let dt = time.duration_since(*older_time).unwrap().as_secs_f32();
+                    if dt > 0.0 {
                         count += 1.;
-                        sum += self.value_delta(val, older_val)
-                            / time.duration_since(*older_time).unwrap().as_secs_f32();
-                    } else {
+                        sum += self.value_delta(val, older_val) / dt;
+                    }
+                    // Continue if older value is still after limit
+                    if *older_time <= *limit {
                         break;
                     }
                 } else {
-                    // No older value, stop
                     break;
                 }
-            } else {
-                break;
             }
         }
 
-        if count == 0.0 {
-            return count;
-        }
-        return sum / count;
+        if count == 0.0 { 0.0 } else { sum / count }
     }
 
     /// Returns the velocity between the latest value and `entries_back` into the cache.
     /// Units: [Change Value/Second]
-    pub fn velocity_by_entry(&self, entries_back: usize) -> Result<f32, RetrievalError> {
+    fn velocity_by_entry(&self, entries_back: usize) -> Result<f32, RetrievalError> {
         // retrieve values
         if let Some((val, time)) = self.values.back() {
             if let Some((val_late, time_late)) = self.values.get(entries_back) {
@@ -149,7 +129,7 @@ impl CacheNode {
     }
 
     /// Pushes an update to the cached values with the current time as a timestamp.
-    pub fn update(&mut self, value: OscType) -> Result<(), WrongNodeTypeError> {
+    pub fn update(&mut self, value: SpectaOscType) -> Result<(), WrongNodeTypeError> {
         if discriminant(&self.osc_type) != discriminant(&value) {
             return Err(WrongNodeTypeError {
                 entered: value,
@@ -165,9 +145,9 @@ impl CacheNode {
     }
 
     /// Returns the velocity and position mixed values
-    pub fn latest(&self) -> f32 {
+    pub fn latest(&self, cfg: &VrcSettings) -> f32 {
         let now = SystemTime::now();
-        let limit = now.checked_sub(self.smoothing_time).unwrap_or(UNIX_EPOCH);
+        let limit = now.checked_sub(cfg.smoothing_time).unwrap_or(UNIX_EPOCH);
 
         // detect when we havent recieved the "closing zero value"
         // should stop buzzing after and having to reset.
@@ -193,21 +173,21 @@ impl CacheNode {
         let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
 
         // blend and clamp
-        ((1.0 - self.position_weight) * (vel * self.vel_mult)
-            + self.position_weight * pos * self.contact_scale)
+        ((cfg.velocity_ratio) * (vel * cfg.velocity_mult)
+            + (1. - cfg.velocity_ratio) * pos * cfg.size)
             .clamp(0.0, 1.0)
     }
 
     /// Trys to parse OscType into a delta value in f32.
     /// uses the order: `value-val_late`.
-    fn value_delta(&self, value: &OscType, val_late: &OscType) -> f32 {
+    fn value_delta(&self, value: &SpectaOscType, val_late: &SpectaOscType) -> f32 {
         match value {
-            OscType::Float(float) => float - val_late.clone().float().unwrap(),
-            OscType::Int(int) => (int - val_late.clone().int().unwrap()) as f32,
-            OscType::Double(double) => (double - val_late.clone().double().unwrap()) as f32,
-            OscType::Long(long) => (long - val_late.clone().long().unwrap()) as f32,
-            OscType::Bool(bool) => {
-                if *bool == val_late.clone().bool().unwrap() {
+            SpectaOscType::Float(float) => float - val_late.clone().float().unwrap(),
+            SpectaOscType::Int(int) => (int - val_late.clone().int().unwrap()) as f32,
+            SpectaOscType::Double(double) => (double - val_late.clone().double().unwrap()) as f32,
+            SpectaOscType::Long(long) => (long - val_late.clone().long().unwrap()) as f32,
+            SpectaOscType::Bool(bool) => {
+                if *bool == val_late.bool().unwrap_or(false) {
                     0.0
                 } else {
                     1.0
@@ -220,8 +200,8 @@ impl CacheNode {
 
 /// The wrong node type was inserted into this node.
 pub struct WrongNodeTypeError {
-    entered: OscType,
-    expected: OscType,
+    entered: SpectaOscType,
+    expected: SpectaOscType,
 }
 
 /// An Error occured during retrieval from cache.

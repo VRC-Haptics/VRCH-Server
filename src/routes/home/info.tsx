@@ -3,6 +3,7 @@ import RawDeviceInfo from "./info/raw";
 import DeviceJsonUpload from "./info/upload_map";
 import { DeviceOffset } from "./info/set_offset";
 import { DisplayHapticNodes } from "./info/display_haptic_nodes";
+import { getDeviceId } from "../common";
 
 interface InfoPageProps {
   selectedDevice: string | null;
@@ -12,7 +13,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   const { devices } = useDeviceContext();
 
   function createInfo(device_id: string) {
-    const device = devices.find((d) => d.id === device_id);
+    const device = devices.find((d) => getDeviceId(d) === device_id);
 
     if (device != null) {
       return (
@@ -20,13 +21,13 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
           id="DeviceInfoCard"
           className="max-w-full max-h-full overflow-auto"
         >
-          <DeviceOffset selectedDevice={device}></DeviceOffset>
+          <DeviceOffset deviceId = {device_id} selectedDevice={device}></DeviceOffset>
           <div className="h-2"></div>
-          <DisplayHapticNodes selectedDevice={device}></DisplayHapticNodes>
+          <DisplayHapticNodes deviceId = {device_id} selectedDevice={device}></DisplayHapticNodes>
           <div className="h-2"></div>
           <DeviceJsonUpload device={device}></DeviceJsonUpload>
           <div className="h-2"></div>
-          <RawDeviceInfo device={device} />
+          <RawDeviceInfo deviceId = {device_id} device={device} />
         </div>
       );
     }
@@ -35,7 +36,7 @@ export default function InfoPage({ selectedDevice }: InfoPageProps) {
   return (
     <div
       id="infoPageContainer"
-      className="bg-base-200 rounded-md p-2 min-w-0 min-h-0 overflow-hidden h-full flex flex-col"
+      className="bg-base-200 rounded-md p-2 min-w-0 min-h-0 overflow-hidden h-full flex flex-col flex-1"
     >
       <div className="font-bold bg-base-300 rounded-md px-2 py-1 h-min">
         <h1>Device Info</h1>

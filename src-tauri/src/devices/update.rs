@@ -1,19 +1,20 @@
-use crate::devices::{wifi::ota, Device, DeviceType};
+use crate::devices::{Device, DeviceInfo, HapticDevice, wifi::{WifiDeviceInfo, ota}};
 use std::{
-    net::Ipv4Addr,
+    net::{IpAddr, Ipv4Addr},
     ops::{Deref, DerefMut},
     str::FromStr,
 };
 
 /// Decides whether we have the capability of determining this devices eligibility.
-pub fn is_updateable(dtype: DeviceType) -> bool {
+pub fn is_updateable(dtype: &HapticDevice) -> bool {
     match dtype {
-        DeviceType::Wifi(_) => true,
+        HapticDevice::Wifi(_) => true,
+        HapticDevice::BhapticBle(_) => false,
     }
 }
 
 /// Bundle containing all user-required information to start a firmware update.
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, specta::Type)]
 pub struct Firmware {
     /// The ID that should be used to find the device:
     pub id: String,
@@ -32,15 +33,21 @@ impl Firmware {
         }
     }
 
-    pub fn do_update(&self, dev: &Device) -> Result<(), String> {
-        match &dev.device_type {
-            DeviceType::Wifi(wifi) => match &self.method {
+    pub fn do_update(&self, dev: &HapticDevice) -> Result<(), String> {
+        match &dev {
+            HapticDevice::Wifi(wifi) => match &self.method {
                 UpdateMethod::OTA(pass) => {
+                    let DeviceInfo::Wifi(info) = wifi.info() else {
+                        return Err("Non Wifi device info.".to_string());
+                    };
+                    let IpAddr::V4(ip) = info.remote_addr.ip() else {
+                        return Err("Must be an IPV4 address".to_string());
+                    };
                     let res = ota::update_ota(
                         self.bytes.clone(),
                         pass.0.clone(),
-                        Ipv4Addr::from_str(&wifi.ip).expect("invalid ip"),
-                        wifi.get_esp_type().ota_auth_port()
+                        ip,
+                        info.esp_model.ota_auth_port()
                     );
                     if res.is_none() {
                         return Err("Couldn't OTA update device".to_string());
@@ -51,13 +58,14 @@ impl Firmware {
                     return Err("Wrong Firmware type".to_string());
                 }
             },
+            _ => return Err("Unable to perform OTA on this device type".to_string()),
         }
 
         Ok(())
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, specta::Type)]
 pub struct OtaPassword(String);
 impl Deref for OtaPassword {
     type Target = String;
@@ -76,7 +84,7 @@ impl DerefMut for OtaPassword {
 /// Which method to use.
 ///
 /// Can contain information on details that aren't automatically negotiable.
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, specta::Type)]
 pub enum UpdateMethod {
     /// over the air updatetyp. OtaPassword; authentication password (default: `Haptics-OTA`)
     OTA(OtaPassword),

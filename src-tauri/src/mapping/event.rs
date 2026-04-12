@@ -1,18 +1,16 @@
-use super::{haptic_node::HapticNode, input_node::InputNode, Id, NodeGroup};
+use super::{haptic_node::HapticNode, input_node::InputNode, NodeId, NodeGroup};
 use crate::mapping::input_node::InputType;
 use crate::util::math::Vec3;
-use dashmap::DashMap;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 /// Describes what effect an event should have.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 pub enum EventEffectType {
     /// Will try to set this node id to this value,
     /// Does not remove node after finished.
-    SingleNode(Id),
+    SingleNode(NodeId),
     /// Same as single node, but with a list of them.
-    MultipleNodes(Vec<Id>),
+    MultipleNodes(Vec<NodeId>),
     /// Effects all InputNodes with the given tag.
     Tags(Vec<String>),
     /// Inserts a node at the given location, automatically removes node when event expires.
@@ -22,7 +20,9 @@ pub enum EventEffectType {
 }
 
 /// Represents a haptic event that takes place over time.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+/// 
+/// Depends on `EventEffectType`
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
 pub struct Event {
     /// user facing name
     pub name: String,
@@ -38,7 +38,7 @@ pub struct Event {
     pub tags: Vec<String>,
     /// radius of effect this event will have
     pub radius: f32,
-    managed_nodes: Vec<Id>, // nodes we have control over.
+    managed_nodes: Vec<NodeId>, // nodes we have control over.
     time_step: Duration,
     steps_completed: usize,
     start_time: Option<SystemTime>,
@@ -97,9 +97,9 @@ impl Event {
     /// Propogates the changes this event represents into the gameMap at this time.
     ///
     /// Returns whether this event should be removed from the pool.
-    pub fn tick(&mut self, input_nodes: Arc<DashMap<Id, InputNode>>) -> bool {
+    pub fn tick(&mut self, mut input_nodes: &mut Vec<InputNode>) -> bool {
         // will return early if initiation isn't needed.
-        self.initiate(&input_nodes);
+        self.initiate(&mut input_nodes);
 
         // get current time.
         let now = SystemTime::now();
@@ -115,13 +115,13 @@ impl Event {
         // apply effects if we need to.
         while self.steps_completed <= should_have_fired && self.steps_completed < self.steps.len() {
             let value = self.steps[self.steps_completed];
-            self.apply_effect(value, &input_nodes);
+            self.apply_effect(value, &mut input_nodes);
             self.steps_completed += 1;
         }
 
         // if the final effects have happened, clean up our stuff.
         if elapsed >= self.duration {
-            self.cleanup(&input_nodes);
+            self.cleanup(&mut input_nodes);
             return true;
         }
 
@@ -131,7 +131,7 @@ impl Event {
     /// Initiates the input_nodes state to handle our event.
     ///
     /// Returns early if start_time is already defined.
-    fn initiate(&mut self, input_nodes: &DashMap<Id, InputNode>) {
+    fn initiate(&mut self, input_nodes: &mut Vec<InputNode>) {
         if self.start_time.is_some() {
             return;
         } // already started
@@ -139,15 +139,14 @@ impl Event {
 
         match &self.effect {
             EventEffectType::Location(pos) => {
-                let id = Id::new();
+                let id = NodeId::new();
                 let haptic_node = HapticNode {
                     x: pos.x,
                     y: pos.y,
                     z: pos.z,
                     groups: vec![NodeGroup::All],
                 };
-                input_nodes.insert(
-                    id.clone(),
+                input_nodes.push(
                     InputNode::new(
                         haptic_node,
                         self.tags.clone(),
@@ -159,7 +158,7 @@ impl Event {
                 self.managed_nodes.push(id);
             }
             EventEffectType::MovingLocation(path) if !path.is_empty() => {
-                let id = Id::new();
+                let id = NodeId::new();
                 let first = path.first().unwrap(); // verified non-zero at new() function
                 let haptic_node = HapticNode {
                     x: first.x,
@@ -167,8 +166,7 @@ impl Event {
                     z: first.z,
                     groups: vec![NodeGroup::All],
                 };
-                input_nodes.insert(
-                    id.clone(),
+                input_nodes.push(
                     InputNode::new(
                         haptic_node,
                         self.tags.clone(),
@@ -186,16 +184,16 @@ impl Event {
     }
 
     /// Applies the described effect at for a given value.
-    fn apply_effect(&self, value: f32, input_nodes: &DashMap<Id, InputNode>) {
+    fn apply_effect(&self, value: f32, input_nodes: &mut Vec<InputNode>) {
         match &self.effect {
             EventEffectType::SingleNode(id) => {
-                if let Some(mut node) = input_nodes.get_mut(id) {
+                if let Some(mut node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
                     node.set_intensity(value);
                 }
             }
             EventEffectType::MultipleNodes(ids) => {
                 for id in ids {
-                    if let Some(mut node) = input_nodes.get_mut(id) {
+                    if let Some(mut node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
                         node.set_intensity(value);
                     }
                 }
@@ -203,12 +201,12 @@ impl Event {
             EventEffectType::Tags(tags) => {
                 input_nodes
                     .iter_mut()
-                    .filter(|kv| tags.iter().any(|t| kv.value().tags.contains(t)))
+                    .filter(|kv| tags.iter().any(|t| kv.tags.contains(t)))
                     .for_each(|mut kv| kv.set_intensity(value));
             }
             EventEffectType::Location(_) => {
                 let id = self.managed_nodes.first().unwrap(); // initiate is called first, which garuntees atleast one managed node.
-                if let Some(mut node) = input_nodes.get_mut(id) {
+                if let Some(node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
                     node.set_intensity(value);
                 }
             }
@@ -216,7 +214,7 @@ impl Event {
                 let idx = self.steps_completed.min(waypoints.len() - 1);
 
                 let id = self.managed_nodes.first().unwrap(); // initiate is called first, which garuntees atleast one managed node.
-                if let Some(mut node) = input_nodes.get_mut(id) {
+                if let Some(node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
                     node.set_position(waypoints[idx]);
                     node.set_intensity(value);
                 }
@@ -225,17 +223,17 @@ impl Event {
     }
 
     /// cleans up the leftover nodes when an event is finished.
-    fn cleanup(&self, input_nodes: &DashMap<Id, InputNode>) {
+    fn cleanup(&self, input_nodes: &mut Vec<InputNode>) {
         //log::trace!("Finished event: {}", self.name);
         match &self.effect {
             EventEffectType::Location(_) | EventEffectType::MovingLocation(_) => {
                 // Remove transient node(s) that were spawned only for this event
                 for ids in &self.managed_nodes {
-                    input_nodes.remove(ids);
+                    input_nodes.retain(|d| d.get_id() != ids);
                 }
             }
             EventEffectType::SingleNode(id) => {
-                if let Some(mut node) = input_nodes.get_mut(id) {
+                if let Some(node) = input_nodes.iter_mut().find(|n| n.get_id() == id ) {
                     node.set_intensity(0.);
                 }
             }

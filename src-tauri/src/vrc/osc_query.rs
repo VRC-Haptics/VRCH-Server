@@ -1,73 +1,131 @@
-use std::sync::mpsc;
-use std::thread;
+use mdns_sd::{ServiceDaemon, ServiceInfo};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::net::UdpSocket;
+use tokio::task::JoinHandle;
+use warp::Filter;
 
-use oyasumivr_oscquery;
-use oyasumivr_oscquery::{OSCMethod, OSCMethodAccessType};
-use serde;
 
-/// Handles advertising our server for vrc to send values to if we need it.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct OscQueryServer {
     recv_port: u16,
     #[serde(skip)]
-    stop_sender: Option<mpsc::Sender<()>>,
+    cancel: Option<tokio::sync::oneshot::Sender<()>>,
+    #[serde(skip)]
+    mdns: Option<ServiceDaemon>,
+}
+
+impl Debug for OscQueryServer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OscQueryServer")
+            .field("recv_port", &self.recv_port)
+            .field("cancel", &self.cancel).finish()
+    }
+}
+
+fn get_lan_ip() -> String {
+    let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+    socket.connect("8.8.8.8:80").unwrap();
+    socket.local_addr().unwrap().ip().to_string()
 }
 
 impl OscQueryServer {
-    pub fn new(recieving_port: u16) -> Self {
-        OscQueryServer {
-            recv_port: recieving_port,
-            stop_sender: None,
+    pub fn new(recv_port: u16) -> Self {
+        Self {
+            recv_port,
+            cancel: None,
+            mdns: None,
         }
     }
 
-    pub fn start(&mut self) {
-        let (tx, rx) = mpsc::channel();
-        let in_port = self.recv_port.clone();
-        self.stop_sender = Some(tx);
+    pub async fn start(&mut self) {
+        let lan_ip = get_lan_ip();
+        let osc_port = self.recv_port;
 
-        thread::spawn(move || {
-            log::debug!("Spawned VRC Advertising on port:{}", in_port);
-            let tk_rt = tokio::runtime::Runtime::new().unwrap();
-            tk_rt.block_on(async {
-                // Initialize the OSCQuery server
-                log::debug!("In port: {}", in_port);
-                let (host, port) = oyasumivr_oscquery::server::init(
-                    "VRC Haptics", // The name of your application (Shows in VRChat's UI)
-                    in_port,
-                    "./sidecars/vrc-sidecar.exe", // The (relative) path to the MDNS sidecar executable
-                )
-                .await
-                .unwrap();
-                let addr = format!("{}:{}", host, port);
-                log::debug!("OscQuery on: {}", addr);
-                oyasumivr_oscquery::server::add_osc_method(OSCMethod {
-                    description: Some("Haptics Specific Parameters".to_string()),
-                    address: "/avatar/parameters/*".to_string(),
-                    ad_type: OSCMethodAccessType::Write,
-                    value_type: None,
-                    value: None,
-                })
-                .await; // /avatar/*, /avatar/parameters/*, etc.
-                oyasumivr_oscquery::server::advertise().await.unwrap();
-            });
+        // Pick a TCP port for the HTTP server
+        let tcp_listener = std::net::TcpListener::bind("0.0.0.0:0").unwrap();
+        let tcp_port = tcp_listener.local_addr().unwrap().port();
+        drop(tcp_listener);
 
-            loop {
-                // Check for stop signal
-                if let Ok(_) = rx.try_recv() {
-                    tk_rt.block_on(async {
-                        let _ = oyasumivr_oscquery::server::deinit().await;
-                    });
-                    break;
+        // 1. HTTP server serving OSCQuery JSON
+        let root_response = serde_json::json!({
+            "FULL_PATH": "/",
+            "ACCESS": 0,
+            "CONTENTS": {
+                "avatar": {
+                    "FULL_PATH": "/avatar",
+                    "ACCESS": 0,
+                    "CONTENTS": {
+                        "parameters": {
+                            "FULL_PATH": "/avatar/parameters",
+                            "ACCESS": 2,
+                            "DESCRIPTION": "Haptics Specific Parameters"
+                        }
+                    }
                 }
             }
         });
+
+        let host_info = serde_json::json!({
+            "NAME": "VRC Haptics",
+            "OSC_IP": lan_ip,
+            "OSC_PORT": osc_port,
+            "OSC_TRANSPORT": "UDP",
+            "EXTENSIONS": {
+                "ACCESS": true,
+                "VALUE": true
+            }
+        });
+
+        let root = root_response.clone();
+        let host = host_info.clone();
+
+        let routes = warp::get().and(warp::path::end()).and(warp::query::raw().or(warp::any().map(|| String::new())).unify()).map(move |query: String| {
+            if query.contains("HOST_INFO") {
+                warp::reply::json(&host)
+            } else {
+                warp::reply::json(&root)
+            }
+        });
+
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+        tokio::spawn(async move {
+            warp::serve(routes)
+                .bind(([0, 0, 0, 0], tcp_port)).await
+                .graceful(async {
+                    let _ = shutdown_rx.await;
+                })
+                .run()
+                .await;
+        });
+
+        // 2. mDNS advertisement
+        let mdns = ServiceDaemon::new().expect("Failed to create mDNS daemon");
+        let service = ServiceInfo::new(
+            "_oscjson._tcp.local.",
+            "VRC Haptics",
+            &format!("VRC-Haptics.local."),
+            &lan_ip,
+            tcp_port,
+            HashMap::new(),
+        )
+        .expect("Failed to create service info");
+
+        mdns.register(service).expect("Failed to register mDNS service");
+
+        log::debug!("OSCQuery advertising at {}:{}, OSC on port {}", lan_ip, tcp_port, osc_port);
+
+        self.cancel = Some(shutdown_tx);
+        self.mdns = Some(mdns);
     }
 
-    #[allow(dead_code)] // TODO: send deinit
     pub fn stop(&mut self) {
-        if let Some(sender) = self.stop_sender.take() {
-            let _ = sender.send(());
+        if let Some(tx) = self.cancel.take() {
+            let _ = tx.send(());
+        }
+        if let Some(mdns) = self.mdns.take() {
+            let _ = mdns.shutdown();
         }
     }
 }

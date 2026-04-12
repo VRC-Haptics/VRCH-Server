@@ -1,6 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![warn(unused_extern_crates)]
+#![feature(debug_closure_helpers)] // needed for tauri-specta pinning a rc specta release
+#![feature(path_absolute_method)]
+// Keep Futures from being left un-awaited. Use crate::log_err for convenient handling.
+#![deny(unused_must_use)]
 
 // make local modules available
 pub mod api;
@@ -9,201 +13,84 @@ mod commands;
 mod devices;
 pub mod mapping;
 pub mod osc;
+pub mod state;
 pub mod util;
+pub(crate) mod wrappers;
 mod vrc;
 
 // local modules
 use api::ApiManager;
-use bhaptics::game::BhapticsGame;
-use devices::wifi::discovery::start_wifi_listener;
-use devices::{Device, DeviceType};
-use mapping::global_map::GlobalMap;
-use vrc::VrcInfo;
+//use bhaptics::game::BhapticsGame;
+use devices::{init_device_manager, DeviceManager};
+use mapping::InputMap;
+use vrc::VrcGame;
 
 //standard imports
 use commands::*;
-use serde_json::json;
-use std::io::{self, Write};
-use std::net::UdpSocket;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use std::panic::{take_hook, set_hook};
+use once_cell::sync::OnceCell;
+use std::panic::{set_hook, take_hook};
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
-use tauri_plugin_store::{JsonValue, StoreExt};
+use specta_typescript::Typescript;
+use tauri_specta::*;
+use tokio::sync::Mutex;
 
-use crate::bhaptics::devices::start_bt_nonblocking;
+use crate::devices::{DeviceHandle, bhaptics::start_ble};
+use crate::{
+    mapping::MapHandle,
+    vrc::VrcHandle,
+};
 
-/// Helper to set persistant store values
-fn set_device_store_field<T: serde::Serialize>(
-    window: &tauri::Window,
-    mac: &str,
-    field: &str,
-    value: T,
-) {
-    let app_handle = window.app_handle();
-    let store = app_handle
-        .store("known_devices.json")
-        .expect("couldn't access known_devices.json");
+use console_subscriber;
 
-    // Try to retrieve the existing device data.d
-    if let Some(mut device_data) = store.get(mac) {
-        // Ensure we have a JSON object.
-        if !device_data.is_object() {
-            device_data = json!({});
+#[macro_export]
+/// Handles an unhandled result by printing if it failed. Optionally add context after the input to use this message instead of the default.
+///
+/// # Usage:
+/// ```
+/// pub fn returns_result() -> Result<(), String> {
+///     Err("Unique Error");
+/// }
+///
+/// log_err(returns_result());
+/// -> "Lazily handled error: Unique Error"
+///
+/// log_err(returns_result(), "Error peforming action");
+/// -> "Error performing action: Unique Error"
+///
+/// ```
+macro_rules! log_err {
+    ($expr:expr) => {
+        if let Err(e) = $expr {
+            log::warn!("[{}:{}] Lazily handled error: {e:?}", file!(), line!());
         }
-
-        // Insert or update the field.
-        if let Some(map) = device_data.as_object_mut() {
-            map.insert(field.to_string(), serde_json::to_value(value).unwrap());
+    };
+    ($expr:expr, $($arg:tt)+) => {
+        if let Err(e) = $expr {
+            log::warn!("[{}:{}] {}: {e:?}", file!(), line!(), format_args!($($arg)+));
         }
-
-        // Write back the updated device data.
-        store.set(mac, device_data);
-    } else {
-        // create new device data instance.
-        let mut device_data = json!({});
-
-        // Insert the field.
-        let map = device_data.as_object_mut().unwrap();
-        map.insert(field.to_string(), serde_json::to_value(value).unwrap());
-
-        // Write back the updated device data.
-        store.set(mac, device_data);
     };
 }
 
-/// Helper to get persistant store values
-fn get_device_store_field<T: serde::de::DeserializeOwned>(
-    app_handle: &tauri::AppHandle,
-    mac: &str,
-    field: &str,
-) -> Option<T> {
-    let store = app_handle
-        .store("known_devices.json")
-        .expect("couldn't access known_devices.json");
-
-    if let Some(device_data) = store.get(mac) {
-        let map = device_data.as_object()?;
-
-        map.get(field)
-            .and_then(|value| serde_json::from_value(value.clone()).ok())
-    } else {
-        None
-    }
-}
-
-fn get_store_field<T: serde::de::DeserializeOwned>(
-    app_handle: &tauri::AppHandle,
-    field: &str,
-) -> Option<T> {
-    let store = app_handle
-        .store("context_store.json")
-        .expect("couldn't access context_store.json");
-
-    if let Some(data) = store.get(field) {
-        serde_json::from_value(data).ok()
-    } else {
-        None
-    }
-}
-
-fn set_store_field<T>(app_handle: &tauri::AppHandle, field: &str, value: T)
-where
-    JsonValue: From<T>,
-{
-    let store = app_handle
-        .store("context_store.json")
-        .expect("couldn't access context_store.json");
-
-    store.set(field, value);
-}
-
-fn tick_devices(
-    device_list: Arc<Mutex<Vec<Device>>>,
-    input_list: Arc<Mutex<GlobalMap>>,
-    bhaptics: Arc<Mutex<BhapticsGame>>,
-    _: &tauri::AppHandle,
-) {
-    log::info!("starting tick");
-    io::stdout().flush().unwrap();
-
-    tauri::async_runtime::spawn(async move {
-        let mut interval = spin_sleep_util::interval(Duration::from_secs(1) / 100);
-
-        let device_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-
-        let mut prev_tick = Instant::now();
-
-        loop {
-            // handle wait times
-            let tick_time = interval.tick();
-            let schedule_slip = tick_time.duration_since(prev_tick);
-            if schedule_slip > Duration::from_millis(11) {
-                log::warn!(
-                    "Device loop timer slipped by {:?}. High CPU Usage Likely.",
-                    schedule_slip,
-                );
-            }
-            prev_tick = tick_time;
-
-            {
-                // handle actual device ticks
-                let mut device_list_guard = device_list.lock().unwrap();
-
-                // Remove devices that need to be killed.
-                // Collect removed devices (dead devices).
-                device_list_guard.retain(|device| {
-                    if device.is_alive {
-                        true
-                    } else {
-                        log::info!("Removed device: {:?}", device.name);
-                        false
-                    }
-                });
-
-                // get updated input state
-                let mut map_guard = input_list.lock().expect("couldn't find inputs guard");
-                map_guard.refresh_inputs();
-                let mut bh = bhaptics.lock().expect("Couldn't lock bhaptics");
-                map_guard.start_events(&mut bh.tick());
-
-                // push updated input state to devices
-                for device in device_list_guard.iter_mut() {
-                    // handle device specific tick functions
-                    match &mut device.device_type {
-                        DeviceType::Wifi(wifi_device) => {
-                            // Send packet if we got one from tick
-                            if let Some(packet) = wifi_device.tick(
-                                &mut device.is_alive,
-                                &mut device.factors,
-                                &map_guard,
-                            ) {
-                                let addr = format!("{}:{}", wifi_device.ip, wifi_device.send_port);
-                                // TODO: Actually error handle
-                                let _ = device_socket.send_to(&packet.packet, addr);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
+// Provides a unified interface for interacting with external api's
+pub static API_MANAGER: LazyLock<Mutex<ApiManager>> =
+    LazyLock::new(|| Mutex::new(ApiManager::new()));
+pub static DEVICE_MANAGER: OnceCell<DeviceHandle> = OnceCell::new();
 
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
-    let bhaptics = window.state::<Arc<Mutex<BhapticsGame>>>();
-    let bh_lock = bhaptics.lock().expect("unable to lock bhaptics");
-    bh_lock.shutdown();
+    state::save_config();
     log::trace!("Shutdown bhaptics server");
     //cleanup vrc TODO:
 }
 
 /// Opens a window if we can't use the default VRC ports.
 /// Using OSCQuery results in inconsistent delivery of packets.
-fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
+/* TODO: actually throw this when needed
+fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcGame>>) {
     let vrc_lock = vrc.lock().unwrap();
     if vrc_lock.in_port.unwrap() != 9001 {
         app.dialog()
@@ -218,17 +105,66 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcInfo>>) {
                 false => (),
             });
     }
+}*/
+
+async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
+    // initialize input map.
+    let (mut input_map, map_handle) = InputMap::new(manager.clone()).await;
+    tokio::spawn(async move {
+        input_map.start().await;
+    });
+
+    // TODO: Move into device manager init.
+    log_err!(start_ble(manager.get_device_channel(), Duration::from_secs(1)).await);
+
+    //start_apps
+    let mut vrc = VrcGame::new(map_handle.clone(), &API_MANAGER).await;
+    let vrc_handle = vrc.get_handle();
+    tokio::spawn(async move {
+        vrc.run().await;
+    });
+
+    (vrc_handle, map_handle)
 }
 
-fn main() {
-    // Core state machines that interface devices and the haptics providers
-    // The GlobalMap; provides interpolated feedback values.
-    let global_map: Arc<Mutex<GlobalMap>> = Arc::new(Mutex::new(GlobalMap::new()));
-    // Global device list; contains all active devices.
-    let device_list: Arc<Mutex<Vec<Device>>> = Arc::new(Mutex::new(Vec::new()));
-    // Provides a unified interface for interacting with external api's
-    let api_manager: Arc<Mutex<ApiManager>> = Arc::new(Mutex::new(ApiManager::new()));
+#[tokio::main]
+async fn main() {
+    console_subscriber::init();
+    tauri::async_runtime::set(tokio::runtime::Handle::current());
 
+    let _ = state::get_config();
+    state::init_save_loop().await;
+
+    let builder = tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(tauri_specta::collect_commands![
+            commands::get_device_list,
+            commands::get_vrc_info,
+            commands::get_core_map,
+            commands::set_vrc,
+            commands::set_device_info,
+            commands::get_repositories,
+            commands::set_repositories,
+            commands::get_wifi_timeout,
+            commands::set_wifi_timeout,
+            commands::upload_device_map,
+            commands::update_device_multiplier,
+            commands::update_device_offset,
+            bhaptics_launch_default,
+            bhaptics_launch_vrch,
+            commands::play_point,
+            commands::swap_conf_nodes,
+            commands::set_tags_radius,
+            commands::set_node_radius,
+            commands::get_device_esp_model,
+            commands::start_device_update,
+        ]);
+
+    #[cfg(debug_assertions)] // Only export on non-release builds
+    builder
+        .export(Typescript::default(), "../src/bindings.ts")
+        .expect("Failed to export typescript bindings");
+
+    // init logging and stuff first
     tauri::Builder::default()
         .plugin(tauri_plugin_serialplugin::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -245,7 +181,6 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_blec::init())
         .plugin(tauri_plugin_serialplugin::init())
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -256,16 +191,17 @@ fn main() {
                 .filter(|metadata| {
                     !metadata.target().starts_with("mio")
                         && !metadata.target().starts_with("reqwest")
+                        && !metadata.target().starts_with("btleplug")
                 })
                 .max_file_size(500_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))
                 .build(),
         )
-        .manage(Arc::clone(&global_map))
-        .manage(Arc::clone(&device_list))
-        .manage(Arc::clone(&api_manager))
-        .setup(move |app| {
-            let app_handle = app.handle();
+        .invoke_handler(builder.invoke_handler())
+        .setup(move |app: &mut tauri::App| {
+            builder.mount_events(app);
+
+            let handle = app.handle().clone();
 
             let default_panic = take_hook();
             set_hook(Box::new(move |info| {
@@ -275,59 +211,29 @@ fn main() {
                 default_panic(info);
             }));
 
-            // Managers for game integrations; each handling connectivity and communications
-            // Global VRC State; connection management and GlobalMap interaction
-            let vrc_info: Arc<Mutex<VrcInfo>> = VrcInfo::new(
-                Arc::clone(&global_map),
-                Arc::clone(&api_manager),
-                app_handle,
-            );
-            // Global Bhaptics state that manages game connection and inserts values into the GlobalMap
-            let bhaptics: Arc<Mutex<BhapticsGame>> = BhapticsGame::new(Arc::clone(&global_map));
+            tauri::async_runtime::spawn(async move {
+                // Lock API_MANAGER inside the spawned task
+                {
+                    let mut api = API_MANAGER.lock().await;
+                    api.refresh_caches().await;
+                } // Guard dropped here, lock released
+                  // DeviceManager init
+                let mut manager = DeviceManager::new();
+                init_device_manager(&mut manager).await;
+                if let Err(e) = DEVICE_MANAGER.set(manager.get_handle()) {
+                    log::error!("Failed to start device manager: {:?}", e);
+                }
+                let device_handle = manager.get_handle();
 
-            app.manage(Arc::clone(&vrc_info));
-            app.manage(Arc::clone(&bhaptics));
-
-            // Initialize stuff that needs the app handle. (interacts directly with GUI)
-            tick_devices(
-                device_list.clone(),
-                global_map.clone(),
-                bhaptics.clone(),
-                app_handle,
-            );
-            start_wifi_listener(app_handle.clone(), app.state());
-            throw_vrc_notif(app_handle, vrc_info.clone());
-            let mut lock = api_manager.lock().unwrap();
-            lock.refresh_caches();
-            drop(lock);
-            log::trace!("past cache refreshes");
-
-            // This returns immediately and runs in background
-            if let Err(e) = start_bt_nonblocking(Arc::clone(&device_list)) {
-                log::error!("Error starting Bluetooth: {}", e);
-            }
+                let (vrc, map) = start_async_tasks(device_handle).await;
+                handle.manage(vrc);
+                handle.manage(map);
+                handle.manage(DEVICE_MANAGER.get().unwrap().clone());
+            });
 
             log::trace!("done with tauri setup");
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::get_device_list,
-            commands::get_vrc_info,
-            commands::get_core_map,
-            commands::upload_device_map,
-            commands::update_device_multiplier,
-            commands::update_device_offset,
-            commands::update_vrc_distance_weight,
-            commands::update_vrc_velocity_multiplier,
-            bhaptics_launch_default,
-            bhaptics_launch_vrch,
-            commands::play_point,
-            commands::swap_conf_nodes,
-            commands::set_tags_radius,
-            commands::set_node_radius,
-            commands::start_device_update,
-            commands::get_device_esp_model,
-        ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {
                 close_app(window);

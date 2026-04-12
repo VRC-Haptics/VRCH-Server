@@ -1,26 +1,26 @@
 use crate::util::math::Vec3;
 
 use super::haptic_node::HapticNode;
-use super::Id;
+use super::NodeId;
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone,specta::Type)]
 /// All information needed to compute an OuputNode of any given location
 pub struct InputNode {
     /// id Unique to this InputNode
-    id: Id,
+    id: NodeId,
     /// Contains the standard location and NodeGroup tags for calculating outputs
     pub haptic_node: HapticNode,
     /// The feedback strength at this location
-    intensity: f32,
+    pub intensity: f32,
     /// The radius that this node will impact
-    radius: f32,
+    pub radius: f32,
     /// used to identify/modify/remove groups of InputNodes. (tags are not NodeGroups)  
     pub tags: Vec<String>,
     /// how this input node should be interpreted
     pub input_type: InputType,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
 /// Describes how an `InputNode` should be used during interpolation.
 ///
 /// Layers are ordered in processing order according to the enum, with the cumulative outputs being passed to the next step.
@@ -52,7 +52,7 @@ impl InputNode {
     pub fn new(
         node: HapticNode,
         tags: Vec<String>,
-        id: Id,
+        id: NodeId,
         radius: f32,
         input_type: InputType,
     ) -> InputNode {
@@ -95,7 +95,7 @@ impl InputNode {
     }
 
     /// Gets our unique ID
-    pub fn get_id(&self) -> &Id {
+    pub fn get_id(&self) -> &NodeId {
         &self.id
     }
 }

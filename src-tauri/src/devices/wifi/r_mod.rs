@@ -1,0 +1,494 @@
+pub mod config;
+mod connection_manager;
+pub mod discovery;
+pub mod ota;
+
+// outside imports
+use rosc::{encoder, OscMessage, OscPacket, OscType};
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::time::{Duration, SystemTime};
+use std::vec;
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{channel, Receiver, Sender},
+        Mutex, RwLock,
+    },
+    time::Instant,
+};
+use tokio_util::sync::CancellationToken;
+
+use crate::{devices::wifi::config::WifiConfig, state};
+// local imports
+use crate::devices::{ESP32Model, OutputFactors};
+use crate::mapping::global_map::GlobalMap;
+use crate::mapping::haptic_node::HapticNode;
+use crate::util::math::Vec3;
+use crate::util::next_free_port;
+use connection_manager::WifiConnManager;
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct WifiDeviceInfo {
+    rssi: usize,
+}
+
+#[derive(serde::Serialize, Debug)]
+/// The DeviceType that handles generic wifi haptic devices
+pub struct WifiDevice {
+    
+    /*
+    // this devices mac address, used as id in Device::from_wifi().
+    pub mac: String,
+    // The address we send data too.
+    pub dev_addr: RwLock<SocketAddr>,
+    // user-facing name
+    pub name: RwLock<String>,
+    // Abstracts communication.
+    connection_manager: WifiConnManager,
+    #[serde(skip)] // no need to serialize channel only usable in rust.
+    /// NOTE: disconnects in clone implementation.
+    tick_channel: RwLock<(Sender<WifiTickSignal>, Receiver<WifiTickSignal>)>,
+    config: RwLock<Option<WifiConfig>>,
+    identifier: RwLock<Option<ESP32Model>>,
+    // Flag for keeping from pinging on every tick() call
+    been_pinged: AtomicBool,
+    logs: RwLock<Vec<String>>,
+    #[serde(skip)]
+    last_heartbeat: Mutex<Instant>,
+    // Last time a query, "GET", command was sent. used for debouncing
+    pub last_queried: RwLock<SystemTime>,
+    #[serde(skip)]
+    is_alive: CancellationToken,
+    // Push whatever device map we have in memory to physical Device
+    push_map: AtomicBool, */
+}
+
+/// Set a signal that will be processed on the next device tick.
+#[derive(Clone, Debug)]
+pub enum WifiTickSignal {
+    NewDeviceLog(String),
+    NewConfig(WifiConfig),
+    /// Should set wifi config to None, since we just changed it's value.
+    ResetConfig,
+    NewIdentifier(ESP32Model),
+    NewHeartBeat(SystemTime),
+    PingConfirmation,
+}
+
+#[derive(Debug)]
+pub struct Packet {
+    pub packet: Vec<u8>,
+}
+
+impl WifiDevice {
+    pub fn get_esp_type(&self) -> ESP32Model {
+        if let Some(esp) = &self.identifier {
+            return esp.clone();
+        } else {
+            return ESP32Model::Unknown;
+        }
+    }
+
+    pub fn re_ping(&self) {
+        self.been_pinged.store(false, Ordering::SeqCst);
+    }
+
+    #[allow(dead_code)]
+    /// Instantiate new device instance
+    pub fn new(mac: String, ip: String, send_port: u16, name: String) -> WifiDevice {
+        let recv_port = next_free_port(1500).unwrap();
+        let (tx, rx) = channel::<WifiTickSignal>();
+        let connection_manager = WifiConnManager::new(&recv_port, "/hrtbt".to_string(), tx.clone());
+
+        return WifiDevice {
+            mac: mac,
+            ip: ip.clone(),
+            name: name,
+            been_pinged: AtomicBool::new(false),
+            push_map: false,
+            last_queried: SystemTime::UNIX_EPOCH,
+            send_port: send_port,
+            connection_manager: connection_manager,
+            //tick_channel: (tx, rx),
+            config: None,
+            identifier: None,
+            logs: vec![],
+            last_heartbeat: Mutex::new(Instant::now()),
+            is_alive: CancellationToken::new(),
+        };
+    }
+
+    async fn keep_alive_service(&self) {
+        loop {
+            let hrtbt = self.last_heartbeat.lock().expect("Heartbeat");
+            let thresh = Duration::from_secs_f32(state::get(|c| c.wifi_device_timeout));
+            if hrtbt.elapsed() >= thresh && self.been_pinged.load(Ordering::SeqCst) {
+                println!("Killed device");
+                self.is_alive.cancel();
+                return;
+            }
+        }
+    }
+
+    pub async fn run_wifi_device(&mut self) {
+        // keep alive service
+        tokio::task::spawn(self.keep_alive_service()).await;
+
+        // start main device management loop
+        tokio::task::spawn(async {
+            // main device management loop
+            loop {
+                if !self.been_pinged.load(Ordering::SeqCst) {
+                    // first round through we ping
+                    self.been_pinged.store(true, Ordering::SeqCst);
+                    return Some(self.build_ping());
+                }
+            }
+        });
+    }
+
+    /// Called in regular intervals. Optionally returns a packet to be sent to the device.
+    pub fn tick(
+        &mut self,
+        // if the Device should be considered ready for haptics
+        is_alive: &mut bool,
+        // output factors specific to nodes under this device only
+        factors: &mut OutputFactors,
+        // The inputs that will be used to give feedback.
+        inputs: &GlobalMap,
+    ) -> Option<Packet> {
+        if !self.been_pinged {
+            // first round through we ping
+            self.been_pinged = true;
+            *is_alive = true;
+            return Some(self.build_ping());
+        }
+
+        // handles accumulated signals.
+        self.handle_signals();
+
+        // keep track of heartbeat timings and whatnot
+        manage_hrtbt(is_alive, &mut self.been_pinged, &self.last_heartbeat);
+
+        // check if we recieved and parsed the config yet.
+        let mut intensities = vec![];
+        let mut should_push_intensities = false;
+        if let Some(conf) = &self.config {
+            //push config to device if necessary
+            if self.push_map {
+                self.push_map = false;
+                let set_map = self.build_set_map(&conf.node_map);
+                return Some(set_map);
+            }
+
+            // Collect haptic values and scale to output.
+            intensities =
+                inputs.get_intensity_from_haptic(&conf.node_map, &factors.interp_algo, &true);
+            let global_offset = inputs.standard_menu.lock().expect("Global Lock").intensity;
+            intensities
+                .iter_mut()
+                .for_each(|x| *x = scale(*x, factors, global_offset));
+            should_push_intensities = true;
+        } else {
+            // If no mapping configuration found
+            // Gather the configuration
+            let now = SystemTime::now();
+            let diff = now
+                .duration_since(self.last_queried)
+                .expect("Error getting difference");
+            if diff > Duration::from_millis(2000) || self.last_queried == SystemTime::UNIX_EPOCH {
+                self.last_queried = now;
+                return Some(self.build_get_all());
+            }
+        }
+
+        // Retrieve board identifier (ESP32C3) if not found
+        if self.identifier.is_none() {
+            let now = SystemTime::now();
+            let diff = now
+                .duration_since(self.last_queried)
+                .expect("Error getting difference");
+            if diff > Duration::from_millis(2000) || self.last_queried == SystemTime::UNIX_EPOCH {
+                self.last_queried = now;
+                log::trace!("sent esp message; get platform");
+                return Some(WifiDevice::build_get_type());
+            }
+        }
+
+        if should_push_intensities {
+            return Some(self.compile_message(&intensities));
+        } else {
+            return None;
+        }
+    }
+
+    /// handles all signals. Called every tick
+    fn handle_signals(&mut self) {
+        for signal in self.tick_channel.1.try_iter() {
+            match signal {
+                WifiTickSignal::NewDeviceLog(log) => self.logs.push(log),
+                WifiTickSignal::NewConfig(conf) => self.config = Some(conf),
+                WifiTickSignal::ResetConfig => self.config = None,
+                WifiTickSignal::NewIdentifier(ident) => self.identifier = Some(ident),
+                WifiTickSignal::NewHeartBeat(then) => self.last_heartbeat = then,
+                WifiTickSignal::PingConfirmation => return,
+            }
+        }
+    }
+
+    /// Builds the command to get type.
+    pub fn build_get_type() -> Packet {
+        let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: "/command".to_string(),
+            args: vec![OscType::String("GET PLATFORM".to_string())],
+        }))
+        .unwrap();
+
+        Packet { packet: msg_buf }
+    }
+
+    /// Sends updated message
+    fn build_set_map(&self, map: &Vec<HapticNode>) -> Packet {
+        let base = "SET NODE_MAP ".to_string();
+
+        // Convert each HapticNode into its 8-byte hex representation.
+        let hex_str: String = map
+            .iter()
+            .map(|node| {
+                let bytes = node.to_bytes();
+                // For each byte, produce a two-digit hex string.
+                bytes
+                    .iter()
+                    .map(|byte| format!("{:02x}", byte))
+                    .collect::<String>()
+            })
+            .collect();
+        let full = base + &hex_str;
+
+        // compile to osc formatted packet
+        let message = rosc::OscMessage {
+            addr: "/command".to_string(),
+            args: vec![OscType::String(full)],
+        };
+        let packet = rosc::OscPacket::Message(message);
+        Packet {
+            packet: rosc::encoder::encode(&packet).unwrap(),
+        }
+    }
+
+    /// Compiles into valid motor packet
+    fn compile_message(&self, float_array: &Vec<f32>) -> Packet {
+        let hex_message = self.compile_to_bytes(float_array);
+
+        let message = rosc::OscMessage {
+            addr: "/h".to_string(),
+            args: vec![OscType::String(hex_message)],
+        };
+        let packet = rosc::OscPacket::Message(message);
+        return Packet {
+            packet: rosc::encoder::encode(&packet).unwrap(),
+        };
+    }
+
+    /// compiles an array of floats to a hexadecimal string
+    fn compile_to_bytes(&self, float_array: &Vec<f32>) -> String {
+        let out = float_array
+            .iter()
+            .map(|&num| {
+                let clamped = num.clamp(0.0, 1.0);
+                let scaled = (clamped * 0xffff as f32).round() as u16;
+                format!("{:04x}", scaled)
+            })
+            // Concatenate all hexadecimal substrings into one
+            .collect::<String>();
+        return out;
+    }
+
+    pub fn build_ping(&self) -> Packet {
+        log::info!("Setting port: {}", self.connection_manager.recv_port);
+        let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: "/ping".to_string(),
+            args: vec![OscType::Int(self.connection_manager.recv_port.into())],
+        }))
+        .unwrap();
+        Packet { packet: msg_buf }
+    }
+
+    fn build_get_all(&self) -> Packet {
+        let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: "/command".to_string(),
+            args: vec![OscType::String("get all".to_string())],
+        }))
+        .unwrap();
+        Packet { packet: msg_buf }
+    }
+
+    /// Sets the wifi connection manager's node map and flags it for transmission.
+    pub fn set_node_list(&mut self, list: Vec<HapticNode>) -> Result<(), String> {
+        if let Some(wifi_con) = self.config.as_mut() {
+            wifi_con.node_map = list;
+            self.push_map = true;
+            return Ok(());
+        } else {
+            return Err("no_map".to_string());
+        }
+    }
+
+    /// Swaps the configured nodes at locations
+    pub fn swap_nodes(&mut self, pos_1: Vec3, pos_2: Vec3) -> Result<(), String> {
+        if let Some(wifi_con) = self.config.as_mut() {
+            // get index of nodes
+            let mut index1: Option<usize> = None;
+            let mut index2: Option<usize> = None;
+            for (index, node) in wifi_con.node_map.iter().enumerate() {
+                if node.to_vec3().close_to(&pos_1, EPSILON) {
+                    index1 = Some(index);
+                    log::debug!("Found node 1 at index: {:?}", index1);
+                } else if node.to_vec3().close_to(&pos_2, EPSILON) {
+                    index2 = Some(index);
+                    log::debug!("Found node 2 at index: {:?}", index2);
+                }
+            }
+
+            // swap them
+            if let (Some(i1), Some(i2)) = (index1, index2) {
+                let first = wifi_con.node_map[i1].clone();
+                wifi_con.node_map[i1] = wifi_con.node_map[i2].clone();
+                wifi_con.node_map[i2] = first;
+                self.push_map = true;
+                return Ok(());
+            } else {
+                return Err("Couldn't find both nodes to swap".to_string());
+            }
+        } else {
+            return Err("no_map".to_string());
+        }
+    }
+}
+
+const EPSILON: f32 = 0.0001;
+
+/// scales a float value according to the output factors.
+fn scale(val: f32, factors: &OutputFactors, global_offset: f32) -> f32 {
+    if val <= EPSILON {
+        return 0.0;
+    }
+    if 1.0 - val <= EPSILON {
+        return factors.sens_mult;
+    }
+
+    let range = factors.sens_mult - factors.start_offset;
+    (val * global_offset) * range + factors.start_offset
+}
+
+/// Manipulates the given flags according to the heartbeat timings.
+/// If is_alive is set to false, device will be removed from being tracked immediatly.
+/// If is_alive is set to false, device will be removed from being tracked immediatly.
+fn manage_hrtbt(is_alive: &mut bool, _been_pinged: &mut bool, last_hrtbt: &SystemTime) {
+    let now = SystemTime::now();
+
+    let diff = match now.duration_since(*last_hrtbt) {
+        Ok(duration) => duration,
+        Err(e) => {
+            // Handle negative duration
+            log::error!("Duration issue, assuming alive: {:?}", e);
+            Duration::from_secs(0)
+        }
+    };
+
+    // if outlived time to live and we are currently set as alive
+    let ttl = Duration::from_secs(3);
+    // if outlived time to live and we are currently set as alive
+    if diff > ttl && is_alive.to_owned() {
+        *is_alive = false;
+        *_been_pinged = false;
+        log::trace!("Set to false");
+    // if the not ttl has passed.
+    } else if diff <= ttl {
+        // if the not ttl has passed.
+    } else if diff <= ttl {
+        *is_alive = true;
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for WifiDevice {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            mac: String,
+            ip: String,
+            name: String,
+            been_pinged: bool,
+            push_map: bool,
+            last_queried: SystemTime,
+            send_port: u16,
+            connection_manager: WifiConnManager,
+            config: Option<WifiConfig>,
+            identifier: Option<ESP32Model>,
+            logs: Vec<String>,
+            last_heartbeat: SystemTime,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+
+        Ok(WifiDevice {
+            mac: helper.mac,
+            ip: helper.ip,
+            name: helper.name,
+            been_pinged: helper.been_pinged,
+            push_map: helper.push_map,
+            last_queried: helper.last_queried,
+            send_port: helper.send_port,
+            connection_manager: helper.connection_manager,
+            tick_channel: channel::<WifiTickSignal>(),
+            config: helper.config,
+            identifier: helper.identifier,
+            logs: helper.logs,
+            last_heartbeat: helper.last_heartbeat,
+        })
+    }
+}
+
+impl Clone for WifiDevice {
+    fn clone(&self) -> Self {
+        Self {
+            mac: self.mac.clone(),
+            ip: self.ip.clone(),
+            name: self.name.clone(),
+            been_pinged: self.been_pinged,
+            push_map: self.push_map,
+            last_queried: self.last_queried,
+            send_port: self.send_port,
+            connection_manager: self.connection_manager.clone(),
+            tick_channel: channel(),
+            config: self.config.clone(),
+            identifier: self.identifier.clone(),
+            logs: self.logs.clone(),
+            last_heartbeat: self.last_heartbeat.clone(),
+        }
+    }
+}
+
+impl Default for WifiDevice {
+    fn default() -> Self {
+        Self {
+            mac: String::new(),
+            ip: String::new(),
+            name: String::new(),
+            been_pinged: false,
+            push_map: false,
+            last_queried: SystemTime::UNIX_EPOCH,
+            send_port: 0,
+            connection_manager: WifiConnManager::default(),
+            tick_channel: channel(),
+            config: None,
+            identifier: None,
+            logs: Vec::new(),
+            last_heartbeat: SystemTime::UNIX_EPOCH,
+        }
+    }
+}

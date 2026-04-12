@@ -1,6 +1,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { useDeviceContext } from "../../context/DevicesContext";
+import { getDeviceId, getDeviceName } from "../common";
 
 interface ConnectedDevicesProps {
   onSelectDevice: (deviceName: string) => void;
@@ -31,7 +32,8 @@ export default function ConnectedDevices({
         <div className="h-max rounded-md px-2 py-1">No Devices Detected</div>
       ) : (
         devices.map((device) => {
-          const isSelected = selectedDevice === device.id;
+          const id = getDeviceId(device);
+          const isSelected = selectedDevice === id;
           const deviceClass = clsx(
             "h-max rounded-md px-2 py-1  hover:bg-base-200",
             isSelected
@@ -40,19 +42,19 @@ export default function ConnectedDevices({
           );
 
           return (
-            <>
-            <div
-              key={device.id}
-              className={deviceClass}
-              title={device.id + "@" + device.id}
-              onClick={() => {
-                onSelectDevice(device.id);
-                setSelectedDevice(device.id);
-              }}
-            >
-              {device.name}
+            <div key={id}>
+              <div
+                className={deviceClass}
+                title={id}
+                onClick={() => {
+                  onSelectDevice(id);
+                  setSelectedDevice(id);
+                }}
+              >
+                {getDeviceName(device)}
+              </div>
+              <div className="h-0.5" />
             </div>
-            <div className="h-0.5"/></>
           );
         })
       )}

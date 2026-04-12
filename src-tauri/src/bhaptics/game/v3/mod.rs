@@ -9,7 +9,7 @@ use std::{
 };
 
 use super::{BhapticsGame, PatternLocation};
-use crate::mapping::{event::Event, global_map::GlobalMap, haptic_node::HapticNode, NodeGroup};
+use crate::mapping::{event::Event, global_map::InputMap, haptic_node::HapticNode, NodeGroup};
 use auth_message::handle_auth_init;
 use serde;
 use strum::IntoEnumIterator;
@@ -49,7 +49,7 @@ pub struct ApiInfo {
 impl BhapticsApiV3 {
     /// Creates a new instance, starts the server on a separate thread,
     /// and returns an Arc-wrapped and Mutex-guarded game state.
-    pub fn new(game: Arc<Mutex<GlobalMap>>) -> Arc<Mutex<Self>> {
+    pub fn new(game: Arc<Mutex<InputMap>>) -> Arc<Mutex<Self>> {
         let shutdown_token = CancellationToken::new();
         let api = Arc::new(Mutex::new(BhapticsApiV3 {
             game_mapping: HashMap::new(),
@@ -115,7 +115,7 @@ impl BhapticsApiV3 {
 }
 
 /// Inserts the default bhaptics maps as inputs.
-fn insert_bhaptics_maps(map: Arc<Mutex<GlobalMap>>) {
+fn insert_bhaptics_maps(map: Arc<Mutex<InputMap>>) {
     let input_lock = map.lock().expect("Unable to lock input_list");
 
     for loc in PatternLocation::iter() {
@@ -137,7 +137,7 @@ fn insert_bhaptics_maps(map: Arc<Mutex<GlobalMap>>) {
 }
 
 /// Removes all bhaptics maps from the global input list.
-fn remove_bhaptics_maps(map: Arc<Mutex<GlobalMap>>) {
+fn remove_bhaptics_maps(map: Arc<Mutex<InputMap>>) {
     let input_lock = map.lock().expect("Unable to lock inputs");
     input_lock.remove_all_with_tag(&"Bhaptics_V3".to_string());
 }
@@ -147,7 +147,7 @@ fn remove_bhaptics_maps(map: Arc<Mutex<GlobalMap>>) {
 async fn run_server(
     api: Arc<Mutex<BhapticsApiV3>>,
     shutdown_token: CancellationToken,
-    game: Arc<Mutex<GlobalMap>>,
+    game: Arc<Mutex<InputMap>>,
 ) -> io::Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 15882));
     let certs = load_certs(PATH_TO_CERT).expect("couldn't load cert");

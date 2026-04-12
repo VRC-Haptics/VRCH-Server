@@ -2,7 +2,7 @@ use crate::mapping::haptic_node::HapticNode;
 
 /// Filled with values from a config json file.
 /// Provides all information needed to fully define the avatar prefab.
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
 pub struct GameMap {
     pub nodes: Vec<ConfNode>,
     pub meta: ConfMetadata,
@@ -10,7 +10,7 @@ pub struct GameMap {
 
 /// Haptic Node information from the game config
 /// Contains more information than the default HapticNode to help with locating
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
 pub struct ConfNode {
     pub node_data: HapticNode,
     pub address: String,
@@ -20,7 +20,7 @@ pub struct ConfNode {
 }
 
 /// Metadata from the json config
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
 pub struct ConfMetadata {
     pub map_name: String,
     pub map_version: u32,
@@ -29,7 +29,7 @@ pub struct ConfMetadata {
 
 /// The bone that the node is parented to in the prefab.
 /// (HumanBodyBones from Unity,)
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
 pub enum TargetBone {
     /// <summary>
     ///   <para>This is the Hips bone.</para>

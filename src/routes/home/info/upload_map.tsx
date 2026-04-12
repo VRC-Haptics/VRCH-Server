@@ -1,14 +1,14 @@
 import React, { useState, useRef } from "react";
-import { Device } from "../../../utils/commonClasses";
+import { DeviceInfo } from "../../../bindings";
 import { invoke } from "@tauri-apps/api/core";
 
 interface DeviceJsonUploadProps {
-  device: Device;
+  device: DeviceInfo;
 }
 
 export default function DeviceJsonUpload({ device }: DeviceJsonUploadProps) {
   // Only render this menu if the device type is Wifi.
-  if (device.device_type.variant !== "Wifi") {
+  if (device.variant !== "Wifi") {
     return null;
   }
 
@@ -47,7 +47,7 @@ export default function DeviceJsonUpload({ device }: DeviceJsonUploadProps) {
     }
     try {
       await invoke("upload_device_map", {
-        id: device.id,
+        id: device.value.mac,
         configJson: jsonContent,
       });
       setUploadSuccess(true);

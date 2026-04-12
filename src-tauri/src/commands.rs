@@ -1,15 +1,17 @@
 // local modules
-use crate::devices::{
-    update::{Firmware, UpdateMethod},
-    Device, DeviceType, ESP32Model,
-};
+use crate::{devices::{
+    Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, update::Firmware, //update::{Firmware, UpdateMethod}
+}, mapping::{MapHandle, MapInfo}, state::{self, Config, Devices, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
-use crate::mapping::{global_map::GlobalMap, Id};
+use crate::mapping::{InputEventMessage, InputMap, NodeId};
+use crate::log_err;
 
-use crate::util::math::Vec3;
-use crate::vrc::{config::GameMap, VrcInfo};
-use crate::{set_device_store_field, set_store_field};
+use crate::{
+    util::math::Vec3,
+    vrc::{config::GameMap, VrcGame},
+};
+use futures::future::Map;
 //standard imports
 use runas::Command;
 use std::sync::{Arc, Mutex};
@@ -17,97 +19,117 @@ use tauri::Manager;
 use tokio::time::Duration;
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_device_esp_model(
     id: String,
-    devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+    devices: tauri::State<'_, DeviceHandle>,
 ) -> Result<ESP32Model, String> {
-    let lock = devices.lock().expect("Lock could not be held");
-    let device = lock.iter().find(|d| d.id == id);
-    if let Some(device) = device.as_ref() {
-        return Ok(device.get_esp_type());
-    } else {
-        log::error!("Couldn't find device with specified id.");
-        return Err("Failed: ID".to_string());
-    }
+    let Some(this) = devices.with_device(&id.into(), |d| d.info().get_esp32()) else {
+        return Err("unable to find device with id".to_string());
+    };
+    return Ok(this);
 }
 
+
 #[tauri::command]
-pub fn start_device_update(
+#[specta::specta]
+/// typescript seems to throw a fit with formats here. So invoke bypasses most of this. EUUUGH
+pub async fn start_device_update(
     fw: Firmware,
-    devices: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+    devices: tauri::State<'_, DeviceHandle>,
 ) -> Result<(), String> {
-    let lock = devices.lock().expect("Lock could not be held");
-    let devices = lock.iter().find(|d| d.id == fw.id);
-    if let Some(device) = devices {
-        fw.do_update(device)?;
-    } else {
-        log::error!("Couldn't find device with specified id.");
-        return Err("Failed: ID".to_string());
-    }
-
-    Ok(())
+    let devices = devices.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        log::trace!("Starting OTA Update");
+        devices
+            .with_device(&fw.id.clone().into(), |d| fw.do_update(d))
+            .ok_or_else(|| "unable to find device with id".to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_tags_radius(
     tag: String,
     radius: f32,
-    global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+    map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
-    let lock = global_map.lock().expect("this is wrong");
-    lock.set_radius_by_tag(&tag, radius);
+    map.has_tag_mut(&tag, |n| {
+        n.set_radius(radius);
+    });
+
     Ok(())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_node_radius(
     id: String,
     radius: f32,
-    global_map: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+    map: tauri::State<'_, MapHandle>,
 ) -> Result<(), String> {
-    let mut lock = global_map.lock().unwrap();
-    let node = lock.get_mut_node(&Id(id));
-    if let Some(mut node) = node {
-        node.set_radius(radius);
-        Ok(())
+    if map.with_node_mut(&id.into(), |n| n.set_radius(radius)).is_some() {
+        return Ok(());
     } else {
-        Err("Can't find node".to_string())
+        return Err("Failed to get device".into());
     }
 }
 
+const EPSILON: f32 = 0.001;
+
 /// Swaps the haptic node indices on the given device id
 #[tauri::command]
+#[specta::specta]
 pub fn swap_conf_nodes(
     device_id: String,
     pos1: Vec3,
     pos2: Vec3,
-    device_state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+    devices: tauri::State<'_, DeviceHandle>,
 ) -> Result<(), String> {
-    let mut device_lock = device_state.lock().expect("Couldn't lock device list");
+    devices
+        .with_device_mut(&device_id.clone().into(), |d| {
+            let mut info = d.info();
+            let mut nodes = info.get_nodes().to_owned();
 
-    for dev in device_lock.iter_mut() {
-        if dev.id == device_id {
-            let DeviceType::Wifi(wifi_cfg) = &mut dev.device_type;
-            log::debug!("swapping nodes with positions: {:?}, {:?}", pos1, pos2);
-            wifi_cfg.swap_nodes(pos1, pos2)?;
-            let _ = wifi_cfg;
+            let mut index1: Option<usize> = None;
+            let mut index2: Option<usize> = None;
 
-            drop(device_lock);
-            log::trace!("Finished Command");
-            return Ok(());
-        }
-    }
+            for (index, node) in nodes.iter().enumerate() {
+                if node.to_vec3().close_to(&pos1, EPSILON) {
+                    index1 = Some(index);
+                    log::debug!("Found node 1 at index: {}", index);
+                } else if node.to_vec3().close_to(&pos2, EPSILON) {
+                    index2 = Some(index);
+                    log::debug!("Found node 2 at index: {}", index);
+                }
+            }
 
-    Err(format!("No device with id to swap nodes: {:?}", device_id))
+            match (index1, index2) {
+                (Some(i1), Some(i2)) => {
+                    nodes.swap(i1, i2);
+                    info.set_nodes(nodes);
+                    d.update_info(info);
+                    Ok(())
+                }
+                _ => Err(format!(
+                    "Could not find both nodes at {:?} and {:?}",
+                    pos1, pos2
+                )),
+            }
+        })
+        .unwrap_or_else(|| Err(format!("No device with id: {:?}", device_id)))
 }
 
 /// Plays the specified point for the duration in seconds at the power percentage of intensity.
 #[tauri::command]
+#[specta::specta]
 pub fn play_point(
     feedback_location: (f32, f32, f32), // xyz location to insert point
     power: f32,                         // the power percentage to play 1 = no change
     duration: f32,                      // When should this point be removed.
-    global_map_state: tauri::State<'_, Arc<Mutex<GlobalMap>>>,
+    map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
     let event = Event::new(
         "Play Point".to_string(),
@@ -122,37 +144,90 @@ pub fn play_point(
     )
     .expect("unable to create play point event");
 
-    let mut global_map = global_map_state.lock().expect("couldn't lock global map");
-
-    global_map.start_event(event);
-
+    log_err!(map.send_event_blocking(InputEventMessage::StartEvent(event)));
     return Ok(());
 }
 
 #[tauri::command]
-pub fn get_device_list(state: tauri::State<'_, Arc<Mutex<Vec<Device>>>>) -> Vec<Device> {
-    let devices = state.lock().unwrap();
-    devices.clone()
+#[specta::specta]
+pub fn get_repositories() -> Vec<GitRepo> {
+    state::get_config().devices.ota_repositories.lock().clone()
 }
 
 #[tauri::command]
-pub fn get_vrc_info(state: tauri::State<'_, Arc<Mutex<VrcInfo>>>) -> VrcInfo {
-    let vrc_info = state.lock().unwrap();
-    vrc_info.clone()
+#[specta::specta]
+pub fn set_repositories(repos: Vec<GitRepo>) {
+    *state::get_config().devices.ota_repositories.lock() = repos;
+    state::mark_dirty();
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_wifi_timeout(timeout: f32) {
+    log::trace!("set to: {timeout:2}");
+    state::get_config().devices.wifi_device_timeout.store(Arc::new(timeout));
+    state::mark_dirty();
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_wifi_timeout() -> f32 {
+    **state::get_config().devices.wifi_device_timeout.load()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_device_list(dev: tauri::State<'_, DeviceHandle>) -> Vec<(DeviceId, Option<DeviceInfo>)> {
+    let mut devices = vec![];
+    let ids = dev.devices();
+    for id in ids {
+        let info = dev.with_device(&id, |d| d.info());
+        devices.push((id, info));
+    }
+    devices
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> VrcInfo {
+    vrc.get_info()
+}
+
+#[tauri::command]
+#[specta::specta]
+/// sets all vrc relevant info. It is all behind an arcswap so it is the same cost to set all or one of them.
+pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
+    let shared = &state::get_config().vrc_settings;
+    let mut new = VrcSettings::clone(&shared.load());
+    new.velocity_mult = mult;
+    new.velocity_ratio = ratio;
+    new.sample_cache = samples;
+    new.smoothing_time = smooth_s;
+
+    shared.swap(Arc::new(new));
+    state::mark_dirty();
+}
+
+#[tauri::command]
+#[specta::specta]
+/// handles persisting and splitting out individual states to where they need to go.
+pub fn set_device_info(dev: tauri::State<'_, DeviceHandle>, id: DeviceId, inf: DeviceInfo) {
+    dev.with_device_mut(&id, |f| f.update_info(inf));
 }
 
 /// Gets the core haptics map that is used to drive feedback.
 #[tauri::command]
-pub fn get_core_map(state: tauri::State<'_, Arc<Mutex<GlobalMap>>>) -> GlobalMap {
-    let map = state.lock().expect("Unable to lock global map");
-    map.clone()
+#[specta::specta]
+pub fn get_core_map(map: tauri::State<'_, MapHandle>) -> MapInfo {
+    map.get_state()
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn upload_device_map(
     id: String,
     config_json: String,
-    devices_mutex: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
+    device: tauri::State<'_, DeviceHandle>,
 ) -> Result<(), String> {
     log::info!("commanded to upload");
 
@@ -167,67 +242,51 @@ pub async fn upload_device_map(
         .map(|node| node.node_data)
         .collect();
 
-    let mut devices = devices_mutex.lock().unwrap();
-    if let Some(device) = devices.iter_mut().find(|d| d.id == id) {
-        // Propagate changes if necessary.
-        match &mut device.device_type {
-            DeviceType::Wifi(wifi) => {
-                return wifi.set_node_list(haptic_nodes);
-            }
-        }
+    let res = device.with_device_mut(&id.clone().into(), |d| {
+        let mut info = d.info();
+        info.set_nodes(haptic_nodes);
+        d.update_info(info);
+    });
+
+    state::mark_dirty();
+    if res.is_none() {
+        return Err(format!("No Device with id: {}", id))
     } else {
-        return Err(format!("No Device with id: {}", id));
+        Ok(())
     }
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_device_multiplier(
-    device_id: String,
+    device_id: DeviceId,
     multiplier: f32,
-    devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-    window: tauri::Window,
-) -> Result<(), ()> {
-    let mut devices_lock = devices_store.lock().unwrap();
-    if let Some(dev) = devices_lock.iter_mut().find(|d| d.id == device_id) {
-        dev.factors.sens_mult = multiplier;
-        set_device_store_field(&window, &device_id, "sens_mult", multiplier);
-    }
-    Ok(())
+)  {
+    let (_, dev) = state::get_device(&device_id);
+    let guard = dev.load();
+    let mut new = PerDevice::clone(&guard);
+    new.intensity = multiplier;
+    state::update_device(Arc::new(new));
+    state::mark_dirty();
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_device_offset(
-    device_id: String,
+    device_id: DeviceId,
     offset: f32,
-    devices_store: tauri::State<'_, Arc<Mutex<Vec<Device>>>>,
-    window: tauri::Window,
-) -> Result<(), ()> {
-    let mut devices_lock = devices_store.lock().unwrap();
-    if let Some(dev) = devices_lock.iter_mut().find(|d| d.id == device_id) {
-        dev.factors.start_offset = offset;
-        set_device_store_field(&window, &device_id, "start_offset", offset);
-    }
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn update_vrc_velocity_multiplier(vel_multiplier: f32, window: tauri::Window) {
-    let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
-    let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
-    vrc_lock.vel_multiplier = vel_multiplier;
-    set_store_field(window.app_handle(), "velocity_multiplier", vel_multiplier);
-}
-
-#[tauri::command]
-pub async fn update_vrc_distance_weight(distance_weight: f32, window: tauri::Window) {
-    let vrc_state = window.app_handle().state::<Arc<Mutex<VrcInfo>>>();
-    let mut vrc_lock = vrc_state.lock().expect("couldn't lock vrc");
-    vrc_lock.dist_weight = distance_weight;
-    set_store_field(window.app_handle(), "distance_weight", distance_weight);
+) {
+    let (_, dev) = state::get_device(&device_id);
+    let guard = dev.load();
+    let mut new = PerDevice::clone(&guard);
+    new.offset = offset;
+    state::update_device(Arc::new(new));
+    state::mark_dirty();
 }
 
 /// Handles setting our app to launch instead of the bHapticsPlayer
 #[tauri::command]
+#[specta::specta]
 pub async fn bhaptics_launch_vrch() {
     // Launch the sidecar with the set argument.
     let path = dunce::canonicalize(r".\sidecars\elevated-register.exe").unwrap();
@@ -251,6 +310,7 @@ pub async fn bhaptics_launch_vrch() {
 
 /// Handles resetting bhaptics to be the default player
 #[tauri::command]
+#[specta::specta]
 pub async fn bhaptics_launch_default() {
     // Launch the sidecar with the "reset" argument.
     let path = dunce::canonicalize(r".\sidecars\elevated-register.exe").unwrap();

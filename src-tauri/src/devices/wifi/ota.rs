@@ -174,6 +174,10 @@ pub fn authenticate(
         }
     };
 
+    out_socket.set_read_timeout(Some(Duration::from_secs(5))).ok();
+    out_socket.set_write_timeout(Some(Duration::from_secs(5))).ok();
+
+
     let our_port = out_socket
         .local_addr()
         .unwrap_or((Ipv4Addr::UNSPECIFIED, 0).into());

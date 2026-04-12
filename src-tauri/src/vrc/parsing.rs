@@ -1,3 +1,5 @@
+use crate::wrappers::SpectaOscType;
+
 use super::OscPath;
 
 use regex::Regex;
@@ -77,7 +79,7 @@ impl OscQueryNode {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, specta::Type)]
 pub enum OscAccessLevel {
     Refused,   // 0 – no value associated
     OnlyRead,  // 1 – value may only be retrieved
@@ -109,11 +111,11 @@ impl From<u8> for OscAccessLevel {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, specta::Type)]
 pub struct OscInfo {
     pub full_path: OscPath,
     pub access: OscAccessLevel,
-    pub value: Vec<OscType>,
+    pub value: Vec<SpectaOscType>,
     pub description: Option<String>,
 }
 
@@ -126,7 +128,7 @@ impl OscInfo {
         }
 
         // create OSCType
-        let mut types: Vec<OscType> = vec![];
+        let mut types: Vec<SpectaOscType> = vec![];
         if let Some(type_tags) = &node.osc_type {
             if let Some(contents) = &node.value {
                 let values_to_parse = if contents.len() == 1 && contents[0].is_array() {
@@ -139,16 +141,16 @@ impl OscInfo {
                 // create array
                 for (tag, value) in type_tags.chars().zip(values_to_parse) {
                     if !access.is_readable() && *value == Value::Null {
-                        types.push(OscType::Nil);
+                        types.push(OscType::Nil.into());
                         continue;
                     }
 
                     match match_tag(tag, value) {
-                        Ok(content) => types.push(content),
+                        Ok(content) => types.push(content.into()),
                         Err((fallback, msg)) => {
                             log::error!("Error parsing {}: {}", node.full_path, msg);
                             log::error!("Full Node: {node:?}");
-                            types.push(fallback);
+                            types.push(fallback.into());
                         }
                     }
                 }

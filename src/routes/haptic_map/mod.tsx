@@ -6,6 +6,7 @@ import { useDeviceContext } from "../../context/DevicesContext";
 import StandardModel from "./standard";
 import VrcConfigRadiusEditor from "./VrcConfigRadiusEditor";
 import NodeFilterOverlay, { type NodeFilter } from "./NodeFilterOverlay";
+import { getDeviceId, getDeviceName } from "../common";
 
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
@@ -33,12 +34,12 @@ export default function InputNodesViewer() {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const controlsRef = useRef<any>(null);
 
-  const inputNodes = Object.values(globalMap.input_nodes);
+  const inputNodes = globalMap?.nodes;
 
   // filter state
   const [filter, setFilter] = useState<NodeFilter>({ mode: "all" });
 
-  const visibleInputNodes = inputNodes.filter((node) => {
+  const visibleInputNodes = inputNodes?.filter((node) => {
     if (filter.mode === "all") return true;
     if (filter.mode === "prefab") {
       const tag = filter.tag;
@@ -91,7 +92,7 @@ export default function InputNodesViewer() {
         {/* The human standard model */}
         <StandardModel />
         {/* Input nodes */}
-        {visibleInputNodes.map((node) => {
+        {visibleInputNodes?.map((node) => {
           const key = `input-${node.id}`;
           return (
             <group
@@ -139,9 +140,9 @@ export default function InputNodesViewer() {
         })}
         {/* Device nodes */}
         {devices.flatMap((device) => {
-          const nodeMap = device.device_type.value.config?.node_map ?? [];
+          const nodeMap = device?.value?.nodes ?? [];
           return nodeMap.map((node, idx) => {
-            const key = `dev-${device.id}-${idx}`;
+            const key = `dev-${getDeviceId(device)}-${idx}`;
             return (
               <mesh
                 key={key}
@@ -163,7 +164,7 @@ export default function InputNodesViewer() {
                       borderRadius: "4px",
                     }}
                   >
-                    <div>{device.name + ": " + idx + "\n"}</div>
+                    <div>{getDeviceName(device) + ": " + idx + "\n"}</div>
                     <span>
                       ({node.x}, {node.y}, {node.z})
                     </span>

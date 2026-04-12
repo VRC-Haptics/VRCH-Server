@@ -2,6 +2,6 @@ export const addressBuilder = (
     group_name: string,
     index: number,
 ) => {
-    const prefix = "/avatar/parameters/h/";
+    const prefix = "/avatar/parameters/";
     return prefix.concat(group_name, "_", index.toString());
 }
