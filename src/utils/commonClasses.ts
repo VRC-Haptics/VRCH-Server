@@ -11,21 +11,18 @@ export class GitRepo {
 }
 
 export interface GaussianState {
-  sigma: number;
-  cutoff: number;
   merge: number;
+  at_edge: number;
 }
 
 export type InterpAlgo = {
-  variant: "Gaussian";
-  value: GaussianState;
+  algo: "Gaussian";
+  state: GaussianState;
 }
-
 // Represents the factors that modulate device output.
 export interface OutputFactors {
-  /// the lowest value that produces feedback
-  start_offset: number;
   sens_mult: number;
+  start_offset: number;
   interp_algo: InterpAlgo;
 }
 
@@ -62,6 +59,18 @@ export interface HapticMap {
   sigma: number;
 }
 
+export type ESP32Model =
+  | "ESP32"
+  | "ESP32S2"
+  | "ESP32S2FH16"
+  | "ESP32S2FH32"
+  | "ESP32S3"
+  | "ESP32C3"
+  | "ESP32C2"
+  | "ESP32C6"
+  | "ESP8266"
+  | "Unknown";
+
 // Mirror of Rust’s `HapticNode` struct
 export interface HapticNode {
   /** Standard Location in x (meters) */
@@ -94,7 +103,6 @@ export interface WifiConfig {
 export interface WifiConnManager {
   /// Port that WE recieve from the device on
   recv_port: number;
-  config: WifiConfig;
 }
 
 
@@ -105,9 +113,15 @@ export interface WifiDevice {
   ip: string;
   name: string;
   been_pinged: boolean;
+  push_map: boolean;
   last_queried: string;
   send_port: number;
   connection_manager: WifiConnManager;
+  // tick_channel is #[serde(skip)]
+  config: WifiConfig | null;
+  identifier: ESP32Model | null;
+  logs: string[];
+  last_heartbeat: string;
 }
 
 // The DeviceType is currently an enum with a Wifi variant.
@@ -130,18 +144,17 @@ export const defaultWifiConfig: WifiConfig = {
   wifi_ssid: '',
   wifi_password: '',
   mdns_name: 'my-device',
-  node_map: [] as HapticNode[],
-  i2c_scl: 21,           // ESP32 default SCL
-  i2c_sda: 22,           // ESP32 default SDA
-  i2c_speed: 100_000,    // 100 kHz
+  node_map: [],
+  i2c_scl: 21,
+  i2c_sda: 22,
+  i2c_speed: 100_000,
   motor_map_i2c_num: 0,
-  motor_map_i2c: [] as number[],
+  motor_map_i2c: [],
   motor_map_ledc_num: 0,
-  motor_map_ledc: [] as number[],
+  motor_map_ledc: [],
   config_version: 1,
 };
 
-// A default instance for convenience.
 export const defaultDevice: Device = {
   id: "",
   name: "",
@@ -151,11 +164,10 @@ export const defaultDevice: Device = {
     sens_mult: 1.0,
     start_offset: 0.0,
     interp_algo: {
-      variant: "Gaussian",
-      value: {
-        sigma: 0.0,
-        cutoff: 0.0,
+      algo: "Gaussian",
+      state: {
         merge: 0.0,
+        at_edge: 0.0,
       }
     }
   },
@@ -166,14 +178,17 @@ export const defaultDevice: Device = {
       ip: "",
       name: "",
       been_pinged: false,
+      push_map: false,
       last_queried: "",
       send_port: 0,
       connection_manager: {
         recv_port: 0,
-        config: defaultWifiConfig,
-      }
+      },
+      config: null,
+      identifier: null,
+      logs: [],
+      last_heartbeat: "",
     },
   },
 };
-
 export default Titles;
