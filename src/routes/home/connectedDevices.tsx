@@ -1,7 +1,6 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { useDeviceContext } from "../../context/DevicesContext";
-import { DeviceInfo } from "../../bindings";
 import { getDeviceId, getDeviceName } from "../common";
 
 interface ConnectedDevicesProps {

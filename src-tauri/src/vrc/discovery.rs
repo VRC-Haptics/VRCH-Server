@@ -13,17 +13,24 @@ use std::thread;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
 
-type PortCallback = unsafe extern "C" fn(u16);
+type PortCallback = unsafe extern "C" fn(u16, *const u8);
 type StartListener = unsafe extern "C" fn(PortCallback);
 type StopListener = unsafe extern "C" fn();
 
-static PORT_SENDER: OnceLock<Mutex<Option<mpsc::Sender<u16>>>> = OnceLock::new();
+static PORT_SENDER: OnceLock<Mutex<Option<mpsc::Sender<(u16, String)>>>> = OnceLock::new();
 
-unsafe extern "C" fn dispatch_port(port: u16) {
+unsafe extern "C" fn dispatch_port(port: u16, ip_ptr: *const u8) {
+    let ip = if ip_ptr.is_null() {
+        "127.0.0.1".to_string()
+    } else {
+        let cstr = std::ffi::CStr::from_ptr(ip_ptr as *const i8);
+        cstr.to_str().unwrap_or("127.0.0.1").to_string()
+    };
+
     if let Some(lock) = PORT_SENDER.get() {
         let guard = lock.blocking_lock();
         if let Some(sender) = guard.as_ref() {
-            let _ = sender.blocking_send(port);
+            let _ = sender.blocking_send((port, ip));
         }
     }
 }
@@ -62,22 +69,18 @@ pub async fn start_filling_available_parameters(
             };
 
         let mut receiver = {
-            let (tx, rx) = mpsc::channel::<u16>(2);
+            let (tx, rx) = mpsc::channel::<(u16, String)>(2);
             let storage = PORT_SENDER.get_or_init(|| Mutex::new(None));
             let mut guard = storage.lock().await;
             *guard = Some(tx);
             rx
         };
 
-        unsafe {
-            start(dispatch_port);
-        }
+        unsafe { start(dispatch_port); }
 
-        while let Some(port) = receiver.recv().await {
-            log::debug!("VRC discovery library reported port: {}", port);
-
-            run_vrc_http_polling(port, &params, vrc.clone(), &api).await;
-
+        while let Some((port, ip)) = receiver.recv().await {
+            log::debug!("VRC discovery: {}:{}", ip, port);
+            run_vrc_http_polling(port, &ip, &params, vrc.clone(), &api).await;
             vrc.send(MsgToMainVrc::VrcDisconnected).await;
         }
 
@@ -218,12 +221,13 @@ async fn load_configs(params: &DashMap<OscPath, OscInfo>, api: &Mutex<ApiManager
 /// * `avatar` - A shared, thread-safe reference to the current avatar configuration.
 async fn run_vrc_http_polling(
     port: u16,
+    ip: &str,
     params: &DashMap<OscPath, OscInfo>,
     vrc: VrcHandle,
     api: &Mutex<ApiManager>,
 ) {
-    let url = format!("http://127.0.0.1:{}/", port);
-    log::debug!("Started polling HTTP.");
+    let url = format!("http://{}:{}/", ip, port);
+    log::debug!("Started polling HTTP at {}", url);
 
     loop {
         match fetch_http_response(&url).await {

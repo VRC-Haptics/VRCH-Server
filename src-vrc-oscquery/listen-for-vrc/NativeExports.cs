@@ -18,7 +18,7 @@ internal static class NativeExports
     private static PortCallback? _callback;
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void PortCallback(ushort port);
+    private delegate void PortCallback(ushort port, nint ipUtf8);
 
     [UnmanagedCallersOnly(EntryPoint = "vrc_start_listener", CallConvs = new[] { typeof(CallConvCdecl) })]
     public static void StartListener(nint callbackPtr)
@@ -56,24 +56,33 @@ internal static class NativeExports
     private static async Task ListenLoopAsync(CancellationToken token)
     {
         var currentPort = 0;
+        var currentIp = "";
 
         while (!token.IsCancellationRequested)
         {
             try
             {
-                var discoveredPort = await BlockUntilFoundAsync(token).ConfigureAwait(false);
+                var (discoveredPort, discoveredIp) = await BlockUntilFoundAsync(token).ConfigureAwait(false);
 
-                if (discoveredPort != currentPort && discoveredPort != 0)
+                if ((discoveredPort != currentPort || discoveredIp != currentIp) && discoveredPort != 0)
                 {
                     currentPort = discoveredPort;
+                    currentIp = discoveredIp;
                     var callback = _callback;
-                    callback?.Invoke((ushort)currentPort);
+                    if (callback != null)
+                    {
+                        var bytes = System.Text.Encoding.UTF8.GetBytes(discoveredIp + '\0');
+                        unsafe
+                        {
+                            fixed (byte* ptr = bytes)
+                            {
+                                callback((ushort)currentPort, (nint)ptr);
+                            }
+                        }
+                    }
                 }
             }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+            catch (OperationCanceledException) { break; }
             catch
             {
                 await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
@@ -81,7 +90,7 @@ internal static class NativeExports
         }
     }
 
-    private static async Task<int> BlockUntilFoundAsync(CancellationToken token)
+    private static async Task<(int port, string ip)> BlockUntilFoundAsync(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
@@ -94,31 +103,22 @@ internal static class NativeExports
                 foreach (var host in responses)
                 {
                     if (!host.DisplayName.StartsWith(ClientPrefix, StringComparison.Ordinal))
-                    {
                         continue;
-                    }
 
                     if (host.Services.Count == 0)
-                    {
                         continue;
-                    }
 
                     var (_, service) = host.Services.First();
-                    return service.Port;
+                    var ip = host.IPAddress;
+                    return (service.Port, ip);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                // Ignore lookup errors and retry.
-            }
+            catch (OperationCanceledException) { throw; }
+            catch { }
 
             await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
         }
 
-        return 0;
+        return (0, "");
     }
 }

@@ -1,4 +1,5 @@
 import { DeviceInfo, DeviceId } from "../../../bindings";
+import { getDeviceId, getDeviceName } from "../../common";
 
 interface RawDeviceInfoProps {
   deviceId: DeviceId;
@@ -16,16 +17,23 @@ export default function RawDeviceInfo({ deviceId, device }: RawDeviceInfoProps) 
         <h2>Basic Information</h2>
         <div className="ml-4">
           <p><strong>ID:</strong> {deviceId}</p>
-          <p><strong>Name:</strong> {info.name}</p>
-          <p><strong>MAC:</strong> {info.mac}</p>
+          <p><strong>Name:</strong> {getDeviceName(device)}</p>
+          <p><strong>MAC:</strong> {getDeviceId(device)}</p>
           <p><strong>Type:</strong> {device.variant}</p>
         </div>
 
         <h2>Connection</h2>
         <div className="ml-4">
-          <p><strong>Address:</strong> {info.remote_addr}</p>
-          <p><strong>RSSI:</strong> {info.rssi}</p>
-          <p><strong>ESP Model:</strong> {info.esp_model}</p>
+          {device.variant === "Wifi" && (
+            <>
+              <p><strong>Address:</strong> {device.value.remote_addr}</p>
+              <p><strong>RSSI:</strong> {device.value.rssi}</p>
+              <p><strong>ESP Model:</strong> {device.value.esp_model}</p>
+            </>
+          )}
+          {device.variant === "BhapticBle" && (
+            <p><strong>Model:</strong> {device.value.model}</p>
+          )}
         </div>
 
         <h2>Haptic Nodes ({info.nodes.length})</h2>

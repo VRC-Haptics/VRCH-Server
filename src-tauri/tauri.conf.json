@@ -34,7 +34,6 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "sidecars/vrc-sidecar.exe",
       "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
       "sidecars/elevated-register.exe",
       "sidecars/listen-for-vrc.dll",

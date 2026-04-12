@@ -7,15 +7,18 @@ interface DeviceOffsetProps {
 }
 
 export const DeviceOffset: React.FC<DeviceOffsetProps> = ({ deviceId, selectedDevice }) => {
-  const info = selectedDevice.value;
-  const [multiplier, setMultiplier] = useState<number>(info.intensity ?? 1.0);
-  const [offset, setOffset] = useState<number>(info.offset ?? 0.0);
+  const initMultiplier = selectedDevice.variant === "Wifi" ? selectedDevice.value.intensity : 1.0;
+  const initOffset = selectedDevice.variant === "Wifi" ? selectedDevice.value.offset : 0.0;
 
-   useEffect(() => {
-    setMultiplier(info.intensity ?? 1.0);
-    setOffset(info.offset ?? 0.0);
-  }, [info]);
+  const [multiplier, setMultiplier] = useState<number>(initMultiplier);
+  const [offset, setOffset] = useState<number>(initOffset);
 
+  useEffect(() => {
+    if (selectedDevice.variant === "Wifi") {
+      setMultiplier(selectedDevice.value.intensity ?? 1.0);
+      setOffset(selectedDevice.value.offset ?? 0.0);
+    }
+  }, [selectedDevice]);
 
   const multiplierPct = useMemo(() => Math.round(multiplier * 100), [multiplier]);
   const offsetPct = useMemo(() => Math.round(offset * 100), [offset]);

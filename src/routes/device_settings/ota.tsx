@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { error, trace } from "@tauri-apps/plugin-log";
 import { fetch } from "@tauri-apps/plugin-http";
 import { useDeviceContext } from "../../context/DevicesContext";
@@ -9,7 +9,6 @@ import {
   commands,
   type GitRepo,
   type ESP32Model,
-  Firmware,
 } from "../../bindings";
 
 const LATEST_TAG = "latest";
@@ -44,7 +43,10 @@ function releaseMatchesEsp(release: Release, esp: ESP32Model): boolean {
   );
 }
 
-function pickAsset(release: Release, esp: ESP32Model): ReleaseAsset | undefined {
+function pickAsset(
+  release: Release,
+  esp: ESP32Model,
+): ReleaseAsset | undefined {
   const key = espToAssetSuffix(esp);
   return release.assets.find(
     (a) => a.file_name.endsWith(".bin") && a.file_name.includes(key),
@@ -95,7 +97,6 @@ async function fetchGithubReleases(repo: GitRepo): Promise<Release[]> {
   );
 }
 
-
 export default function OtaUpdate(): JSX.Element {
   const { repositories } = useSettingsContext();
   const { devices } = useDeviceContext();
@@ -111,14 +112,21 @@ export default function OtaUpdate(): JSX.Element {
   const [updateStatus, setUpdateStatus] = useState<string>("");
 
   // ── Resolve eligible devices (debounced by serializing to string) ─────
-  const deviceMacs = devices.map((d) => d.value.mac).join(",");
+  const deviceMacs = devices
+    .filter((d): d is typeof d & { variant: "Wifi" } => d.variant === "Wifi")
+    .map((d) => d.value.mac)
+    .join(",");
 
   useEffect(() => {
     let cancelled = false;
 
     async function resolve() {
+      const wifiDevices = devices.filter(
+        (d): d is typeof d & { variant: "Wifi" } => d.variant === "Wifi",
+      );
+
       const results = await Promise.allSettled(
-        devices.map(async (device) => {
+        wifiDevices.map(async (device) => {
           const res = await commands.getDeviceEspModel(device.value.mac);
           if (res.status === "ok") return { device, esp: res.data };
           throw new Error(String(res.error));
@@ -129,8 +137,12 @@ export default function OtaUpdate(): JSX.Element {
 
       const eligible: EligibleDevice[] = results
         .filter(
-          (r): r is PromiseFulfilledResult<{ device: (typeof devices)[0]; esp: ESP32Model }> =>
-            r.status === "fulfilled",
+          (
+            r,
+          ): r is PromiseFulfilledResult<{
+            device: (typeof wifiDevices)[0];
+            esp: ESP32Model;
+          }> => r.status === "fulfilled",
         )
         .map((r) => ({
           id: r.value.device.value.mac,
@@ -138,7 +150,6 @@ export default function OtaUpdate(): JSX.Element {
           esp: r.value.esp,
         }));
 
-      // Only update state if the list actually changed
       setEligibleDevices((prev) => {
         const key = (list: EligibleDevice[]) =>
           list.map((d) => `${d.id}:${d.esp}`).join(",");
@@ -147,8 +158,10 @@ export default function OtaUpdate(): JSX.Element {
     }
 
     resolve();
-    return () => { cancelled = true; };
-  }, [deviceMacs]); // stable string dep, not the array reference
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceMacs]);
 
   // ── Fetch releases when repository changes ────────────────────────────
   const repoKey = `${repository.owner}/${repository.name}`;
@@ -164,8 +177,12 @@ export default function OtaUpdate(): JSX.Element {
     fetchGithubReleases(repository)
       .then((releases) => {
         if (stale) return;
-        const allAssets = releases.flatMap((r) => r.assets.map((a) => a.file_name));
-        trace(`[OTA] Stored ${releases.length} releases. Assets: ${allAssets.join(", ")}`);
+        const allAssets = releases.flatMap((r) =>
+          r.assets.map((a) => a.file_name),
+        );
+        trace(
+          `[OTA] Stored ${releases.length} releases. Assets: ${allAssets.join(", ")}`,
+        );
         setAvailableReleases(releases);
       })
       .catch((err: unknown) => {
@@ -178,7 +195,9 @@ export default function OtaUpdate(): JSX.Element {
         setReleasesLoading(false);
       });
 
-    return () => { stale = true; };
+    return () => {
+      stale = true;
+    };
   }, [repoKey]); // stable string, not object reference
 
   // ── Derived data ──────────────────────────────────────────────────────
@@ -189,8 +208,12 @@ export default function OtaUpdate(): JSX.Element {
 
   const filteredReleases = useMemo(() => {
     if (!selectedEsp || availableReleases.length === 0) return [];
-    const filtered = availableReleases.filter((r) => releaseMatchesEsp(r, selectedEsp.esp));
-    trace(`[OTA] Filtered ${filtered.length}/${availableReleases.length} for ${selectedEsp.esp}`);
+    const filtered = availableReleases.filter((r) =>
+      releaseMatchesEsp(r, selectedEsp.esp),
+    );
+    trace(
+      `[OTA] Filtered ${filtered.length}/${availableReleases.length} for ${selectedEsp.esp}`,
+    );
     return filtered;
   }, [selectedEsp, availableReleases]);
 
@@ -217,7 +240,9 @@ export default function OtaUpdate(): JSX.Element {
 
       const asset = pickAsset(release, selectedEsp.esp);
       if (!asset) {
-        setUpdateStatus(`✗ ${release.tag_name} has no binary for ${selectedEsp.esp}`);
+        setUpdateStatus(
+          `✗ ${release.tag_name} has no binary for ${selectedEsp.esp}`,
+        );
         return;
       }
 
@@ -230,7 +255,8 @@ export default function OtaUpdate(): JSX.Element {
       }
 
       const arrayBuffer = await response.arrayBuffer();
-      if (arrayBuffer.byteLength === 0) throw new Error("Downloaded firmware is empty");
+      if (arrayBuffer.byteLength === 0)
+        throw new Error("Downloaded firmware is empty");
       trace(`[OTA] Downloaded ${arrayBuffer.byteLength} bytes`);
 
       const bytes: number[] = Array.from(new Uint8Array(arrayBuffer));
@@ -266,13 +292,22 @@ export default function OtaUpdate(): JSX.Element {
     <div id="OtaModule" className="flex min-w-full max-h-min items-center">
       <div className="dropdown dropdown-start">
         <div tabIndex={0} role="button" className="btn m-1">
-          {selectedEsp ? `${selectedEsp.name} : ${selectedEsp.esp}` : "Select Device"}
+          {selectedEsp
+            ? `${selectedEsp.name} : ${selectedEsp.esp}`
+            : "Select Device"}
         </div>
-        <ul tabIndex={0} className="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow">
-          {eligibleDevices.length === 0 && <li className="p-2 text-center">No Devices Connected</li>}
+        <ul
+          tabIndex={0}
+          className="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow"
+        >
+          {eligibleDevices.length === 0 && (
+            <li className="p-2 text-center">No Devices Connected</li>
+          )}
           {eligibleDevices.map((d) => (
             <li key={d.id}>
-              <a onClick={() => setSelectedDevice(d.id)}>{d.name} : {d.esp}</a>
+              <a onClick={() => setSelectedDevice(d.id)}>
+                {d.name} : {d.esp}
+              </a>
             </li>
           ))}
         </ul>
@@ -284,14 +319,20 @@ export default function OtaUpdate(): JSX.Element {
         <div tabIndex={0} role="button" className="btn m-1">
           {repository.owner}/{repository.name}
         </div>
-        <ul tabIndex={0} className="dropdown-content menu bg-base-200 rounded-box z-[1] p-2 shadow">
+        <ul
+          tabIndex={0}
+          className="dropdown-content menu bg-base-200 rounded-box z-[1] p-2 shadow"
+        >
           {repositories.map((repo: GitRepo, i: number) => (
             <li key={i}>
               <a onClick={() => setRepository(repo)}>
                 {repo.owner}/{repo.name}
-                {repo.owner === DEFAULT_REPO.owner && repo.name === DEFAULT_REPO.name && (
-                  <span className="badge badge-primary badge-sm">Official</span>
-                )}
+                {repo.owner === DEFAULT_REPO.owner &&
+                  repo.name === DEFAULT_REPO.name && (
+                    <span className="badge badge-primary badge-sm">
+                      Official
+                    </span>
+                  )}
               </a>
             </li>
           ))}
@@ -301,8 +342,13 @@ export default function OtaUpdate(): JSX.Element {
       <FaArrowRight />
 
       <div className="dropdown dropdown-start">
-        <div tabIndex={0} role="button" className="btn m-1">{versionLabel}</div>
-        <ul tabIndex={0} className="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow">
+        <div tabIndex={0} role="button" className="btn m-1">
+          {versionLabel}
+        </div>
+        <ul
+          tabIndex={0}
+          className="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow"
+        >
           {!selectedDevice ? (
             <li className="text-center p-2">Please select a device</li>
           ) : releasesLoading ? (
@@ -319,9 +365,12 @@ export default function OtaUpdate(): JSX.Element {
                 <a onClick={() => setReleaseTag(release.tag_name)}>
                   {release.tag_name}
                   {release.pre_release && " Pre-Release"}
-                  {!release.pre_release && release === findLatest(filteredReleases) && (
-                    <span className="badge badge-primary badge-sm">Latest</span>
-                  )}
+                  {!release.pre_release &&
+                    release === findLatest(filteredReleases) && (
+                      <span className="badge badge-primary badge-sm">
+                        Latest
+                      </span>
+                    )}
                 </a>
               </li>
             ))
@@ -331,16 +380,24 @@ export default function OtaUpdate(): JSX.Element {
 
       <FaArrowRight />
 
-      <button className="btn" onClick={handleUpdate} disabled={isUpdating || !selectedDevice}>
+      <button
+        className="btn"
+        onClick={handleUpdate}
+        disabled={isUpdating || !selectedDevice}
+      >
         {isUpdating ? (
-          <><span className="loading loading-spinner" /> Updating…</>
+          <>
+            <span className="loading loading-spinner" /> Updating…
+          </>
         ) : (
           "Upload Firmware"
         )}
       </button>
 
       {updateStatus && (
-        <div className={`ml-2 ${updateStatus.startsWith("✓") ? "text-success" : updateStatus.startsWith("✗") ? "text-error" : "text-info"}`}>
+        <div
+          className={`ml-2 ${updateStatus.startsWith("✓") ? "text-success" : updateStatus.startsWith("✗") ? "text-error" : "text-info"}`}
+        >
           {updateStatus}
         </div>
       )}
