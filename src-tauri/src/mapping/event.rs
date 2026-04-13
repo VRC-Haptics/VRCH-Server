@@ -29,7 +29,7 @@ pub struct Event {
     /// how should this event effect the input map
     pub effect: EventEffectType,
     /// The different outputs that should be output at different times.
-    steps: Vec<f32>,
+    pub steps: Vec<f32>,
     /// The total duration of this event.
     ///
     /// Steps will be distributed across this duration.
@@ -84,7 +84,7 @@ impl Event {
             steps: steps.clone(),
             duration: duration,
             tags: tags,
-            radius: 0.001,
+            radius: 0.10,
             managed_nodes: Vec::new(),
             time_step: time_step,
             steps_completed: 0,

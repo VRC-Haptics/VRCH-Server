@@ -1,14 +1,14 @@
 /// A mess of serialization crap that sorta works to deserialize the weirdly formatted AuthenticationInit Message
 pub mod network;
-mod player_messages;
+mod v3;
+mod v2;
 
-use crate::{
-    mapping::event::Event,
-};
+use crate::mapping::{MapHandle, event::Event};
 
 use network::event_map::PatternLocation;
 use serde;
 use std::sync::{Arc, Mutex};
+use tokio_util::sync::CancellationToken;
 
 pub enum ApiVersion {
     V3,
@@ -22,34 +22,27 @@ pub struct ActiveApi {
     pub sdk_version: u32,
 }
 
-/// Master Struct containing a unified interface for various api versions
-pub struct BhapticsGame {
-    // active connection
-    pub active_api: Option<ActiveApi>,
+#[derive(Debug, Clone)]
+pub struct BhapticHandle {
+    pub shutdown_token: CancellationToken,
 }
 
-impl BhapticsGame {
-    /// Performs startup for all the api versions
-    pub fn new() -> Arc<Mutex<Self>> {
-
-
-        let game = Arc::new(Mutex::new(BhapticsGame {
-            active_api: None,
-        }));
-
-        game
-    }
-
-    /// Shuts down all Bhaptics API's
+impl BhapticHandle {
     pub fn shutdown(&self) {
+        self.shutdown_token.cancel();
     }
+}
 
-    /// updates the GlobalMap with values from the game since last tick
-    pub fn tick(&mut self) -> Vec<Event> {
-        let mut new_events = Vec::new();
+/// Starts all bhaptics api versions and returns the user handle
+pub async fn start_bhaptics(map: MapHandle) -> BhapticHandle {
+    let token = CancellationToken::new();
 
-        new_events
-    }
+    tokio::spawn(v3::run_server(map.clone(), token.child_token()));
+    tokio::spawn(v2::run_server(map.clone(), token.child_token()));
+    // tokio::spawn(v1::run_server(map.clone(), token.child_token()));
+
+    BhapticHandle { shutdown_token: token }
+
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

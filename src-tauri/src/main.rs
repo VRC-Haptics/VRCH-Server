@@ -20,7 +20,6 @@ mod vrc;
 use api::ApiManager;
 //use bhaptics::game::BhapticsGame;
 use devices::{init_device_manager, DeviceManager};
-use mapping::InputMap;
 use vrc::VrcGame;
 
 //standard imports
@@ -36,7 +35,9 @@ use specta_typescript::Typescript;
 use tauri_specta::*;
 use tokio::sync::Mutex;
 
+use crate::bhaptics::game::BhapticHandle;
 use crate::devices::{DeviceHandle, bhaptics::start_ble};
+use crate::mapping::start_interp_map;
 use crate::{
     mapping::MapHandle,
     vrc::VrcHandle,
@@ -81,8 +82,12 @@ pub static DEVICE_MANAGER: OnceCell<DeviceHandle> = OnceCell::new();
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
     state::save_config();
+    
     log::trace!("Shutdown bhaptics server");
-    //cleanup vrc TODO:
+    let app = window.app_handle();
+    if let Some(handle) = app.try_state::<BhapticHandle>() {
+        handle.shutdown();
+    }
 }
 
 /// Opens a window if we can't use the default VRC ports.
@@ -105,15 +110,13 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcGame>>) {
     }
 }*/
 
-async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
+async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle, BhapticHandle) {
     // initialize input map.
-    let (mut input_map, map_handle) = InputMap::new(manager.clone()).await;
-    tokio::spawn(async move {
-        input_map.start().await;
-    });
+    let map_handle = start_interp_map(&manager).await;
 
     // TODO: Move into device manager init.
     log_err!(start_ble(manager.get_device_channel(), Duration::from_secs(1)).await);
+    let bhaptic = bhaptics::game::start_bhaptics(map_handle.clone()).await;
 
     //start_apps
     let mut vrc = VrcGame::new(map_handle.clone(), &API_MANAGER).await;
@@ -122,7 +125,7 @@ async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle) {
         vrc.run().await;
     });
 
-    (vrc_handle, map_handle)
+    (vrc_handle, map_handle, bhaptic)
 }
 
 #[tokio::main]
@@ -223,9 +226,10 @@ async fn main() {
                 }
                 let device_handle = manager.get_handle();
 
-                let (vrc, map) = start_async_tasks(device_handle).await;
+                let (vrc, map, bhaptic) = start_async_tasks(device_handle).await;
                 handle.manage(vrc);
                 handle.manage(map);
+                handle.manage(bhaptic);
                 handle.manage(DEVICE_MANAGER.get().unwrap().clone());
             });
 

@@ -78,6 +78,10 @@ pub enum PatternLocation {
     Head,
     ForearmL,
     ForearmR,
+    FootL,
+    FootR,
+    HandL,
+    HandR,
     #[serde(other)]
     Unknown,
 }
@@ -103,6 +107,7 @@ impl PatternLocation {
         match *self {
             Self::VestFront | Self::VestBack => 20,
             Self::Head => 6,
+            Self::FootL | Self::FootR | Self::HandL | Self::HandR => 8, // TODO: Verify this
             Self::ForearmL | Self::ForearmR => 8,
             Self::Unknown => 0,
         }
@@ -116,6 +121,10 @@ impl PatternLocation {
             Self::Head => "Bhaptics_Headset",
             Self::ForearmL => "Bhaptics_ForearmL",
             Self::ForearmR => "Bhaptics_ForearmR",
+            Self::FootL => "Bhaptics_FootL",
+            Self::FootR => "Bhaptics_FootR",
+            Self::HandL => "Bhaptics_HandL",
+            Self::HandR => "Bhaptics_HandR",
             Self::Unknown => "Bhaptics_Unknown",
         }
     }
@@ -127,16 +136,7 @@ impl PatternLocation {
             return None;
         }
 
-        let id = match *self {
-            Self::VestFront => format!("Bhaptics_VestFront_{}", motor_index),
-            Self::VestBack => format!("Bhaptics_VestBack_{}", motor_index),
-            Self::Head => format!("Bhaptics_Head_{}", motor_index),
-            Self::ForearmL => format!("Bhaptics_ForearmS_{}", motor_index),
-            Self::ForearmR => format!("Bhaptics_ForearmR_{}", motor_index),
-            Self::Unknown => format!("Bhaptics_Unknown_{}", motor_index),
-        };
-
-        return Some(NodeId(id));
+        return Some(NodeId(format!("{}_{}", self.to_input_tag(), motor_index)));
     }
 }
 

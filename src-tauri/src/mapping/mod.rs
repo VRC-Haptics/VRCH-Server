@@ -19,7 +19,6 @@ use tokio::sync::{
 };
 
 use event::Event;
-//use global_map::InputMap;
 use haptic_node::HapticNode;
 use input_node::InputNode;
 use interp::Interpolate;
@@ -47,7 +46,7 @@ pub struct MapHandle {
 }
 
 impl MapHandle {
-    // mark_dirty_blocking becomes a simple atomic store
+    /// marks that some change has been made and should be propogated to devices
     pub fn mark_dirty(&self) {
         self.map_dirty.notify_one();
     }
@@ -133,6 +132,7 @@ impl MapHandle {
 }
 
 impl Clone for MapHandle {
+    /// Cheap clone, ideally not every itteration but not expensive either.
     fn clone(&self) -> Self {
         Self {
             event_sender: self.event_sender.clone(),
@@ -181,12 +181,20 @@ impl MappingDevice {
     }
 }
 
+pub async fn start_interp_map(manager: &DeviceHandle) -> MapHandle {
+    let (mut input_map, map_handle) = InputMap::new(manager.clone()).await;
+    tokio::spawn(async move {
+        input_map.start().await;
+    });
+    map_handle
+}
+
 /// Needs to handle:
 ///
 /// Taking input from games;
 /// Triggering update pushed to devices;
 ///
-pub struct InputMap {
+struct InputMap {
     /// Needs to be shareable so that events can be ticked asyncrhonously.
     active_events: Arc<RwLock<Vec<Event>>>,
     input_nodes: Arc<RwLock<Vec<InputNode>>>,
@@ -373,6 +381,7 @@ impl InputMap {
     }
 }
 
+/// pull dirty info from individual devices
 fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &Mutex<Vec<MappingDevice>>) {
     if let Some(info) = dev.with_device(&id, |d| d.info()) {
         match info {

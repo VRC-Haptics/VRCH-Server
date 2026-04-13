@@ -1,128 +1,72 @@
-use super::ApiInfo;
-use crate::bhaptics::game::network;
-use crate::bhaptics::game::v3::{create_init_response, BhapticsApiV3};
-use crate::bhaptics::maps::pattern_to_events;
 use crate::util::deserialization::skip_outer_quotes;
-use std::sync::{Arc, Mutex};
-use tokio::task;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-/// Collects alot of weird classes to handle serialization and deserialization of the AuthInit Message
-pub struct AuthInitMessage {
-    #[serde(deserialize_with = "skip_outer_quotes")]
-    pub authentication: AuthenticationSection,
-    #[serde(deserialize_with = "skip_outer_quotes")]
-    pub haptic: HapticSection,
-}
-
-impl AuthInitMessage {
-    pub fn from_message_str(raw: &str) -> Result<AuthInitMessage, Box<serde_json::Error>> {
-        let res: AuthInitMessage = serde_json::from_str(raw)?;
-        return Ok(res);
-    }
-}
-
-/// Handler for SdkRequestAuthInit messages.
-pub fn handle_auth_init(contents: &str, game: Arc<Mutex<BhapticsApiV3>>) {
-    log::info!("Recieved Auth Init message.");
-
-    // get rid of double escaped quotes
-    let new = contents.replace(r"\\", "");
-
-    //Trim weird extra escape characters
-    let init_msg = AuthInitMessage::from_message_str(&new);
-    match init_msg {
-        Ok(msg) => {
-            let new_info = ApiInfo {
-                application_id: msg.authentication.application_id,
-                api_key: msg.authentication.sdk_api_key,
-                creator_id: msg.haptic.message.creator,
-                workspace_id: msg.haptic.message.workspace_id,
-            };
-
-            let mut game_lock = game.lock().expect("could not lock BhapticsGame");
-            game_lock.api_info = Some(new_info);
-
-            game_lock.name = Some(msg.haptic.message.name);
-
-            log::info!("Need to handle saving this info maybe?");
-
-            // send the OK message
-            game_lock.send(create_init_response());
-
-            // see if we can get our game mapping info from api
-            if let Some(api_info) = &game_lock.api_info {
-                let api_key = api_info.api_key.clone();
-                let app_id = api_info.application_id.clone();
-
-                drop(game_lock); // drop lock so it doesn't hold while network fetching.
-
-                let game_clone = Arc::clone(&game);
-                tokio::spawn(async move {
-                    // pull mappings from bhaptics api
-                    match task::spawn_blocking(move || network::fetch_mappings(api_key, app_id, -1))
-                        .await
-                    {
-                        // if succeded
-                        Ok(Ok(mapping)) => {
-                            // insert mappings into our hashmap.
-                            if let Ok(mut api) = game_clone.lock() {
-                                for hapt in mapping.haptic_mappings {
-                                    let key = hapt.key.clone();
-                                    let events = pattern_to_events(hapt);
-                                    api.game_mapping.insert(key, events);
-                                }
-                            }
-                        }
-                        Ok(Err(e)) => log::error!("fetch_mappings error: {e:?}"),
-                        Err(join) => log::error!("blocking task panicked: {join:?}"),
-                    }
-                });
-            }
-        }
-        Err(err) => {
-            log::error!("Unable to parse authorization message: {}", err);
-        }
-    }
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct AuthenticationSection {
-    #[serde(rename = "cipher")]
-    pub cipher: String,
-    #[serde(rename = "applicationId")]
-    pub application_id: String,
-    #[serde(rename = "nonceHashValue")]
-    pub nonce_hash_value: String,
-    #[serde(rename = "applicationIdHashValue")]
-    pub application_id_hash_value: String,
-    #[serde(rename = "sdkApiKey")]
-    pub sdk_api_key: String,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct HapticSection {
-    pub status: bool,
-    pub message: HapticSectionMessage,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct HapticSectionMessage {
-    pub id: String,
-    #[serde(rename = "createTime")]
-    pub create_time: u64,
+pub struct ParsedAuth {
     pub name: String,
-    pub creator: String,
-    #[serde(rename = "workspaceId")]
+    pub application_id: String,
+    pub api_key: String,
+    pub creator_id: String,
     pub workspace_id: String,
-    pub version: u32,
+}
+
+pub fn parse_auth_init(contents: &str) -> Result<ParsedAuth, Box<dyn std::error::Error>> {
+    // The raw message has double-escaped backslashes from the SDK.
+    let cleaned = contents.replace(r"\\", "");
+    let msg: AuthInitMessage = serde_json::from_str(&cleaned)?;
+
+    Ok(ParsedAuth {
+        name: msg.haptic.message.name,
+        application_id: msg.authentication.application_id,
+        api_key: msg.authentication.sdk_api_key,
+        creator_id: msg.haptic.message.creator,
+        workspace_id: msg.haptic.message.workspace_id,
+    })
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct AuthInitMessage {
+    #[serde(deserialize_with = "skip_outer_quotes")]
+    authentication: AuthenticationSection,
+    #[serde(deserialize_with = "skip_outer_quotes")]
+    haptic: HapticSection,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct AuthenticationSection {
+    #[serde(rename = "cipher")]
+    cipher: String,
+    #[serde(rename = "applicationId")]
+    application_id: String,
+    #[serde(rename = "nonceHashValue")]
+    nonce_hash_value: String,
+    #[serde(rename = "applicationIdHashValue")]
+    application_id_hash_value: String,
+    #[serde(rename = "sdkApiKey")]
+    sdk_api_key: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct HapticSection {
+    status: bool,
+    message: HapticSectionMessage,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct HapticSectionMessage {
+    id: String,
+    #[serde(rename = "createTime")]
+    create_time: u64,
+    name: String,
+    creator: String,
+    #[serde(rename = "workspaceId")]
+    workspace_id: String,
+    version: u32,
     #[serde(rename = "disableValidation")]
-    pub disable_validation: bool,
+    disable_validation: bool,
     #[serde(rename = "hapticMappings")]
-    pub haptic_mappings: Vec<HapticMapping>,
+    haptic_mappings: Vec<HapticMapping>,
     #[serde(rename = "categoryOptions")]
-    pub category_options: Vec<String>,
-    pub description: String,
+    category_options: Vec<String>,
+    description: String,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -167,13 +111,7 @@ pub struct Effect {
     pub offset_time: i32,
     #[serde(rename = "startTime")]
     pub start_time: i32,
-    pub modes: serde_json::Value, // TODO: Actually impelement modes
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum Modes {
-    VestFront(Mode),
-    VestBack(Mode),
+    pub modes: serde_json::Value,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

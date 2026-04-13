@@ -1,3 +1,3 @@
 
 pub mod maps;
-mod game;
+pub mod game;

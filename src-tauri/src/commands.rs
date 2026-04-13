@@ -4,7 +4,7 @@ use crate::{devices::{
 }, mapping::{MapHandle, MapInfo}, state::{self, Config, Devices, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
-use crate::mapping::{InputEventMessage, InputMap, NodeId};
+use crate::mapping::{InputEventMessage};
 use crate::log_err;
 
 use crate::{

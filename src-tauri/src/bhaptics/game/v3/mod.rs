@@ -5,13 +5,18 @@ use std::{
     fs::File,
     io::{self, BufReader},
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
-use super::{BhapticsGame, PatternLocation};
-use crate::mapping::{event::Event, global_map::InputMap, haptic_node::HapticNode, NodeGroup};
-use auth_message::handle_auth_init;
-use serde;
+use super::network::event_map::PatternLocation;
+use crate::{
+    bhaptics::{game::network, maps::pattern_to_events},
+    log_err,
+    mapping::{
+        event::Event, haptic_node::HapticNode, input_node::{InputNode, InputType},
+        InputEventMessage, MapHandle, NodeGroup,
+    },
+};
 use strum::IntoEnumIterator;
 
 use futures_util::{SinkExt, StreamExt};
@@ -23,283 +28,249 @@ use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_util::sync::CancellationToken;
 use tokio_websockets::Message;
 
-/// Holds information for the bhaptics v3 api.
-pub struct BhapticsApiV3 {
-    // list of events that represent 'EventName' String.
-    pub game_mapping: HashMap<String, Vec<Event>>,
-    // events that were triggered since last tick.
-    new_events: Vec<String>,
-    // info for bHaptics API
-    pub api_info: Option<ApiInfo>,
-    // user facing name
-    pub name: Option<String>,
-    // Channel for sumbitting messages to our sender.
-    ws_sender: Option<mpsc::UnboundedSender<Message>>,
-    // shuts down the TCP server.
-    shutdown_token: CancellationToken,
+const PATH_TO_CERT: &str = "security/localhost.crt";
+const PATH_TO_KEY: &str = "security/localhost.key";
+
+pub(crate) struct ApiInfo {
+    pub application_id: String,
+    pub api_key: String,
+    pub creator_id: String,
+    pub workspace_id: String,
 }
 
-pub struct ApiInfo {
-    application_id: String,
-    api_key: String,
-    creator_id: String,
-    workspace_id: String,
+/// per Connection local state.
+struct ConnectionState {
+    game_mapping: HashMap<String, Vec<Event>>,
+    api_info: Option<ApiInfo>,
+    name: Option<String>,
 }
 
-impl BhapticsApiV3 {
-    /// Creates a new instance, starts the server on a separate thread,
-    /// and returns an Arc-wrapped and Mutex-guarded game state.
-    pub fn new(game: Arc<Mutex<InputMap>>) -> Arc<Mutex<Self>> {
-        let shutdown_token = CancellationToken::new();
-        let api = Arc::new(Mutex::new(BhapticsApiV3 {
-            game_mapping: HashMap::new(),
-            new_events: Vec::new(),
-            api_info: None,
-            name: None,
-            ws_sender: None,
-            shutdown_token: shutdown_token.clone(),
-        }));
-
-        let api_clone = Arc::clone(&api);
-        // this block runs at most once, no matter how many times new() is called
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-            rt.block_on(async move {
-                log::trace!("Started bhaptics thread");
-                if let Err(e) = run_server(api_clone, shutdown_token, game).await {
-                    log::error!("Server error: {e:?}");
-                }
-            });
-        });
-
-        api
-    }
-
-    /// Returns the list of events that were triggerd during this tick.
-    pub fn tick(&mut self) -> Vec<Event> {
-        let mut new_events = Vec::new();
-        let new_events_names = std::mem::take(&mut self.new_events);
-
-        // Iterate over the events collected for THIS tick
-        for event_name in new_events_names {
-            if let Some(mapped_events) = self.game_mapping.get(&event_name) {
-                new_events.extend(mapped_events.iter().cloned());
-            } else {
-                log::trace!("Unknown event with name: {}", event_name);
-            }
-        }
-
-        new_events
-    }
-
-    /// Kills this API instance
-    ///
-    /// Shuts down the TCP listener by signalling the cancellation token.
-    pub fn shutdown(&self) {
-        self.shutdown_token.cancel();
-    }
-
-    /// Sends a text message over the established WebSocket connection.
-    ///
-    /// If no connection is available, a warning is logged.
-    fn send(&self, msg: Vec<SendMessage>) {
-        if let Some(ref sender) = self.ws_sender {
-            let data = serde_json::to_string(&msg).expect("couldn't create json for sending");
-            if let Err(e) = sender.send(Message::text(data)) {
-                log::error!("Failed to send message: {}", e);
-            }
-        } else {
-            log::warn!("No WebSocket connection available.");
-        }
+pub async fn run_server(map: MapHandle, token: CancellationToken) {
+    if let Err(e) = run_server_inner(map, token).await {
+        log::error!("bHaptics V3 server error: {:?}", e);
     }
 }
 
-/// Inserts the default bhaptics maps as inputs.
-fn insert_bhaptics_maps(map: Arc<Mutex<InputMap>>) {
-    let input_lock = map.lock().expect("Unable to lock input_list");
-
-    for loc in PatternLocation::iter() {
-        for index in 0..loc.motor_count() {
-            let position = loc.to_position(index);
-            let node = HapticNode {
-                x: position.x,
-                y: position.y,
-                z: position.z,
-                groups: vec![NodeGroup::All], //TODO: Actually make the groups apply right.
-            };
-            let tags = vec!["Bhaptics_V3".to_string(), loc.to_input_tag().to_string()];
-            if let Some(id) = loc.to_id(index) {
-                // doesn't really matter if it is already there, we want to keep only one instance.
-                let _ = input_lock.add_input_node(node, tags, id.0, 0.1, None);
-            }
-        }
-    }
-}
-
-/// Removes all bhaptics maps from the global input list.
-fn remove_bhaptics_maps(map: Arc<Mutex<InputMap>>) {
-    let input_lock = map.lock().expect("Unable to lock inputs");
-    input_lock.remove_all_with_tag(&"Bhaptics_V3".to_string());
-}
-
-/// Runs the server by setting up TLS, binding the TCP listener, and
-/// handling incoming connections with cancellation support.
-async fn run_server(
-    api: Arc<Mutex<BhapticsApiV3>>,
-    shutdown_token: CancellationToken,
-    game: Arc<Mutex<InputMap>>,
-) -> io::Result<()> {
+async fn run_server_inner(map: MapHandle, token: CancellationToken) -> io::Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 15882));
-    let certs = load_certs(PATH_TO_CERT).expect("couldn't load cert");
-    let key = load_key(PATH_TO_KEY).expect("couldn't load key");
+    let certs = load_certs(PATH_TO_CERT)?;
+    let key = load_key(PATH_TO_KEY)?;
 
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(certs, key)
-        .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
 
     let acceptor = TlsAcceptor::from(Arc::new(config));
-    let listener = match TcpListener::bind(&addr).await {
-        Ok(list) => list,
-        Err(e) => {
-            log::error!("Error connecting to bhaptics dedicated port: {}", e);
-            return Err(e);
-        }
-    };
+    let listener = TcpListener::bind(&addr).await?;
     log::info!("bHaptics V3 API server started on {}", addr);
 
-    // loop every time we gain a new connection.
     loop {
         tokio::select! {
-            _ = shutdown_token.cancelled() => {
-                break;
-            }
-            accept_result = listener.accept() => {
-                match accept_result {
+            _ = token.cancelled() => break,
+            result = listener.accept() => {
+                match result {
                     Ok((stream, _)) => {
-                        let acceptor_clone = acceptor.clone();
-                        let game_clone = Arc::clone(&api);
-                        let map_clone = Arc::clone(&game);
+                        let acceptor = acceptor.clone();
+                        let map = map.clone();
+                        let child = token.child_token();
                         tokio::spawn(async move {
-                            insert_bhaptics_maps(map_clone.clone());
-                            if let Err(e) = handle_connection(
-                                stream,
-                                acceptor_clone,
-                                game_clone
-                            ).await {
-                                log::error!("Connection error: {:?}", e);
-
-                            };
-                            remove_bhaptics_maps(map_clone);
+                            if let Err(e) = handle_connection(stream, acceptor, map, child).await {
+                                log::error!("V3 connection error: {:?}", e);
+                            }
                         });
                     }
-                    Err(e) => {
-                        log::error!("Failed to accept connection: {:?}", e);
-                    }
+                    Err(e) => log::error!("V3 accept error: {:?}", e),
                 }
             }
         }
-        // after each disconneciton remove our maps from input.
     }
-    log::info!("Listener loop terminated.");
+
+    log::info!("bHaptics V3 listener terminated.");
     Ok(())
 }
 
-/// Handles an individual incoming connection, performing the TLS handshake,
-/// upgrading to WebSocket, and managing messaging.
-/// Blocks until connection is terminated.
+
 async fn handle_connection(
     stream: tokio::net::TcpStream,
     acceptor: TlsAcceptor,
-    api: Arc<Mutex<BhapticsApiV3>>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let stream = acceptor.accept(stream).await?;
+    map: MapHandle,
+    token: CancellationToken,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let tls_stream = acceptor.accept(stream).await?;
     let (_request, ws_stream) = tokio_websockets::ServerBuilder::new()
-        .accept(stream)
+        .accept(tls_stream)
         .await?;
-    log::info!("New WebSocket connection established");
+    log::info!("V3 WebSocket connection established");
 
-    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-    let (tx, mut rx) = mpsc::unbounded_channel::<tokio_websockets::Message>();
+    let (mut ws_write, mut ws_read) = ws_stream.split();
+    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
-    // Store sending tx into api class
-    {
-        let mut api_lock = api.lock().unwrap();
-        api_lock.ws_sender = Some(tx);
-    }
-
-    // Spawn a task to forward outgoing messages.
+    // Forward outgoing messages to the WebSocket writer half.
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            if ws_sender.send(msg).await.is_err() {
-                log::error!("Failed to send message over WebSocket");
+            if ws_write.send(msg).await.is_err() {
                 break;
             }
         }
     });
 
-    log::trace!("Connected to a bhaptics v3 game.");
+    insert_bhaptics_maps(&map).await;
 
-    // Process incoming messages.
-    while let Some(result) = ws_receiver.next().await {
-        match result {
-            Ok(msg) if msg.is_text() => {
-                msg_received(msg, Arc::clone(&api));
-            }
-            Ok(msg) if msg.is_ping() || msg.is_pong() => { /* Ignore ping/pong messages.*/ }
-            Ok(_) => {
-                log::warn!("Received non-text message");
-            }
-            Err(e) => {
-                log::error!("WebSocket error: {:?}", e);
-                break;
+    let mut state = ConnectionState {
+        game_mapping: HashMap::new(),
+        api_info: None,
+        name: None,
+    };
+
+    loop {
+        tokio::select! {
+            _ = token.cancelled() => break,
+            frame = ws_read.next() => {
+                match frame {
+                    Some(Ok(msg)) if msg.is_text() => {
+                        let raw = msg.as_text().expect("checked is_text");
+                        handle_message(raw, &mut state, &map, &tx).await;
+                    }
+                    Some(Ok(msg)) if msg.is_ping() || msg.is_pong() => {}
+                    Some(Ok(_)) => log::warn!("V3: non-text message received"),
+                    Some(Err(e)) => {
+                        log::error!("V3 WebSocket error: {:?}", e);
+                        break;
+                    }
+                    None => break,
+                }
             }
         }
     }
+
+    remove_bhaptics_maps(&map).await;
+    log::info!("V3 connection closed");
     Ok(())
 }
 
-/// Handles decoding message strings into their respective structs.
-fn msg_received(msg: Message, api: Arc<Mutex<BhapticsApiV3>>) {
-    let raw_text = msg.as_text().expect("Failed to convert message to text");
-
-    match serde_json::from_str::<RecievedMessage>(raw_text) {
-        Ok(RecievedMessage::SdkRequestAuthInit(contents)) => handle_auth_init(&contents, api),
-        Ok(RecievedMessage::SdkPlay(event)) => {
-            handle_sdk_play(api, &event);
-            log::trace!("Played event: {}", event);
+/// processes each message received over the websocket
+async fn handle_message(
+    raw: &str,
+    state: &mut ConnectionState,
+    map: &MapHandle,
+    ws_tx: &mpsc::UnboundedSender<Message>,
+) {
+    match serde_json::from_str::<ReceivedMessage>(raw) {
+        Ok(ReceivedMessage::SdkRequestAuthInit(contents)) => {
+            handle_auth(&contents, state, ws_tx).await;
         }
-        Ok(RecievedMessage::SdkStopAll(_)) => {
-            log::trace!("Stop all not implemented");
+        Ok(ReceivedMessage::SdkPlay(payload)) => {
+            handle_play(&payload, state, map).await;
         }
-        Err(e) => log::error!("Error decoding {:?}: {}", raw_text, e),
+        Ok(ReceivedMessage::SdkStopAll(_)) => {
+            log_err!(
+                map.send_event(InputEventMessage::CancelAllWithTags(
+                    vec!["Bhaptics_V3".to_string()]
+                ))
+                .await
+            );
+        }
+        Err(e) => log::error!("V3 decode error: {} | raw: {:?}", e, raw),
     }
 }
 
-fn handle_sdk_stop(game: &Arc<Mutex<BhapticsGame>>) {
-    let lock = game.lock().expect("Couldn't get game lock");
-    let mut in_list = lock.global_map.lock().expect("couldn't lock input_list");
-    in_list.clear_events(&"Bhaptics".to_string());
-}
+/// Responds to the authorization message specifically.
+async fn handle_auth(
+    contents: &str,
+    state: &mut ConnectionState,
+    ws_tx: &mpsc::UnboundedSender<Message>,
+) {
+    log::info!("V3: Received Auth Init");
 
-fn handle_sdk_play(api: Arc<Mutex<BhapticsApiV3>>, input: &str) {
-    let mut api_lock = api.lock().expect("Api lock");
-
-    let content = serde_json::from_str::<SdkPlayMessage>(input);
-    match content {
-        Ok(content) => {
-            api_lock.new_events.push(content.event_name);
+    let parsed = match auth_message::parse_auth_init(contents) {
+        Ok(p) => p,
+        Err(e) => {
+            log::error!("V3: Failed to parse auth: {}", e);
+            return;
         }
-        Err(err) => log::error!(
-            "Error decoding bhaptics play message: {} \n Content: {:?}",
-            err,
-            input
-        ),
+    };
+
+    state.name = Some(parsed.name);
+    state.api_info = Some(ApiInfo {
+        application_id: parsed.application_id.clone(),
+        api_key: parsed.api_key.clone(),
+        creator_id: parsed.creator_id,
+        workspace_id: parsed.workspace_id,
+    });
+
+    // Respond to the game immediately so it starts sending events.
+    let response = create_init_response();
+    if let Ok(json) = serde_json::to_string(&response) {
+        let _ = ws_tx.send(Message::text(json));
+    }
+
+    // Fetch mappings from the bHaptics HTTP API.
+    let api_key = parsed.api_key;
+    let app_id = parsed.application_id;
+
+    match tokio::task::spawn_blocking(move || network::fetch_mappings(api_key, app_id, -1)).await {
+        Ok(Ok(mapping)) => {
+            for hapt in mapping.haptic_mappings {
+                let key = hapt.key.clone();
+                let events = pattern_to_events(hapt);
+                state.game_mapping.insert(key, events);
+            }
+            log::info!("V3: Loaded {} event mappings", state.game_mapping.len());
+        }
+        Ok(Err(e)) => log::error!("V3: fetch_mappings error: {:?}", e),
+        Err(e) => log::error!("V3: mapping task panicked: {:?}", e),
     }
 }
 
-const PATH_TO_CERT: &str = "security/localhost.crt";
-const PATH_TO_KEY: &str = "security/localhost.key";
+/// Sends a play message to the map
+async fn handle_play(payload: &str, state: &ConnectionState, map: &MapHandle) {
+    match serde_json::from_str::<SdkPlayMessage>(payload) {
+        Ok(msg) => {
+            if let Some(events) = state.game_mapping.get(&msg.event_name) {
+                log_err!(
+                    map.send_event(InputEventMessage::StartEvents(events.clone()))
+                        .await
+                );
+                log::trace!("V3: Started event: {}", msg.event_name);
+            } else {
+                log::trace!("V3: Unknown event: {}", msg.event_name);
+            }
+        }
+        Err(e) => log::error!("V3: SdkPlay parse error: {} | {:?}", e, payload),
+    }
+}
+
+/// On connection; initializes our nodes we will address through events later.
+async fn insert_bhaptics_maps(map: &MapHandle) {
+    for loc in PatternLocation::iter() {
+        for index in 0..loc.motor_count() {
+            let pos = loc.to_position(index);
+            let node = HapticNode {
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+                groups: vec![NodeGroup::All],
+            };
+            let tags = vec!["Bhaptics_V3".to_string(), loc.to_input_tag().to_string()];
+            if let Some(id) = loc.to_id(index) {
+                let input = InputNode::new(node, tags, id, 0.1, InputType::ADDITIVE);
+                log_err!(map.send_event(InputEventMessage::InsertNode(input)).await);
+            }
+        }
+    }
+}
+
+/// Removes all nodes associated with our connection.
+async fn remove_bhaptics_maps(map: &MapHandle) {
+    log_err!(
+        map.send_event(InputEventMessage::RemoveWithTags(vec![
+            "Bhaptics_V3".to_string()
+        ]))
+        .await
+    );
+}
+
 
 fn load_certs(path: &str) -> io::Result<Vec<CertificateDer<'static>>> {
     certs(&mut BufReader::new(File::open(path)?)).collect()
@@ -313,24 +284,18 @@ fn load_key(path: &str) -> io::Result<PrivateKeyDer<'static>> {
 }
 
 fn create_init_response() -> Vec<SendMessage> {
-    let messages: Vec<SendMessage> = vec![
+    vec![
         SendMessage::ServerReady,
         SendMessage::ServerEventNameList(vec!["event_names".to_string()]),
         SendMessage::ServerEventList(vec![]),
-    ];
-
-    return messages;
+    ]
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "message")]
-/// Intermediary enum to direct string parsing
-enum RecievedMessage {
-    /// The first message sent from the game
+enum ReceivedMessage {
     SdkRequestAuthInit(String),
-    /// The message that triggers the start of a haptic event
     SdkPlay(String),
-    /// Clears all active events
     SdkStopAll(Option<String>),
 }
 
@@ -345,13 +310,13 @@ pub enum SendMessage {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerEvent {
-    event_name: String,
-    event_time: u32,
+    pub event_name: String,
+    pub event_time: u32,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SdkPlayMessage {
+struct SdkPlayMessage {
     event_name: String,
     request_id: u32,
     position: u32,
