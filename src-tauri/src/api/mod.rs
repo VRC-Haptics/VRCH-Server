@@ -245,29 +245,56 @@ impl ApiManager {
 
         // try to retrieve remote
         let remote_maps_guard = self.remote_maps.lock().await;
-        if let Some(ref remote_maps) = *remote_maps_guard {
-            for remote in remote_maps.iter() {
-                if name == remote.name && author == remote.author {
-                    let request_url = self.base_url.clone() + &remote.url;
-                    // if we can't load the desired map refresh the index and recursively try again.
-                    if let Ok(content) = get(&request_url).await {
-                        if let Ok(map) = content.json::<GameMap>().await {
-                            return Ok(map);
+    if let Some(ref remote_maps) = *remote_maps_guard {
+        for remote in remote_maps.iter() {
+            if name == remote.name && author == remote.author {
+                let request_url = self.base_url.clone() + &remote.url;
+                if let Ok(content) = get(&request_url).await {
+                    if let Ok(map) = content.json::<GameMap>().await {
+                        // Cache to disk
+                        let cache_dir = PathBuf::from(&self.config_folder);
+                        if let Err(e) = fs::create_dir_all(&cache_dir) {
+                            log::warn!("Failed to create cache dir: {}", e);
                         } else {
-                            return Err(ApiRetrievalError::BadResponseFromServer(format!(
-                                "Bad map received from server. Author:{}, name:{}, version:{}",
-                                remote.author, remote.name, remote.version
-                            )));
+                            let filename = format!("{}_{}_{}.json", author, name, version);
+                            let cache_path = cache_dir.join(&filename);
+                            match serde_json::to_string_pretty(&map) {
+                                Ok(json) => {
+                                    if let Err(e) = fs::write(&cache_path, &json) {
+                                        log::warn!("Failed to write cached map: {}", e);
+                                    } else {
+                                        log::debug!("Cached map to {:?}", cache_path);
+                                        // Update local index with the new entry
+                                        let mut local = self.local_maps.lock().await;
+                                        local.insert(LocalAvailableMap {
+                                            author: remote.author.clone(),
+                                            name: remote.name.clone(),
+                                            version: remote.version,
+                                            path: cache_path,
+                                        });
+                                    }
+                                }
+                                Err(e) => {
+                                    log::warn!("Failed to serialize map for caching: {}", e);
+                                }
+                            }
                         }
+                        return Ok(map);
                     } else {
-                        return Err(ApiRetrievalError::UnableToRetrieve(format!(
-                            "Error Retrieving: {}",
-                            request_url
+                        return Err(ApiRetrievalError::BadResponseFromServer(format!(
+                            "Bad map received from server. Author:{}, name:{}, version:{}",
+                            remote.author, remote.name, remote.version
                         )));
                     }
+                } else {
+                    return Err(ApiRetrievalError::UnableToRetrieve(format!(
+                        "Error Retrieving: {}",
+                        request_url
+                    )));
                 }
             }
         }
+    }
 
         Err(ApiRetrievalError::MapNotFound(format!(
             "No Map found for:  Author:{}, name:{}, version:{}",
