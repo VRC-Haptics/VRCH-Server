@@ -1,7 +1,7 @@
 // local modules
 use crate::{devices::{
     Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, update::Firmware, //update::{Firmware, UpdateMethod}
-}, mapping::{MapHandle, MapInfo}, state::{self, Config, Devices, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
+}, mapping::{MapHandle, MapInfo}, state::{self, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::{InputEventMessage};
@@ -9,13 +9,11 @@ use crate::log_err;
 
 use crate::{
     util::math::Vec3,
-    vrc::{config::GameMap, VrcGame},
+    vrc::{config::GameMap},
 };
-use futures::future::Map;
 //standard imports
 use runas::Command;
-use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use std::sync::Arc;
 use tokio::time::Duration;
 
 #[tauri::command]

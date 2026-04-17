@@ -5,14 +5,14 @@
 // make local modules available
 pub mod api;
 mod network;
-mod bhaptics;
+pub mod bhaptics;
 pub mod devices;
 pub mod mapping;
 pub mod osc;
 pub mod state;
 pub mod util;
 pub(crate) mod wrappers;
-mod vrc;
+pub mod vrc;
 
 // local modules
 use api::ApiManager;
@@ -22,11 +22,13 @@ use vrc::VrcGame;
 //standard imports
 use once_cell::sync::OnceCell;
 use std::panic::{set_hook, take_hook};
+use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use tokio::sync::Mutex;
 
 use crate::bhaptics::game::BhapticHandle;
+use crate::devices::Device;
 use crate::devices::{DeviceHandle, bhaptics::start_ble};
 use crate::mapping::start_interp_map;
 use crate::{
@@ -86,22 +88,42 @@ async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle, Bhap
     (vrc_handle, map_handle, bhaptic)
 }
 
-pub fn run_server(config_path: String) -> (VrcHandle, MapHandle, BhapticHandle) {
-    let default_panic = take_hook();
-    set_hook(Box::new(move |info| {
-        log::logger().flush();
-        log::error!("Panic Captured: {info}");
-        log::logger().flush();
-        default_panic(info);
-    }));
+/// Handles spawning the various components of the haptic server using the config_dir as the root to our configuration, and cache. 
+pub async fn start_server(config_dir: PathBuf) -> (VrcHandle, MapHandle, BhapticHandle, DeviceHandle) {
+    state::set_config_dir(config_dir);
+    let _ = state::get_config();
+    state::init_save_loop().await;
 
+    {
+        let mut api = API_MANAGER.lock().await;
+        api.refresh_caches().await;
+    }
+
+    let mut manager = DeviceManager::new();
+    init_device_manager(&mut manager).await;
+    if let Err(e) = DEVICE_MANAGER.set(manager.get_handle()) {
+        log::error!("Failed to start device manager: {:?}", e);
+    }
+    let device_handle = manager.get_handle();
+
+    let (vrc, map, bh) = start_async_tasks(device_handle.clone()).await;
+
+    (vrc, map, bh, device_handle)
+}
+
+
+/// Starts the various components of the server and returns their handles. 
+/// 
+/// Same as start_server but does not rely on an existing runtime.
+pub fn start_server_blocking(config_dir: PathBuf) -> (VrcHandle, MapHandle, BhapticHandle, DeviceHandle) {
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
     let _running_handle = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("unable to start sub tokio runtime");
         rt.block_on(async move {
+            state::set_config_dir(config_dir);
             let _ = state::get_config();
-            state::init_save_loop(config_path).await;
+            state::init_save_loop().await;
 
             {
                 let mut api = API_MANAGER.lock().await;
@@ -115,8 +137,8 @@ pub fn run_server(config_path: String) -> (VrcHandle, MapHandle, BhapticHandle) 
             }
             let device_handle = manager.get_handle();
 
-            let handles = start_async_tasks(device_handle).await;
-            let _ = tx.send(handles);
+            let (vrc, map, bh) = start_async_tasks(device_handle.clone()).await;
+            let _ = tx.send((vrc, map, bh, device_handle));
 
             // Keep the runtime alive after sending handles
             std::future::pending::<()>().await;

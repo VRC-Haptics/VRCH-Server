@@ -4,35 +4,46 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::PathBuf,
-    sync::{Arc, OnceLock, atomic::AtomicBool},
+    sync::{Arc, LazyLock, OnceLock, atomic::AtomicBool},
     time::Duration,
 };
 
 use crate::{
-    devices::DeviceId,
-    mapping::interp::{GaussianState, InterpAlgo},
+    devices::DeviceId, log_err, mapping::interp::{GaussianState, InterpAlgo}
 };
 
 // not intended to be accessed publicly. Use functions below
-static CONFIG: LazyLock<Config> = OnceLock::new();
+static CONFIG: LazyLock<Config> = LazyLock::new(|| {load_config().unwrap_or_default()});
+/// init by set_config_dir
 static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
+/// init by load_config
+static CONFIG_FILE: OnceLock<PathBuf> = OnceLock::new();
 static DIRTY: AtomicBool = AtomicBool::new(false);
 
+/// Only intended to be called once
 fn load_config() -> Option<Config> {
-    let data = fs::read_to_string(path).ok()?;
+    let mut dir = CONFIG_DIR.get()?.clone();
+    dir.push("memory");
+    dir.set_extension("json");
+    log_err!(CONFIG_FILE.set(dir.clone()));
+
+    let data = fs::read_to_string(dir).ok()?;
     serde_json::from_str(&data).ok()
+}
+
+pub fn set_config_dir(path: PathBuf) {
+    log_err!(CONFIG_DIR.set(path));
 }
 
 
 /// ONLY USED AT PROGRAM START. NOT A GENERAL USE FUNCTION.
-pub async fn init_save_loop(abs_path: String) {
-    let path = PathBuf::from(abs_path);
+pub async fn init_save_loop() {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(500));
         loop {
             interval.tick().await;
             if DIRTY.swap(false, std::sync::atomic::Ordering::AcqRel) {
-                save_config(&path);
+                save_config();
             }
         }
     });
@@ -44,17 +55,18 @@ pub fn mark_dirty() {
 }
 
 /// Heavy function, persists a snapshot of our config to the disk.
-pub fn save_config(path: &PathBuf) {
+pub fn save_config() {
+    let path = CONFIG_FILE.get().expect("Should have initialized config before calling save loop");
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let _ = fs::write(path, serde_json::to_string_pretty(&*CONFIG.get().unwrap()).unwrap());
+    let _ = fs::write(path, serde_json::to_string_pretty(get_config()).unwrap());
 }
 
 
 /// returns bare static reference to global app configuration (state)
 pub fn get_config() -> &'static Config {
-    &*CONFIG.get().unwrap()
+    &*CONFIG
 }
 
 /// Main method for retrieving a read-only view of a device configuration.
@@ -63,14 +75,14 @@ pub fn get_config() -> &'static Config {
 /// Saved device index,
 /// static reference to device.
 pub fn get_device(id: &DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
-    let Some(existing) = CONFIG.get().unwrap()
+    let Some(existing) = CONFIG
         .devices
         .states
         .iter()
         .find(|(_, d)| d.load().id == *id)
     else {
         let idx = update_device(Arc::new(PerDevice::default(id.clone())));
-        return (idx.clone(), CONFIG.get().unwrap()
+        return (idx.clone(), CONFIG
             .devices
             .states.get(idx).expect("The device should have just been created."))
     };
@@ -80,13 +92,13 @@ pub fn get_device(id: &DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
 /// Either updates an existing PerDevice with the same id, or adds it to known devices
 /// returns index device was stored at.
 pub fn update_device(state: Arc<PerDevice>) -> usize {
-    let Some((idx, existing)) = CONFIG.get().unwrap()
+    let Some((idx, existing)) = CONFIG
         .devices
         .states
         .iter()
         .find(|(_, d)| d.load().id == state.id)
     else {
-        return CONFIG.get().unwrap().devices.states.push(ArcSwap::new(state));
+        return CONFIG.devices.states.push(ArcSwap::new(state));
     };
     existing.swap(state);
     idx
