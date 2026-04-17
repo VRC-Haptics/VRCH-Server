@@ -6,7 +6,8 @@ fn rad_to_deg(rad: f32) -> f32 {
 }
 
 /// Minimal 3‑vector with **f32** components for high‑throughput numeric geometry.
-#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, Debug, Default, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, Debug, Default)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,

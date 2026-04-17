@@ -15,6 +15,7 @@ name = "vrch_gui_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
 console-subscriber = "0.5"
@@ -36,7 +37,7 @@ tauri-plugin-log = "2"
 tauri-plugin-serialplugin = "2.21.1"
 
 # project stuff
-haptic-core = { path = "../src-core"}
+haptic-core = { path = "../src-core", features = ["tauri-get", "specta"]}
 tokio = {version = "1.42.1", features = ["rt-multi-thread", "full", "tracing"] }
 dunce = "1.0.5"
 log = "0.4.27"

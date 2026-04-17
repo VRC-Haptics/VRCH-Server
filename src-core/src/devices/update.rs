@@ -14,7 +14,8 @@ pub fn is_updateable(dtype: &HapticDevice) -> bool {
 }
 
 /// Bundle containing all user-required information to start a firmware update.
-#[derive(serde::Deserialize, serde::Serialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub struct Firmware {
     /// The ID that should be used to find the device:
     pub id: String,
@@ -65,7 +66,8 @@ impl Firmware {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub struct OtaPassword(String);
 impl Deref for OtaPassword {
     type Target = String;
@@ -84,7 +86,8 @@ impl DerefMut for OtaPassword {
 /// Which method to use.
 ///
 /// Can contain information on details that aren't automatically negotiable.
-#[derive(serde::Deserialize, serde::Serialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub enum UpdateMethod {
     /// over the air updatetyp. OtaPassword; authentication password (default: `Haptics-OTA`)
     OTA(OtaPassword),

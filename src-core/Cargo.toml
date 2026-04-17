@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = []
 tauri-get = ["dep:tauri-plugin-http"]
+specta = ["dep:specta"]
 
 [dependencies]
 tauri-plugin-http = { version = "2", features = ["blocking"], optional = true}
@@ -40,7 +41,7 @@ enum_dispatch = "0.3.13"
 hazarc = { version = "0.1.0", features = ["serde"] }
 arc-swap = { version = "1.8.1", features = ["serde"] }
 boxcar = "0.2.14"
-specta = { version = "2.0.0-rc.24", features = ["serde_json"] }
+specta = { version = "2.0.0-rc.24", features = ["serde_json"], optional = true }
 rayon = "1.11.0"
 mdns-sd = "0.19.0"
 warp = { version = "0.4.2", features = ["server"] }

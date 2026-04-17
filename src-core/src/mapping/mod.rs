@@ -31,7 +31,8 @@ use crate::{
 };
 
 /// Snapshot of map state.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct MapInfo {
     nodes: Vec<InputNode>,
     events: Vec<Event>,
@@ -427,8 +428,9 @@ pub enum InputEventMessage {
 
 /// Descriptors for location groups.
 /// Allows for segmented Interpolation
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(
-    PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter, specta::Type,
+    PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter,
 )]
 pub enum NodeGroup {
     Head,
@@ -451,7 +453,8 @@ pub enum NodeGroup {
     All,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 /// Id unique to the node it references.
 /// if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
 pub struct NodeId(pub String);

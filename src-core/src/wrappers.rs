@@ -1,6 +1,7 @@
 use rosc::OscType;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum SpectaOscType {
     Int(i32),
     Float(f32),

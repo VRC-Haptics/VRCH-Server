@@ -7,7 +7,8 @@ use crate::util::math::{self, Vec3};
 /// Used for mapping from one haptic model to another.
 /// Units are in Meters: Y is vertical, X is aligned with the Right Arm, Z is towards the front.
 /// Standard location is zeroed at the reference models feet, directly below the viewpoint.
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct HapticNode {
     /// Standard Location in x (meters)
     pub x: f32,

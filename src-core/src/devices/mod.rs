@@ -39,7 +39,8 @@ pub enum HapticDevice {
 /// 
 /// An informattion that should be in all variants should be made so via the below impl.
 /// Don't manually dip into each variant please.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceInfo {
     Wifi(WifiDeviceInfo),
@@ -294,7 +295,8 @@ fn handle_device_message(
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DeviceId(pub String);
 
 impl Deref for DeviceId {
@@ -318,7 +320,8 @@ impl From<&str> for DeviceId {
 }
 
 /// The firmware type returned from the device.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize,specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
 pub enum ESP32Model {
     /// All original ESP32 variants
     ESP32,

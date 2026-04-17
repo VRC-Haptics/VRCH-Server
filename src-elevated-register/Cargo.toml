@@ -8,6 +8,7 @@ dunce = "1.0.5"
 winreg = "0.55.0"
 
 [build-dependencies]
+winres = "0.1.12"
 
 [package.metadata.winres]
 FileDescription = "A sidecar of VRCHapitcs that sets the registry entries used by bHaptics. Allows for limited elevated privledges."

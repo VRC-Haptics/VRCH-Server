@@ -79,7 +79,8 @@ impl OscQueryNode {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub enum OscAccessLevel {
     Refused,   // 0 – no value associated
     OnlyRead,  // 1 – value may only be retrieved
@@ -111,7 +112,8 @@ impl From<u8> for OscAccessLevel {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct OscInfo {
     pub full_path: OscPath,
     pub access: OscAccessLevel,

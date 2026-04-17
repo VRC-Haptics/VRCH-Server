@@ -3,7 +3,8 @@ use crate::util::math::Vec3;
 use super::haptic_node::HapticNode;
 use super::NodeId;
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone,specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 /// All information needed to compute an OuputNode of any given location
 pub struct InputNode {
     /// id Unique to this InputNode
@@ -20,7 +21,8 @@ pub struct InputNode {
     pub input_type: InputType,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 /// Describes how an `InputNode` should be used during interpolation.
 ///
 /// Layers are ordered in processing order according to the enum, with the cumulative outputs being passed to the next step.

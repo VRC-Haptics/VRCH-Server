@@ -40,7 +40,8 @@ use tokio::sync::{
 /// struct exposed to the UI.
 ///
 /// Seperates serializable with under the hood specifications.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct VrcInfo {
     pub is_connected: bool,
     pub in_port: Option<u16>,
@@ -457,7 +458,8 @@ fn to_inputs(avi: &Avatar) -> Vec<InputNode> {
     nodes
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 /// Abstraction over raw VRC parameters.
 ///
 /// Represents all relevant *Descriptive* data. Does not contain any relevant high-speed or low latency datat.
@@ -470,7 +472,8 @@ pub struct Avatar {
     configs: Vec<GameMap>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 /// Simple wrapper for the String class.
 /// Represnts a full OscPath without any elements stripped,
 /// other than the VRC Fury naming.

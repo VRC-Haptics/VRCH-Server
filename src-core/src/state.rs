@@ -115,13 +115,15 @@ pub struct Config {
     pub ui: ArcSwap<UiSettings>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitRepo {
     pub owner: String,
     pub name: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Handles all settings only needed for the frontend.
 pub struct UiSettings {
     pub theme: String,

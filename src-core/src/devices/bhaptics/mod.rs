@@ -17,7 +17,8 @@ use crate::{
     mapping::{haptic_node::HapticNode, NodeGroup},
 };
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct BhapticInfo {
     pub id: DeviceId,
     pub nodes: Vec<HapticNode>,
@@ -41,7 +42,8 @@ const X16_NODE_INDICES: [usize; 16] = [
     32, 33, 34, 35,
 ];
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BhapticsModel {
     TacsuitX16,
 }

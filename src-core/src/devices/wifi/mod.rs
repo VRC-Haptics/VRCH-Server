@@ -70,7 +70,8 @@ impl Default for WifiDeviceState {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, specta::Type)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct WifiDeviceInfo {
     pub nodes: Vec<HapticNode>,
     pub remote_addr: SocketAddr,
