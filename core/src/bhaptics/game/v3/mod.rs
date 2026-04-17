@@ -209,8 +209,8 @@ async fn handle_auth(
     let api_key = parsed.api_key;
     let app_id = parsed.application_id;
 
-    match tokio::task::spawn_blocking(move || network::fetch_mappings(api_key, app_id, -1)).await {
-        Ok(Ok(mapping)) => {
+    match network::fetch_mappings(api_key, app_id, -1).await {
+        Ok(mapping) => {
             for hapt in mapping.haptic_mappings {
                 let key = hapt.key.clone();
                 let events = pattern_to_events(hapt);
@@ -218,7 +218,6 @@ async fn handle_auth(
             }
             log::info!("V3: Loaded {} event mappings", state.game_mapping.len());
         }
-        Ok(Err(e)) => log::error!("V3: fetch_mappings error: {:?}", e),
         Err(e) => log::error!("V3: mapping task panicked: {:?}", e),
     }
 }

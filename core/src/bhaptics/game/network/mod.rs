@@ -8,7 +8,8 @@ use std::{
 
 use directories::ProjectDirs;
 use event_map::{BaseMessage, GameMapping};
-use tauri_plugin_http::reqwest::blocking::get;
+
+use crate::network::{self, fetch_text};
 
 const CACHE_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 
@@ -42,7 +43,7 @@ fn write_cache(path: &PathBuf, mapping: &GameMapping) {
 /// Results are cached to disk and reused for up to 24 hours.
 ///
 /// Set version to -1 to get latest version.
-pub fn fetch_mappings(
+pub async fn fetch_mappings(
     api_key: String,
     app_id: String,
     version: i32,
@@ -61,8 +62,8 @@ pub fn fetch_mappings(
         version, api_key, app_id
     );
 
-    let resp = get(url).map_err(FetchMappingsError::HttpError)?;
-    let body = resp.text().map_err(FetchMappingsError::HttpError)?;
+    let resp = fetch_text(&url).await.map_err(FetchMappingsError::HttpError)?;
+    let body = resp;
     let msg: BaseMessage =
         serde_json::from_str(&body).map_err(|e| FetchMappingsError::DeserializeError(e, body))?;
 
@@ -75,6 +76,6 @@ pub fn fetch_mappings(
 
 #[derive(Debug)]
 pub enum FetchMappingsError {
-    HttpError(reqwest::Error),
+    HttpError(network::HttpError),
     DeserializeError(serde_json::Error, String),
 }

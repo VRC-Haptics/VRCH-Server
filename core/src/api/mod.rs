@@ -4,8 +4,7 @@ use std::sync::Arc;
 use std::{collections::HashSet, path::PathBuf};
 use tokio::sync::Mutex;
 use walkdir::WalkDir;
-
-use tauri_plugin_http::reqwest::get;
+use crate::network::fetch_text;
 
 pub struct ApiManager {
     pub config_folder: String,
@@ -23,6 +22,7 @@ pub struct NetworkAvailableMap {
     version: u32,
     url: String,
 }
+
 
 /// Represents the config files available on disk
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Hash, PartialEq, Eq)]
@@ -168,22 +168,16 @@ impl ApiManager {
         base_url: String,
         remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>,
     ) {
-        match get(base_url.clone() + "catalog.json").await {
+        match fetch_text(&(base_url.clone() + "catalog.json")).await {
             Ok(res) => {
-                log::trace!("Retrieved remote index with status: {:?}", res.status());
-                match res.text().await {
-                    Ok(text) => match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
-                        Ok(updated_index) => {
-                            let mut maps = remote_maps.lock().await;
-                            *maps = Some(updated_index);
-                        }
-                        Err(err) => {
-                            log::error!("Unable to parse returned response: {}\n{}", err, &text);
-                        }
-                    },
-                    Err(err) => {
-                        log::error!("Unable to get text from index response: {}", err);
-                    }
+                match serde_json::from_str::<Vec<NetworkAvailableMap>>(&res) {
+                Ok(updated_index) => {
+                    let mut maps = remote_maps.lock().await;
+                    *maps = Some(updated_index);
+                }
+                Err(err) => {
+                    log::error!("Unable to parse returned response: {}\n{}", err, &res);
+                }
                 }
             }
             Err(err) => {
@@ -249,8 +243,8 @@ impl ApiManager {
         for remote in remote_maps.iter() {
             if name == remote.name && author == remote.author {
                 let request_url = self.base_url.clone() + &remote.url;
-                if let Ok(content) = get(&request_url).await {
-                    if let Ok(map) = content.json::<GameMap>().await {
+                if let Ok(content) = fetch_text(&request_url).await {
+                    if let Ok(map) = serde_json::from_str::<GameMap>(&content) {
                         // Cache to disk
                         let cache_dir = PathBuf::from(&self.config_folder);
                         if let Err(e) = fs::create_dir_all(&cache_dir) {
@@ -346,24 +340,16 @@ impl ApiManager {
     /// Calls to refresh files available on the remote index.
     /// Fills self.available_maps with result.
     pub async fn refresh_remote_index(&mut self) {
-        match get(self.base_url.clone() + "catalog.json").await {
-            Ok(res) => {
-                log::trace!("Retrieved remote index with status: {:?}", res.status());
-                match res.text().await {
-                    Ok(text) => match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
-                        Ok(updated_index) => {
-                            let mut maps = self.remote_maps.lock().await;
-                            *maps = Some(updated_index);
-                        }
-                        Err(err) => {
-                            log::error!("Unable to parse returned response: {}\n{}", err, &text);
-                        }
-                    },
-                    Err(err) => {
-                        log::error!("Unable to get text from index response: {}", err);
-                    }
+        match fetch_text(&(self.base_url.clone() + "catalog.json")).await {
+            Ok(text) => match serde_json::from_str::<Vec<NetworkAvailableMap>>(&text) {
+                Ok(updated_index) => {
+                    let mut maps = self.remote_maps.lock().await;
+                    *maps = Some(updated_index);
                 }
-            }
+                Err(err) => {
+                    log::error!("Unable to parse returned response: {}\n{}", err, &text);
+                }
+            },
             Err(err) => {
                 log::error!("Unable to fetch map index: {}", err);
             }

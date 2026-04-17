@@ -2611,6 +2611,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "haptic-core"
+version = "0.0.9"
+dependencies = [
+ "arc-swap",
+ "async-spin-sleep",
+ "base64 0.22.1",
+ "boxcar",
+ "btleplug",
+ "dashmap 6.1.0",
+ "directories",
+ "dunce",
+ "enum_dispatch",
+ "espflash",
+ "futures",
+ "futures-util",
+ "hazarc",
+ "if-addrs 0.13.4",
+ "libloading 0.8.9",
+ "log",
+ "md5",
+ "mdns-sd",
+ "once_cell",
+ "parking_lot",
+ "rayon",
+ "regex",
+ "reqwest 0.12.28",
+ "rosc",
+ "runas",
+ "rustls-pemfile",
+ "rustls-pki-types",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "spin_sleep_util",
+ "strum",
+ "tauri-plugin-http",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tokio-websockets",
+ "urlencoding",
+ "uuid",
+ "walkdir",
+ "warp",
+ "windows 0.61.3",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7578,15 +7628,14 @@ dependencies = [
  "espflash",
  "futures",
  "futures-util",
+ "haptic-core",
  "hazarc",
  "if-addrs 0.13.4",
  "libloading 0.8.9",
  "log",
  "md5",
- "mdns-sd",
  "once_cell",
  "parking_lot",
- "rayon",
  "regex",
  "reqwest 0.12.28",
  "rosc",
@@ -7595,7 +7644,6 @@ dependencies = [
  "rustls-pki-types",
  "serde",
  "serde_json",
- "specta",
  "specta-typescript",
  "spin_sleep_util",
  "strum",
@@ -7620,7 +7668,6 @@ dependencies = [
  "urlencoding",
  "uuid",
  "walkdir",
- "warp",
  "windows 0.61.3",
 ]
 
