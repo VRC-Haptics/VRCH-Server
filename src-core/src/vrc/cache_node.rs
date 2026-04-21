@@ -15,6 +15,8 @@ pub struct CacheNode {
     /// Ring buffer of values we have recieved.
     /// Front items are the most recent.
     values: VecDeque<(SpectaOscType, SystemTime)>,
+    /// Keep track of ray's seperately
+    ray_values: VecDeque<(SpectaOscType, SystemTime)>,
     /// contains the OscType that this CacheNode accepts.
     /// The payload should be considered the default value if the cache is empty.
     osc_type: SpectaOscType,
@@ -35,9 +37,11 @@ impl CacheNode {
         smoothing_time: Duration,
     ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
+        let mut ray_values = VecDeque::with_capacity(max_entries);
         values.push_front((SpectaOscType::from(value_type.clone()), UNIX_EPOCH));
         CacheNode {
             values,
+            ray_values,
             osc_type: value_type.into(),
             max_len: max_entries,
             smoothing_time: smoothing_time,
@@ -145,32 +149,66 @@ impl CacheNode {
         return Ok(());
     }
 
+    /// Pushes an update to the cached values with the current time as a timestamp.
+    pub fn update_ray(&mut self, value: SpectaOscType) -> Result<(), WrongNodeTypeError> {
+        if discriminant(&self.osc_type) != discriminant(&value) {
+            return Err(WrongNodeTypeError {
+                entered: value,
+                expected: self.osc_type.clone(),
+            });
+        }
+        if self.ray_values.len() >= self.max_len {
+            self.ray_values.pop_back();
+        }
+        self.ray_values.push_front((value, SystemTime::now()));
+
+        return Ok(());
+    }
+
     /// Returns the velocity and position mixed values
     pub fn latest(&self, cfg: &VrcSettings) -> f32 {
         let now = SystemTime::now();
         let limit = now.checked_sub(cfg.smoothing_time).unwrap_or(UNIX_EPOCH);
 
+        // Use ray values for position if available, otherwise fall back to spherical
+        let pos_values = if self.ray_values.is_empty() {
+            &self.values
+        } else {
+            &self.ray_values
+        };
+
         // detect when we havent recieved the "closing zero value"
         // should stop buzzing after and having to reset.
+        let mut old = false;
         if let Some((latest, time)) = self.values.front() {
             let age_ms = now
                 .duration_since(*time)
-                .unwrap_or(Duration::new(0, 0))
+                .unwrap_or(Duration::new(5000, 0))
                 .as_millis();
             if latest.clone().float().unwrap() > 0.001 && age_ms > 200 {
-                return 0.0;
+                old = true;
             }
         }
+        if let Some((_, ray_time)) = self.ray_values.front() {
+                let age_ms = now
+                    .duration_since(*ray_time)
+                    .unwrap_or(Duration::new(5000, 0))
+                    .as_millis();
+
+            if age_ms > 200 {
+                old = true;
+            }
+        }
+        if old {return 0.0;}
 
         // pull current position
-        let pos = self
-            .values
+        let pos = pos_values
             .front()
             .map(|(v, _)| v.clone().float().unwrap_or(0.0))
             .unwrap_or(0.0)
             .clamp(0.0, 1.0);
 
-        // compute smoothed absolute velocity
+        // compute smoothed absolute velocity from spherical values
         let vel = self.velocity_since(&limit).abs().clamp(0.0, 1.0);
 
         // blend and clamp
@@ -200,12 +238,14 @@ impl CacheNode {
 }
 
 /// The wrong node type was inserted into this node.
+#[derive(Debug)]
 pub struct WrongNodeTypeError {
     entered: SpectaOscType,
     expected: SpectaOscType,
 }
 
 /// An Error occured during retrieval from cache.
+#[derive(Debug)]
 pub enum RetrievalError {
     /// Value is requested but the cache is still empty
     EmptyCache,

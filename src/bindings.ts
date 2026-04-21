@@ -74,6 +74,11 @@ export type CacheNode = {
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
 }])[],
+	// Keep track of ray's seperately
+	ray_values: ([SpectaOscType, {
+	duration_since_epoch: number,
+	duration_since_unix_epoch: number,
+}])[],
 	/**
 	 *  contains the OscType that this CacheNode accepts.
 	 *  The payload should be considered the default value if the cache is empty.
@@ -105,6 +110,7 @@ export type ConfNode = {
 	is_external_address: boolean,
 	radius: number,
 	target_bone: TargetBone,
+	ray?: RayNode | null,
 };
 
 export type DeviceId = string;
@@ -303,6 +309,12 @@ export type OscInfo = {
 export type OscPath = string;
 
 export type OtaPassword = string;
+
+export type RayNode = {
+	rotation_offset: Vec3,
+	position_offset: Vec3,
+	size: number,
+};
 
 export type SpectaOscType = ({ Int: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Float: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ String: string }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; Time?: never } | ({ Long: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Midi?: never; String?: never; Time?: never } | ({ Double: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Char: string }) & { Array?: never; Blob?: never; Bool?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Bool: boolean }) & { Array?: never; Blob?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | "Nil" | "Inf" | ({ Blob: number[] }) & { Array?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Time: {
 	seconds: number,

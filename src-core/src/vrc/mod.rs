@@ -13,7 +13,7 @@ use crate::mapping::{
 use crate::mapping::{InputEventMessage, MapHandle};
 use crate::osc::server::OscServer;
 use crate::state::{self, StandardMenu, VrcSettings};
-use arc_swap::Cache;
+use arc_swap::{Cache, cache};
 use tokio::task::JoinHandle;
 use crate::vrc::parsing::OscInfo;
 use crate::{log_err};
@@ -249,13 +249,13 @@ impl VrcGame {
                 // called at high velocity.
                 MsgToMainVrc::RefreshMap => {
 
-                    self.refresh_map(&self.map, &settings.load());
+                    self.refresh_map(&self.map, &settings.load()).await;
                 }
                 MsgToMainVrc::OscBatch(batch) => {
                     let cfg = settings.load();
                     self.process_osc_batch(&batch, cfg);
 
-                    self.refresh_map(&self.map, cfg);
+                    self.refresh_map(&self.map, cfg).await;
                     self.update_info();
                 }
                 MsgToMainVrc::FlushCache => {
@@ -314,9 +314,26 @@ impl VrcGame {
             let addr = remove_version(&msg.addr);
             let Some(arg) = msg.args.first() else { return };
 
+            // TODO: Make this search better, needs to cross reference our config but idk right now
+            if addr.ends_with("_Ratio") {
+                // push to the child cached node rather than the seperate one
+                let key = OscPath(addr.replace("_Ratio", ""));
+                if let Some(mut cache) = self.parameter_cache.get_mut(&key) {
+                    log_err!(cache.update_ray(arg.to_owned().into()));
+                } else {
+                    self.parameter_cache.insert(
+                    key,
+                    CacheNode::new(
+                        arg.to_owned(),
+                        cfg.sample_cache.clone(),
+                        cfg.smoothing_time.clone(),
+                    ),
+                );
+                }
+            }
             let key = OscPath(addr);
             if let Some(mut cache) = self.parameter_cache.get_mut(&key) {
-                let _ = cache.update(arg.to_owned().into());
+                log_err!(cache.update(arg.to_owned().into()));
             } else {
                 self.parameter_cache.insert(
                     key,
@@ -331,7 +348,7 @@ impl VrcGame {
     }
 
     /// Propogates our cached values to changes on the input map.
-    fn refresh_map(&self, map: &MapHandle, settings: &VrcSettings) {
+    async fn refresh_map(&self, map: &MapHandle, settings: &VrcSettings) {
 
         let Some(avatar) = self.avatar.as_ref() else {
             return;

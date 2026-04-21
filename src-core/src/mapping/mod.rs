@@ -486,9 +486,9 @@ impl NodeId {
 impl NodeGroup {
     /// maps node groups into two points defining an axis that runs through the center of the model.
     /// See NodeGroupPoints in standard unity project.
-    pub fn to_points(&self) -> (Vec3, Vec3) {
+    pub const fn to_points(&self) -> (Vec3, Vec3) {
         // helper: flip the sign of the X component for both points
-        fn mirror_x(p: (Vec3, Vec3)) -> (Vec3, Vec3) {
+        const fn mirror_x(p: (Vec3, Vec3)) -> (Vec3, Vec3) {
             let (a, b) = p;
             (Vec3::new(-a.x, a.y, a.z), Vec3::new(-b.x, b.y, b.z))
         }

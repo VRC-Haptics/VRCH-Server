@@ -1,4 +1,4 @@
-use crate::mapping::haptic_node::HapticNode;
+use crate::{mapping::haptic_node::HapticNode, util::math::Vec3};
 
 /// Filled with values from a config json file.
 /// Provides all information needed to fully define the avatar prefab.
@@ -19,6 +19,16 @@ pub struct ConfNode {
     pub is_external_address: bool,
     pub radius: f32,
     pub target_bone: TargetBone,
+    #[serde(default)] // was added on to the spec, so defaults to unavailable.
+    pub ray: Option<RayNode>,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
+pub struct RayNode {
+    pub rotation_offset: Vec3,
+    pub position_offset: Vec3,
+    pub size: f32,
 }
 
 /// Metadata from the json config
