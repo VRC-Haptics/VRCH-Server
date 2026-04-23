@@ -170,36 +170,34 @@ impl CacheNode {
         let now = SystemTime::now();
         let limit = now.checked_sub(cfg.smoothing_time).unwrap_or(UNIX_EPOCH);
 
-        // Use ray values for position if available, otherwise fall back to spherical
-        let pos_values = if self.ray_values.is_empty() {
-            &self.values
-        } else {
-            &self.ray_values
-        };
-
         // detect when we havent recieved the "closing zero value"
         // should stop buzzing after and having to reset.
+        let use_ray = !self.ray_values.is_empty();
+        let pos_values = if use_ray { &self.ray_values } else { &self.values };
+
         let mut old = false;
-        if let Some((latest, time)) = self.values.front() {
-            let age_ms = now
-                .duration_since(*time)
-                .unwrap_or(Duration::new(5000, 0))
-                .as_millis();
-            if latest.clone().float().unwrap() > 0.001 && age_ms > 200 {
-                old = true;
-            }
-        }
-        if let Some((_, ray_time)) = self.ray_values.front() {
+        if use_ray {
+            if let Some((val, ray_time)) = self.ray_values.front() {
                 let age_ms = now
                     .duration_since(*ray_time)
                     .unwrap_or(Duration::new(5000, 0))
                     .as_millis();
-
-            if age_ms > 200 {
-                old = true;
+                if val.clone().float().unwrap_or(0.0) > 0.001 && age_ms > 200 {
+                    old = true;
+                }
+            }
+        } else {
+            if let Some((latest, time)) = self.values.front() {
+                let age_ms = now
+                    .duration_since(*time)
+                    .unwrap_or(Duration::new(5000, 0))
+                    .as_millis();
+                if latest.clone().float().unwrap() > 0.001 && age_ms > 200 {
+                    old = true;
+                }
             }
         }
-        if old {return 0.0;}
+        if old { return 0.0; }
 
         // pull current position
         let pos = pos_values

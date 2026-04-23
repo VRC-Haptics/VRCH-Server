@@ -330,6 +330,7 @@ impl VrcGame {
                     ),
                 );
                 }
+                return ;
             }
             let key = OscPath(addr);
             if let Some(mut cache) = self.parameter_cache.get_mut(&key) {
