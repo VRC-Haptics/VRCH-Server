@@ -14,11 +14,14 @@ edition = "2021"
 name = "vrch_gui_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "vr_haptics_player"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-console-subscriber = "0.5"
 
 # tauri requirements
 tauri = { version = "2", features = ["devtools"] }
@@ -38,7 +41,7 @@ tauri-plugin-serialplugin = "2.21.1"
 
 # project stuff
 haptic-core = { path = "../src-core", features = ["tauri-get", "specta"] }
-tokio = {version = "1.42.1", features = ["rt-multi-thread", "full", "tracing"] }
+tokio = {version = "1.42.1", features = ["rt-multi-thread", "full"] }
 dunce = "1.0.5"
 log = "0.4.27"
 runas = "1.2.0"

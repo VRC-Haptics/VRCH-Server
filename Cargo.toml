@@ -10,3 +10,7 @@ resolver = "2"
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[profile.release]
+debug = 2
+strip = false

@@ -19,8 +19,6 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
 use specta_typescript::Typescript;
 
-use console_subscriber;
-
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
     state::save_config();
@@ -55,7 +53,6 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcGame>>) {
 
 #[tokio::main]
 async fn main() {
-    console_subscriber::init();
     tauri::async_runtime::set(tokio::runtime::Handle::current());
 
     let builder = tauri_specta::Builder::<tauri::Wry>::new()
@@ -89,7 +86,6 @@ async fn main() {
 
     // init logging and stuff first
     tauri::Builder::default()
-        .plugin(tauri_plugin_serialplugin::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             println!("Instance already open, shutting down.");
             let _ = app
@@ -98,7 +94,6 @@ async fn main() {
                 .set_focus();
         }))
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())

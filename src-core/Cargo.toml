@@ -14,7 +14,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 btleplug = {version = "0.11.8", features = ["serde"] }
-tokio = {version = "1.42.1", features = ["rt-multi-thread", "full", "tracing"] }
+tokio = {version = "1.42.1", features = ["rt-multi-thread", "full"] }
 rosc = { git = "https://github.com/virtuallyaverage/rosc-serde.git" }
 regex = "1.11.1"
 uuid = { version = "1.14", features = ["v4"] }

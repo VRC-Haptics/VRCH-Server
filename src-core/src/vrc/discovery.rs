@@ -192,7 +192,7 @@ async fn load_configs(params: &DashMap<OscPath, OscInfo>, api: &Mutex<ApiManager
     if let Some(prefabs) = get_prefab_info(params) {
         for prefab in prefabs {
             let mut lock = api.try_lock().expect("Couldn't get lock");
-            match lock.load_map(prefab.0, prefab.1, prefab.2).await {
+            match Box::pin(lock.load_map(prefab.0, prefab.1, prefab.2)).await {
                 Ok(map) => configs.push(map),
                 Err(err) => match err {
                     other => {
@@ -230,7 +230,7 @@ async fn run_vrc_http_polling(
     log::debug!("Started polling HTTP at {}", url);
 
     loop {
-        match fetch_http_response(&url).await {
+        match Box::pin(fetch_http_response(&url)).await {
             Ok(text) => {
                 // Update OSC parameters based on the incoming HTTP response.
                 let (present_parameters, new_avi) = update_params_from_text(&text, params);
@@ -246,7 +246,7 @@ async fn run_vrc_http_polling(
                     let mid = id_path.value.first().unwrap().clone();
                     let new_id = mid.string().unwrap();
 
-                    let new_avatar = create_avatar(params, new_id.to_string(), &api).await;
+                    let new_avatar = Box::pin(create_avatar(params, new_id.to_string(), &api)).await;
                     vrc.send(MsgToMainVrc::FlushCache).await;
                     vrc.send(MsgToMainVrc::NewAvatar(new_avatar)).await;
                 }
