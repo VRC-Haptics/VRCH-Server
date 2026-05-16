@@ -2,13 +2,14 @@ use x40_vest::{x40_vest_back, x40_vest_front};
 use x6_head::x6_headset;
 
 use std::time::Duration;
+use glam::Vec3;
 
 use super::game::network::event_map::{
     AudioFilePattern, HapticMapping, PatternLine, PatternLocation,
 };
 use crate::mapping::event::Event;
 /// Contains all the index -> position matricies for bhaptics devices.
-use crate::{mapping::event::EventEffectType, util::math::Vec3};
+use crate::mapping::event::EventEffectType;
 
 pub mod x40_vest;
 pub mod x6_head;

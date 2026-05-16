@@ -1,4 +1,4 @@
-use crate::util::math::Vec3;
+use glam::Vec3;
 
 use super::haptic_node::HapticNode;
 use super::NodeId;

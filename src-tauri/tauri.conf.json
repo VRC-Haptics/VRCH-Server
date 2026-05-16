@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "mainBinaryName": "vr-haptics-player",
+  "mainBinaryName": "vr_haptics_player",
   "productName": "vrch-gui",
   "version": "0.0.10",
   "identifier": "com.vrch.app",

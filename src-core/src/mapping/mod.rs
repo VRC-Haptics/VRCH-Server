@@ -23,11 +23,11 @@ use haptic_node::HapticNode;
 use input_node::InputNode;
 use interp::Interpolate;
 use uuid::Uuid;
+use glam::Vec3;
 
 use crate::{
     devices::{Device, DeviceHandle, DeviceId, DeviceInfo, DeviceOutEvents},
     state::{self, PerDevice},
-    util::math::Vec3,
 };
 
 /// Snapshot of map state.
@@ -430,7 +430,7 @@ pub enum InputEventMessage {
 /// Allows for segmented Interpolation
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(
-    PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter,
+    PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter, Copy
 )]
 pub enum NodeGroup {
     Head,
@@ -452,6 +452,7 @@ pub enum NodeGroup {
     /// Should not be exported to devices or imported from games.
     All,
 }
+
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -532,6 +533,31 @@ impl NodeGroup {
             NodeGroup::FootLeft => mirror_x(NodeGroup::FootRight.to_points()),
             NodeGroup::All => (Vec3::new(0., 0., 0.), Vec3::new(0., 0., 0.)),
         };
+    }
+
+    #[inline]
+    pub fn iter(self) -> impl Iterator<Item = NodeGroup> {
+        const BIT_TO_GROUP: [(u16, NodeGroup); 15] = [
+            (0,  NodeGroup::Head),
+            (1,  NodeGroup::UpperArmRight),
+            (2,  NodeGroup::UpperArmLeft),
+            (3,  NodeGroup::TorsoRight),
+            (4,  NodeGroup::TorsoLeft),
+            (5,  NodeGroup::TorsoFront),
+            (6,  NodeGroup::TorsoBack),
+            (7,  NodeGroup::UpperLegRight),
+            (8,  NodeGroup::UpperLegLeft),
+            (9,  NodeGroup::FootRight),
+            (10, NodeGroup::FootLeft),
+            (11, NodeGroup::LowerArmRight),
+            (12, NodeGroup::LowerArmLeft),
+            (13, NodeGroup::LowerLegRight),
+            (14, NodeGroup::LowerLegLeft),
+        ];
+        let bits = self.0;
+        BIT_TO_GROUP.into_iter()
+            .filter(move |(bit, _)| bits & (1 << bit) != 0)
+            .map(|(_, group)| group)
     }
 
     /// Given a string containing at least 2 raw bytes, interpret the first two bytes as

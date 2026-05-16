@@ -1,6 +1,6 @@
 use super::{haptic_node::HapticNode, input_node::InputNode, NodeId, NodeGroup};
 use crate::mapping::input_node::InputType;
-use crate::util::math::Vec3;
+use glam::Vec3;
 use std::time::{Duration, SystemTime};
 
 /// Describes what effect an event should have.

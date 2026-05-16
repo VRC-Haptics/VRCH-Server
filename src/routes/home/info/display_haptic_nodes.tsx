@@ -1,7 +1,7 @@
 import React from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
-import { DeviceInfo, DeviceId, HapticNode, Vec3, commands } from '../../../bindings';
+import { DeviceInfo, DeviceId, HapticNode, commands } from '../../../bindings';
 
 interface DisplayHapticNodesProps {
   deviceId: DeviceId;
@@ -37,8 +37,8 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
     if (selectedIndices.length !== 2) return;
     const n1 = nodes[selectedIndices[0]];
     const n2 = nodes[selectedIndices[1]];
-    const pos1: Vec3 = { x: n1.x, y: n1.y, z: n1.z };
-    const pos2: Vec3 = { x: n2.x, y: n2.y, z: n2.z };
+    const pos1: [number, number, number] = [n1.x, n1.y, n1.z];
+    const pos2: [number, number, number] = [n2.x, n2.y, n2.z];
     const result = await commands.swapConfNodes(deviceId, pos1, pos2);
     if (result.status === "error") console.error("swap_conf_nodes failed:", result.error);
   };

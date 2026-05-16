@@ -1,16 +1,13 @@
 // local modules
 use crate::{devices::{
     Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, update::Firmware, //update::{Firmware, UpdateMethod}
-}, mapping::{MapHandle, MapInfo}, state::{self, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}};
+}, mapping::{MapHandle, MapInfo}, state::{self, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}, glam::Vec3};
 use crate::mapping::event::Event;
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::{InputEventMessage};
 use crate::log_err;
 
-use crate::{
-    util::math::Vec3,
-    vrc::{config::GameMap},
-};
+use crate::vrc::{config::GameMap};
 //standard imports
 use runas::Command;
 use std::sync::Arc;
@@ -95,10 +92,10 @@ pub fn swap_conf_nodes(
             let mut index2: Option<usize> = None;
 
             for (index, node) in nodes.iter().enumerate() {
-                if node.to_vec3().close_to(&pos1, EPSILON) {
+                if node.to_vec3().abs_diff_eq(pos1, EPSILON) {
                     index1 = Some(index);
                     log::debug!("Found node 1 at index: {}", index);
-                } else if node.to_vec3().close_to(&pos2, EPSILON) {
+                } else if node.to_vec3().abs_diff_eq(pos2, EPSILON) {
                     index2 = Some(index);
                     log::debug!("Found node 2 at index: {}", index);
                 }

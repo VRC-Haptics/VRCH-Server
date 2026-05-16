@@ -1716,6 +1716,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.32.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f70749695b063ecbf6b62949ccccde2e733ec3ecbbd71d467dca4e5c6c97cca0"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "glib"
 version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1862,6 +1871,7 @@ dependencies = [
  "directories",
  "enum_dispatch",
  "futures-util",
+ "glam",
  "hazarc",
  "if-addrs 0.13.4",
  "libloading 0.8.9",
@@ -4903,6 +4913,7 @@ version = "2.0.0-rc.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f320c7dd82008b6958f43f6257c95319c407d1c17ade43686e50ea520c28bb26"
 dependencies = [
+ "glam",
  "paste",
  "rustc_version",
  "serde_json",

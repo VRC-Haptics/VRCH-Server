@@ -14,6 +14,9 @@ pub mod util;
 pub(crate) mod wrappers;
 pub mod vrc;
 
+// rexports
+pub use glam; 
+
 // local modules
 use api::ApiManager;
 use devices::{init_device_manager, DeviceManager};

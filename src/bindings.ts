@@ -29,7 +29,7 @@ export const commands = {
 	// Plays the specified point for the duration in seconds at the power percentage of intensity.
 	playPoint: (feedbackLocation: [number, number, number], power: number, duration: number) => typedError<null, null>(__TAURI_INVOKE("play_point", { feedbackLocation, power, duration })),
 	// Swaps the haptic node indices on the given device id
-	swapConfNodes: (deviceId: string, pos1: Vec3, pos2: Vec3) => typedError<null, string>(__TAURI_INVOKE("swap_conf_nodes", { deviceId, pos1, pos2 })),
+	swapConfNodes: (deviceId: string, pos1: [number, number, number], pos2: [number, number, number]) => typedError<null, string>(__TAURI_INVOKE("swap_conf_nodes", { deviceId, pos1, pos2 })),
 	setTagsRadius: (tag: string, radius: number) => typedError<null, null>(__TAURI_INVOKE("set_tags_radius", { tag, radius })),
 	setNodeRadius: (id: string, radius: number) => typedError<null, string>(__TAURI_INVOKE("set_node_radius", { id, radius })),
 	getDeviceEspModel: (id: string) => typedError<ESP32Model, string>(__TAURI_INVOKE("get_device_esp_model", { id })),
@@ -183,9 +183,9 @@ export type EventEffectType =
 // Effects all InputNodes with the given tag.
 ({ Tags: string[] }) & { Location?: never; MovingLocation?: never; MultipleNodes?: never; SingleNode?: never } | 
 // Inserts a node at the given location, automatically removes node when event expires.
-({ Location: Vec3 }) & { MovingLocation?: never; MultipleNodes?: never; SingleNode?: never; Tags?: never } | 
+({ Location: [number, number, number] }) & { MovingLocation?: never; MultipleNodes?: never; SingleNode?: never; Tags?: never } | 
 // Divides locations between the duration of the event and moves the node to that location.
-({ MovingLocation: Vec3[] }) & { Location?: never; MultipleNodes?: never; SingleNode?: never; Tags?: never };
+({ MovingLocation: ([number, number, number])[] }) & { Location?: never; MultipleNodes?: never; SingleNode?: never; Tags?: never };
 
 // Bundle containing all user-required information to start a firmware update.
 export type Firmware = {
@@ -311,8 +311,8 @@ export type OscPath = string;
 export type OtaPassword = string;
 
 export type RayNode = {
-	rotation_offset: Vec3,
-	position_offset: Vec3,
+	rotation_offset: [number, number, number],
+	position_offset: [number, number, number],
 	size: number,
 };
 
@@ -683,13 +683,6 @@ export type UpdateMethod =
 ({ OTA: OtaPassword }) & { Serial?: never } | 
 // Not currently supported
 ({ Serial: string }) & { OTA?: never };
-
-// Minimal 3‑vector with **f32** components for high‑throughput numeric geometry.
-export type Vec3 = {
-	x: number,
-	y: number,
-	z: number,
-};
 
 /**
  *  struct exposed to the UI.

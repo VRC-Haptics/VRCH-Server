@@ -1,4 +1,5 @@
-use crate::{mapping::haptic_node::HapticNode, util::math::Vec3};
+use crate::mapping::haptic_node::HapticNode;
+use glam::Vec3;
 
 /// Filled with values from a config json file.
 /// Provides all information needed to fully define the avatar prefab.

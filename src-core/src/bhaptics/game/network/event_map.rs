@@ -6,7 +6,8 @@ use strum::EnumIter;
 use crate::bhaptics::maps::{
     x40_vest::x40_vest_back, x40_vest::x40_vest_front, x6_head::x6_headset,
 };
-use crate::{mapping::NodeId, util::math::Vec3};
+use crate::mapping::NodeId;
+use glam::Vec3;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

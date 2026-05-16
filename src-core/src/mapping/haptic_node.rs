@@ -1,7 +1,8 @@
 use std::f32::consts::PI;
 
 use crate::mapping::NodeGroup;
-use crate::util::math::{self, Vec3};
+use crate::util::math::{self, within_half_angle};
+use glam::Vec3;
 
 /// Struct defining all needed properties for a haptic node.
 /// Used for mapping from one haptic model to another.
@@ -40,7 +41,7 @@ impl HapticNode {
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
 
-    pub fn to_vec3(&self) -> math::Vec3 {
+    pub fn to_vec3(&self) -> Vec3 {
         Vec3 {
             x: self.x,
             y: self.y,
@@ -54,18 +55,20 @@ impl HapticNode {
             return true;
         }
 
-        for shared_group in &self.groups {
-            if other.groups.contains(shared_group) {
-                let this = self.to_vec3();
-                let that = other.to_vec3();
+        let overlap = NodeGroupSet::from_groups(&self.groups)
+            .intersects(NodeGroupSet::from_groups(&other.groups));
 
-                let (top, bottom) = shared_group.to_points();
-                let angle = math::angle_between_points(top, bottom, this, that)
-                    .expect("Unable to get angle");
-                if angle <= (PI / 2.) {
-                    // only return interactions that are with the 180 deg window
-                    return true;
-                }
+        if overlap.is_empty() {
+            return false;
+        }
+
+        let this = self.to_vec3();
+        let that = other.to_vec3();
+
+        for group in overlap.iter() {
+            let (top, bottom) = group.to_points();
+            if within_half_angle(top, bottom, this, that) {
+                return true;
             }
         }
 
@@ -112,5 +115,38 @@ impl HapticNode {
             z: z_fixed as f32 / scale,
             groups: NodeGroup::from_bitflag(flag),
         }
+    }
+}
+
+
+/// Bitflags representation of NodeGroup for overlap checks
+#[derive(Clone, Copy, Default)]
+pub struct NodeGroupSet(u16);
+
+impl NodeGroupSet {
+    #[inline]
+    pub fn from_groups(groups: &[NodeGroup]) -> Self {
+        Self(NodeGroup::to_bitflag(groups))
+    }
+
+    #[inline]
+    pub fn contains_all(&self) -> bool {
+        // All maps to 0 in to_bitflag, so check the slice-based path instead
+        false // handled separately before constructing the set
+    }
+
+    #[inline]
+    pub fn intersects(self, other: Self) -> Self {
+        Self(self.0 & other.0)
+    }
+
+    #[inline]
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    #[inline]
+    pub fn iter(self) -> impl Iterator<Item = NodeGroup> {
+        NodeGroup::from_bitflag(self.0).into_iter()
     }
 }

@@ -12,8 +12,9 @@ use crate::{
     log_err,
     mapping::{
         InputEventMessage, MapHandle, NodeGroup, NodeId, event::{Event, EventEffectType}, haptic_node::HapticNode, input_node::{InputNode, InputType}
-    }, util::math::Vec3,
+    },
 };
+use glam::Vec3;
 use strum::IntoEnumIterator;
 
 use futures_util::{SinkExt, StreamExt};
