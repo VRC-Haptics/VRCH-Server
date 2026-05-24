@@ -10,14 +10,16 @@ use directories::ProjectDirs;
 use event_map::{BaseMessage, GameMapping};
 
 use crate::network::{self, fetch_text};
+use crate::file::{resolve_dir, Directory};
+use crate::log_err;
 
 const CACHE_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 
-fn cache_path(app_id: &str) -> Option<PathBuf> {
-    ProjectDirs::from("", "", "vrch-gui").map(|dirs| {
-        dirs.data_local_dir()
-            .join(format!("bhaptics_cache_{}.json", app_id))
-    })
+fn cache_path(app_id: &str) -> PathBuf {
+    let folder = resolve_dir(Directory::BhapticsCache);
+    let mut file = folder.join(format!("bhaptics_cache_{}", app_id));
+    file.add_extension("json");
+    file
 }
 
 fn read_cache(path: &PathBuf) -> Option<GameMapping> {
@@ -30,13 +32,14 @@ fn read_cache(path: &PathBuf) -> Option<GameMapping> {
     serde_json::from_str::<GameMapping>(&data).ok()
 }
 
-fn write_cache(path: &PathBuf, mapping: &GameMapping) {
+fn write_cache(path: &PathBuf, mapping: &GameMapping) -> Result<(), std::io::Error> {
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        fs::create_dir_all(parent)?;
     }
-    if let Ok(json) = serde_json::to_string(mapping) {
-        let _ = fs::write(path, json);
-    }
+    let json = serde_json::to_string(mapping)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    fs::write(path, json)?;
+    Ok(())
 }
 
 /// Tries to get a response from the api and parse it.
@@ -48,13 +51,11 @@ pub async fn fetch_mappings(
     app_id: String,
     version: i32,
 ) -> Result<GameMapping, FetchMappingsError> {
-    let cache = cache_path(&app_id);
+    let path = cache_path(&app_id);
 
-    if let Some(ref path) = cache {
-        if let Some(cached) = read_cache(path) {
-            log::info!("Using cached bHaptics mappings for {}", app_id);
-            return Ok(cached);
-        }
+    if let Some(cached) = read_cache(&path) {
+        log::info!("Using cached bHaptics mappings for {}", app_id);
+        return Ok(cached);
     }
 
     let url = format!(
@@ -67,9 +68,9 @@ pub async fn fetch_mappings(
     let msg: BaseMessage =
         serde_json::from_str(&body).map_err(|e| FetchMappingsError::DeserializeError(e, body))?;
 
-    if let Some(ref path) = cache {
-        write_cache(path, &msg.message);
-    }
+
+    log_err!(write_cache(&path, &msg.message));
+    
 
     Ok(msg.message)
 }

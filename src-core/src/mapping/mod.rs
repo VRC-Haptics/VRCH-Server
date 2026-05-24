@@ -554,7 +554,7 @@ impl NodeGroup {
             (13, NodeGroup::LowerLegRight),
             (14, NodeGroup::LowerLegLeft),
         ];
-        let bits = self.0;
+        let bits = NodeGroup::to_bitflag(&[self]);
         BIT_TO_GROUP.into_iter()
             .filter(move |(bit, _)| bits & (1 << bit) != 0)
             .map(|(_, group)| group)

@@ -8,6 +8,7 @@
 mod commands;
 
 use haptic_core::bhaptics::game::BhapticHandle;
+use haptic_core::file::AppRoot;
 use haptic_core::*;
 
 //standard imports
@@ -130,10 +131,11 @@ async fn main() {
             }));
 
             tauri::async_runtime::spawn(async move {
-                let mut data_dir = handle.path().app_local_data_dir().expect("failed to resolve app data dir");
-                data_dir.push("data");
-                log::trace!("data-dir: {data_dir:?}");
-                let (vrc, map, bh, device) = haptic_core::start_server(data_dir).await;
+                let root = AppRoot::default("vrch-gui").unwrap_or_else(|| {
+                    log::error!("Unable to initialize app root");
+                    panic!(); // TODO: This should be done better.
+                });
+                let (vrc, map, bh, device) = haptic_core::start_server(root).await;
                 handle.manage(vrc);
                 handle.manage(map);
                 handle.manage(bh);

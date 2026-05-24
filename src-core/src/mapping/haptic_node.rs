@@ -1,7 +1,4 @@
-use std::f32::consts::PI;
-
 use crate::mapping::NodeGroup;
-use crate::util::math::{self, within_half_angle};
 use glam::Vec3;
 
 /// Struct defining all needed properties for a haptic node.
@@ -118,6 +115,20 @@ impl HapticNode {
     }
 }
 
+/// Calculates whether the nodes are on the same half of the bone. 
+/// This is used so that nodes on the front and back of legs/torso don't interact.
+#[inline]
+fn within_half_angle(axis_one: Vec3, axis_two: Vec3, input: Vec3, output: Vec3) -> bool {
+    let n1 = (axis_one - input).cross(axis_two - input);
+    let n2 = (axis_one - output).cross(axis_two - output);
+
+    // Degenerate check using squared length (avoids sqrt)
+    if n1.length_squared() == 0.0 || n2.length_squared() == 0.0 {
+        return false;
+    }
+
+    n1.dot(n2) >= 0.0
+}
 
 /// Bitflags representation of NodeGroup for overlap checks
 #[derive(Clone, Copy, Default)]

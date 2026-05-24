@@ -6,8 +6,9 @@ use tokio::sync::Mutex;
 use walkdir::WalkDir;
 use crate::network::fetch_text;
 
+#[derive(Debug)]
 pub struct ApiManager {
-    pub config_folder: String,
+    pub config_folder: PathBuf,
     pub base_url: String,
     pub remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>,
     pub local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
@@ -36,12 +37,11 @@ pub struct LocalAvailableMap {
 impl ApiManager {
     /// Creates a new ApiManager.
     /// Caches WILL NOT be filled until refresh_caches is called.
-    pub fn new() -> ApiManager {
-        let local_path = "./map_configs/".to_string();
+    pub fn new(cache: PathBuf) -> ApiManager {
         let base_url = "http://vrc-haptics.github.io/haptic-config-hosting/".to_string();
 
         ApiManager {
-            config_folder: local_path,
+            config_folder: cache,
             base_url,
             remote_maps: Arc::new(Mutex::new(None)),
             local_maps: Arc::new(Mutex::new(HashSet::new())),
@@ -124,7 +124,7 @@ impl ApiManager {
 
     /// Thread-safe version of refresh_local_index for use in async refresh
     async fn refresh_local_index_thread(
-        config_folder: String,
+        config_folder: PathBuf,
         local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
     ) {
         let mut new_local_maps = HashSet::new();
