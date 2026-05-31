@@ -2,7 +2,7 @@
 
 A simple user interface for the haptic server backend. 
 
-Designed with to run in the background with acceptable efficiency and resource usage. 
+Designed from the ground up to run massive haptics arrays in the background with acceptable efficiency and resource usage.
 
 **Layout and look is likely to change**
 ![Beta Image](.github/resources/MainPage.jpg)
