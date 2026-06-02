@@ -166,7 +166,7 @@ async fn create_avatar(
     let configs = load_configs(params, api).await;
     let names = configs
         .iter()
-        .map(|conf| conf.meta.map_name.clone())
+        .map(|conf| conf.identification.map_name.clone())
         .collect();
     log::info!("Updated avatar with new configuration");
 
@@ -247,7 +247,6 @@ async fn run_vrc_http_polling(
                     let new_id = mid.string().unwrap();
 
                     let new_avatar = Box::pin(create_avatar(params, new_id.to_string(), &api)).await;
-                    vrc.send(MsgToMainVrc::FlushCache).await;
                     vrc.send(MsgToMainVrc::NewAvatar(new_avatar)).await;
                 }
             }

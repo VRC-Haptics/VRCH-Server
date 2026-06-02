@@ -137,9 +137,9 @@ impl ApiManager {
                 if let Ok(content) = fs::read_to_string(entry.path()) {
                     if let Ok(game_map) = serde_json::from_str::<GameMap>(&content) {
                         let map = LocalAvailableMap {
-                            author: game_map.meta.map_author,
-                            name: game_map.meta.map_name,
-                            version: game_map.meta.map_version,
+                            author: game_map.identification.map_author,
+                            name: game_map.identification.map_name,
+                            version: game_map.identification.map_version,
                             path: entry.clone().into_path(),
                         };
 
@@ -311,9 +311,9 @@ impl ApiManager {
                     // Deserialize JSON content into GameMap
                     if let Ok(game_map) = serde_json::from_str::<GameMap>(&content) {
                         let map = LocalAvailableMap {
-                            author: game_map.meta.map_author,
-                            name: game_map.meta.map_name,
-                            version: game_map.meta.map_version,
+                            author: game_map.identification.map_author,
+                            name: game_map.identification.map_name,
+                            version: game_map.identification.map_version,
                             path: entry.clone().into_path(),
                         };
 

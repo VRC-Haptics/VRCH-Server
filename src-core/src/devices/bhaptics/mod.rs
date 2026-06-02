@@ -14,7 +14,7 @@ use crate::{
     bhaptics::maps::x40_vest::{x40_vest_back, x40_vest_front},
     devices::{bhaptics::ble::BleHandle, DeviceId, DeviceInfo, DeviceMessage},
     log_err,
-    mapping::{haptic_node::HapticNode, NodeGroup},
+    mapping::{haptic_node::HapticNode, groups::NodeGroup},
 };
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -113,10 +113,8 @@ impl BhapticsModel {
                         .map(|&i| {
                             let v = all[i];
                             HapticNode {
-                                x: v.x,
-                                y: v.y,
-                                z: v.z,
-                                groups: vec![NodeGroup::All],
+                                loc: v.clone(),
+                                groups: NodeGroup::All,
                             }
                         })
                         .collect()

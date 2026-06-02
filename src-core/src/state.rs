@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    devices::DeviceId, log_err, mapping::interp::{GaussianState, InterpAlgo}
+    devices::DeviceId, log_err, mapping::interp::InterpState 
 };
 
 // not intended to be accessed publicly. Use functions below
@@ -238,7 +238,7 @@ impl PerDevice {
             id: id,
             intensity: 1.0,
             offset: 0.01,
-            interp_algo: InterpAlgo::Gaussian(GaussianState::default()),
+            interp_algo: InterpState::default(),
         }
     }
 }
@@ -281,5 +281,5 @@ pub struct PerDevice {
     pub id: DeviceId,
     pub intensity: f32,
     pub offset: f32,
-    pub interp_algo: InterpAlgo,
+    pub interp_algo: InterpState,
 }

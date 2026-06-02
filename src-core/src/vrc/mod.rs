@@ -6,29 +6,31 @@ pub mod parsing;
 
 // crate dependencies
 use crate::api::ApiManager;
+use crate::mapping::input_node::{Slot, SlotKey};
 use crate::mapping::{
-    input_node::{InputNode, InputType},
-    NodeId,
+    input_node::InputNode,
 };
-use crate::mapping::{InputEventMessage, MapHandle};
+use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind};
 use crate::osc::server::OscServer;
-use crate::state::{self, StandardMenu, VrcSettings};
-use arc_swap::{Cache, cache};
-use tokio::task::JoinHandle;
+use crate::state::{self, VrcSettings};
+use crate::vrc::config::InputType;
+use arc_swap::{Cache};
+use glam::Vec3;
+use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
+use tokio::sync::oneshot;
 use crate::vrc::parsing::OscInfo;
 use crate::{log_err};
 
 // module dependencies
-use cache_node::CacheNode;
 use config::GameMap;
 use dashmap::DashMap;
 use discovery::start_filling_available_parameters;
 use hazarc::{ArcBorrow, AtomicArc};
 use osc_query::OscQueryServer;
 use parsing::remove_version;
-use rayon::prelude::*;
 
-use rosc::OscMessage;
+use rosc::{OscMessage, OscType};
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 use std::{net::Ipv4Addr, sync::Arc};
@@ -49,7 +51,7 @@ pub struct VrcInfo {
     pub avatar: Option<Avatar>,
     pub velocity_ratio: f32,
     pub velocity_mult: f32,
-    pub cached: Vec<(OscPath, CacheNode)>,
+    pub watched: Vec<(String, AddrInfo)>,
     pub available: Vec<OscInfo>,
 }
 
@@ -62,7 +64,7 @@ impl Default for VrcInfo {
             avatar: None,
             velocity_ratio: 0.5,
             velocity_mult: 0.5,
-            cached: Vec::new(),
+            watched: vec![],
             available: Vec::new(),
         }
     }
@@ -145,6 +147,14 @@ impl Clone for VrcHandle {
     }
 }
 
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum AddrInfo
+{
+    Slot(SlotKey, SlotFieldKind),
+    Node(NodeKey, NodeFieldKind)
+}
+
 pub struct VrcGame {
     recv_port: u16,
     ui_info: Arc<AtomicArc<VrcInfo>>,
@@ -155,12 +165,10 @@ pub struct VrcGame {
     ///
     /// NOTE: The values actual values contained in this struct are out of date by up to 2 seconds.
     pub available_parameters: Arc<DashMap<OscPath, OscInfo>>,
-    /// Buffer that is filled with values collected from the OSC stream.
-    /// If the buffer doesn't contain value it hasn't been seen since last flush.
-    pub parameter_cache: Arc<DashMap<OscPath, CacheNode>>,
+    pub watched: FxHashMap<String, AddrInfo>,
     rx: Receiver<MsgToMainVrc>,
     map: MapHandle,
-    /// The OSC server we recieve updates from
+    /// The OSC server we receive updates from
     osc_server: OscServer,
     /// Spawns our own OSCQuery advertising
     query_server: Option<OscQueryServer>,
@@ -169,10 +177,7 @@ pub struct VrcGame {
 /// I hate naming things
 #[derive(Debug)]
 pub enum MsgToMainVrc {
-    FlushCache,
-    /// Pushes our cache to the map state.
-    RefreshMap,
-    /// message is recieved from the OSC server
+    /// message is received from the OSC server
     OscBatch(Vec<OscMessage>),
     /// A new avatar configuration was detected
     NewAvatar(Avatar),
@@ -190,7 +195,6 @@ impl VrcGame {
             flush_scheduled: Arc::new(AtomicBool::new(false)),
             osc_buffer: Arc::new(std::sync::Mutex::new(vec![])),
         };
-        let param_cache = Arc::new(DashMap::new());
         let param_avail = Arc::new(DashMap::new());
 
         //create the low-latency server.
@@ -198,8 +202,8 @@ impl VrcGame {
         let on_receive = move |msg: OscMessage| {
             handle_rcv.send_osc_msg_rcv(msg);
         };
-        let recieving_port = 9001;
-        let mut vrc_server = OscServer::new(recieving_port, Ipv4Addr::UNSPECIFIED, on_receive);
+        let receiving_port = 9001;
+        let mut vrc_server = OscServer::new(receiving_port, Ipv4Addr::UNSPECIFIED, on_receive);
         let port_used = vrc_server.start().await;
 
         // Instantiate
@@ -213,7 +217,7 @@ impl VrcGame {
             rx: rx,
             map: map_handle,
             available_parameters: Arc::clone(&param_avail),
-            parameter_cache: Arc::clone(&param_cache),
+            watched: FxHashMap::default(),
         };
 
         // Start the thread that handles finding available vrc parameters
@@ -221,8 +225,8 @@ impl VrcGame {
         start_filling_available_parameters(vrc.get_handle(), api, param_avail).await;
 
         // if the server wasn't able to capture the port start advertising the port it was bound to.
-        if port_used != recieving_port {
-            let mut osc_server = OscQueryServer::new(recieving_port);
+        if port_used != receiving_port {
+            let mut osc_server = OscQueryServer::new(receiving_port);
             osc_server.start().await;
             log::warn!("Not using VRC dedicated ports, expect slower operations.");
         }
@@ -245,36 +249,38 @@ impl VrcGame {
             };
 
             match msg {
-
-                // called at high velocity.
-                MsgToMainVrc::RefreshMap => {
-
-                    self.refresh_map(&self.map, &settings.load()).await;
-                }
                 MsgToMainVrc::OscBatch(batch) => {
                     let cfg = settings.load();
                     self.process_osc_batch(&batch, cfg);
 
-                    self.refresh_map(&self.map, cfg).await;
                     self.update_info();
-                }
-                MsgToMainVrc::FlushCache => {
-                    self.purge_cache();
                 }
                 MsgToMainVrc::NewAvatar(avi) => {
                     //clear current input nodes
                     log_err!(self.map
-                        .send_event(InputEventMessage::RemoveWithTags(vec![VRC_TAG.into()]))
-                        .await);
+                        .send_event(InputEventMessage::Flush));
 
-                    let nodes = to_inputs(&avi);
+                    let cfg = settings.load();
+                    let nodes = to_inputs(&avi, cfg);
                     self.avatar = Some(avi);
 
                     if !nodes.is_empty() {
-                        for node in nodes {
+                        for (pairs, node) in nodes {
+                            let (tx, rx) = oneshot::channel();
                             log_err!(self.map
-                                .send_event(InputEventMessage::InsertNode(node))
-                                .await);
+                                .send_event(InputEventMessage::Register { node: node, reply: tx }));
+                            let Ok(resp) = rx.await else {
+                                log::error!("Error registering haptic node. Shutting down VRC Module");
+                                return;
+                            };
+
+                            for (addr, idx) in pairs {
+                                let key = SlotKey::new(resp, idx);
+                                let old = self.watched.insert(addr.clone(), AddrInfo::Slot(key, SlotFieldKind::Value));
+                                if let Some(old) = old {
+                                    log::warn!("Duplicate nodes with address: `{addr}`:{old:?}");
+                                };
+                            }
                         }
                     }
                     self.update_info();
@@ -300,57 +306,13 @@ impl VrcGame {
             avatar: self.avatar.clone(),
             velocity_mult: 0.0, // these will be filled out by touching the state in the handle function
             velocity_ratio: 0.0,
-            cached: self.parameter_cache.iter()
-                .map(|entry| (entry.key().clone(), entry.value().clone()))
-                .collect(),
+            watched: self.watched.iter().map(|(s, i) | {(s.clone(), i.clone())}).collect(),
         };
 
         current.swap(Arc::new(changed));
     }
 
     fn process_osc_batch(&self, batch: &[OscMessage], cfg: &VrcSettings) {
-        // DashMap supports concurrent writes — process in parallel
-        batch.par_iter().for_each(|msg| {
-            let addr = remove_version(&msg.addr);
-            let Some(arg) = msg.args.first() else { return };
-
-            // TODO: Make this search better, needs to cross reference our config but idk right now
-            if addr.ends_with("_Ratio") {
-                // push to the child cached node rather than the seperate one
-                let key = OscPath(addr.replace("_Ratio", ""));
-                if let Some(mut cache) = self.parameter_cache.get_mut(&key) {
-                    log_err!(cache.update_ray(arg.to_owned().into()));
-                } else {
-                    self.parameter_cache.insert(
-                    key,
-                    CacheNode::new(
-                        arg.to_owned(),
-                        cfg.sample_cache.clone(),
-                        cfg.smoothing_time.clone(),
-                    ),
-                );
-                }
-                return ;
-            }
-            let key = OscPath(addr);
-            if let Some(mut cache) = self.parameter_cache.get_mut(&key) {
-                log_err!(cache.update(arg.to_owned().into()));
-            } else {
-                self.parameter_cache.insert(
-                    key,
-                    CacheNode::new(
-                        arg.to_owned(),
-                        cfg.sample_cache.clone(),
-                        cfg.smoothing_time.clone(),
-                    ),
-                );
-            }
-        });
-    }
-
-    /// Propogates our cached values to changes on the input map.
-    async fn refresh_map(&self, map: &MapHandle, settings: &VrcSettings) {
-
         let Some(avatar) = self.avatar.as_ref() else {
             return;
         };
@@ -359,117 +321,132 @@ impl VrcGame {
             return;
         };
 
-        // update menu items and only push when needed
-        let int_node = self.parameter_cache.get(&OscPath(INTENSITY_PATH.into()));
-        let en_node = self.parameter_cache.get(&OscPath(ENABLE_PATH.into()));
-        match (int_node, en_node) {
-            (None, None) => {}, // both are zero
-            (Some(int), Some(en)) =>  {
-                let intensity = int.raw_last().clamp(0.0, 1.0);
-                let enable = en.raw_last();
-                let enable = enable > 0.5; 
+        for msg in batch {
+            let addr = remove_version(&msg.addr);
+            let Some(arg) = msg.args.first() else { return };
 
-                let menu = state::get_config().mapping_menu.load();
-                if (menu.intensity - intensity).abs() > 0.05 || enable != menu.enable {
-                    let mut new = StandardMenu::clone(&menu);
-                    new.intensity = intensity;
-                    new.enable = enable;
-                    state::get_config().mapping_menu.store(new.into());
-                }
-            },
-            (int, en) => {
-                if let Some(intensity) = int {
-                    let intensity = intensity.raw_last().clamp(0.0, 1.0);
-                    let menu = state::get_config().mapping_menu.load();
-                    if (menu.intensity - intensity).abs() > 0.05 {
-                        let mut new = StandardMenu::clone(&menu);
-                        new.intensity = intensity;
-                        state::get_config().mapping_menu.store(new.into());
-                    }
-                }
+            let Some(key) = self.watched.get(&addr) else {
+                continue; // not one we watch for.
+            };
 
-                if let Some(enable) = en {
-                    let en = enable.raw_last() > 0.5;
-                    let menu = state::get_config().mapping_menu.load();
-                    if menu.enable != en {
-                        let mut new = StandardMenu::clone(&menu);
-                        new.enable = en;
-                        state::get_config().mapping_menu.store(new.into());
-                    }
+            match key {
+                AddrInfo::Slot(s, kind) => {
+                    let msg = match kind {
+                        SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(try_f32(arg.clone())) },
+                        SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(try_f32(arg.clone())) },
+                        SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(try_bool(arg.clone())) },
+                    };
+                    log_err!(self.map.send_event(msg));
+                },
+                AddrInfo::Node(n, kind) => {
+                    let msg = match kind {
+                        NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(try_vec(arg.clone())) },
+                        NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(try_f32(arg.clone())) },
+                        NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(try_bool(arg.clone())) },
+                    };
+                    log_err!(self.map.send_event(msg));
                 }
-
             }
         }
-
-        // update input nodes
-        for conf in &avatar.configs {
-            for node in &conf.nodes {
-                if let Some(cache_node) =
-                    self.parameter_cache.get(&OscPath(node.address.clone()))
-                {
-                    // update node if already created
-                    let id = NodeId(node.address.clone());
-
-                    let res = map.with_node_mut(&id, |n| {
-                        if node.is_external_address {
-                            n.set_intensity(cache_node.raw_last());
-                            return;
-                        }
-
-                        n.set_intensity(cache_node.latest(settings));
-                    });
-
-                    if res.is_none() {
-                        log::trace!("This option none: {id:?}");
-                    }
-                    
-                } // we only get a value in cache when it has been modified. It is non-error to not have it yet.
-            } // for loop
-
-            // tell map we are done messing with it
-            // blocks till it sends.
-            map.mark_dirty();
-        }
-    }
-
-    /// Purges the parameter cache.
-    pub fn purge_cache(&mut self) {
-        self.parameter_cache.clear();
-        log::info!("Purged Parameter cache.");
     }
 }
 
+const F32DEFAULT: f32 = 0.0;
+const VECDEFAULT: Vec3 = Vec3::ZERO;
+
+/// I know this is somewhere else in the codebase but i don't care.
+/// Defaults to zero array and inserts first value into x if singular value.
+fn try_vec(val: OscType) -> Vec3 {
+    match val {
+        OscType::Float(f) => Vec3::new(f, 0.0, 0.0),
+        OscType::Array(a) => {
+            let x = try_f32(a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT)).clone());
+            let y = try_f32(a.content.get(1).unwrap_or(&OscType::Float(F32DEFAULT)).clone());
+            let z = try_f32(a.content.get(2).unwrap_or(&OscType::Float(F32DEFAULT)).clone());
+            Vec3::new(x, y, z)
+        },
+        OscType::Double(d) => Vec3::new(d as f32, 0.0, 0.0),
+        // TODO: Look into better casting these values.
+        _ => VECDEFAULT,
+
+    }
+}
+
+/// I know this is somewhere else in the codebase but i don't care.
+/// Defaults to 0.0, and first element of an array.
+fn try_f32(val: OscType) -> f32 {
+    match val {
+        OscType::Float(f) => f,
+        OscType::Array(a) => {
+            let first = a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT));
+            try_f32(first.clone())
+        },
+        OscType::Bool(b) => f32::from(u8::from(b)),
+        OscType::Double(d) => d as f32,
+        OscType::Inf => 1.0,
+        // TODO: Look into better casting these values.
+        _ => F32DEFAULT,
+
+    }
+}
+
+/// I know this is somewhere else in the codebase but i don't care.
+/// Defaults to false
+fn try_bool(val: OscType) -> bool {
+    match val {
+        OscType::Float(f) => f > 0.5,
+        OscType::Array(a) => {
+            let first = a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT));
+            try_bool(first.clone())
+        },
+        OscType::Bool(b) => b,
+        OscType::Double(d) => d > 0.5,
+        OscType::Inf => true,
+        // TODO: Look into better casting these values.
+        _ => false,
+
+    }
+}
+ 
 /// Converts a vrc avatar descriptor into a list of input nodes for our input map.
-fn to_inputs(avi: &Avatar) -> Vec<InputNode> {
+fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)>, Box<InputNode>)> {
     let mut nodes = vec![];
 
     for conf in &avi.configs {
         for node in &conf.nodes {
-            let mut haptic_node = node.node_data.clone();
-            if node.is_external_address {
-                haptic_node.groups.push(crate::mapping::NodeGroup::All);
+            let location = node.location;
+            let layer = &node.interpolation_layer;
+            let groups  = node.interaction_tags;
+            let radius = node.radius;
+            
+            let vel = settings.velocity_ratio;
+            let slots: Vec<(String, Slot)> = node.inputs.iter().map(|i| {
+                let weight = match i.source {
+                    InputType::Weight => vel,
+                    InputType::Velocity => 1.0 - vel,
+                };
+
+                return (
+                    i.vrc_prefix.to_owned() + &i.address.to_owned(), 
+                    Slot {
+                        muted: false,
+                        source: i.source.clone(),
+                        layer: i.layer.clone(),
+                        weight: weight,
+                        value: 0.0,
+                        history: SmallVec::new(),
+                    }
+                );
+            }).collect();
+
+            let mut node = Box::new(InputNode::new(location, groups, layer.clone(), SmallVec::new(), radius));
+            let mut addrs = vec![];
+            for (idx, (addr, slot)) in slots.iter().enumerate() {
+                node.slots.push(slot.clone());
+                addrs.push((addr.clone(), idx as u8));
             }
 
-            let mut input_type = InputType::INTERP;
-            if node.is_external_address {
-                input_type = InputType::ADDITIVE
-            }
-
-            nodes.push(InputNode::new(
-                haptic_node,
-                vec![
-                    format!(
-                        "{}_{}_{}",
-                        conf.meta.map_author, conf.meta.map_name, conf.meta.map_version
-                    ),
-                    node.target_bone.to_string(),
-                    "vrc_config_node".to_string(),
-                    VRC_TAG.into(),
-                ],
-                NodeId(node.address.clone()),
-                node.radius,
-                input_type,
-            ));
+            nodes.push((addrs, node));
         }
     }
 
@@ -482,7 +459,7 @@ fn to_inputs(avi: &Avatar) -> Vec<InputNode> {
 ///
 /// Represents all relevant *Descriptive* data. Does not contain any relevant high-speed or low latency datat.
 pub struct Avatar {
-    /// The avatar reffered to by the VRC api
+    /// The avatar referred to by the VRC api
     id: String,
     /// the names of the prefabs from the avatar parameter
     prefab_names: Vec<String>,

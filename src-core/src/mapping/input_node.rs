@@ -1,81 +1,107 @@
+use std::time::Instant;
 use glam::Vec3;
+use smallvec::SmallVec;
 
-use super::haptic_node::HapticNode;
-use super::NodeId;
+use crate::mapping::NodeKey;
+use crate::mapping::groups::NodeGroup;
+use crate::vrc::config::{InputLayer, InputType};
 
+const DEFAULT_NODE_SLOTS: usize = 2;
+
+/// Points to an input slot, within a node, within an interpolation layer.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-/// All information needed to compute an OuputNode of any given location
-pub struct InputNode {
-    /// id Unique to this InputNode
-    id: NodeId,
-    /// Contains the standard location and NodeGroup tags for calculating outputs
-    pub haptic_node: HapticNode,
-    /// The feedback strength at this location
-    pub intensity: f32,
-    /// The radius that this node will impact
-    pub radius: f32,
-    /// used to identify/modify/remove groups of InputNodes. (tags are not NodeGroups)  
-    pub tags: Vec<String>,
-    /// how this input node should be interpreted
-    pub input_type: InputType,
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct SlotKey {
+    pub node: NodeKey,
+    pub slot_idx: u8,
+}
+
+impl SlotKey {
+    pub fn new(node: NodeKey, idx: u8) -> Self {
+        SlotKey { node, slot_idx: idx }
+    }
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-/// Describes how an `InputNode` should be used during interpolation.
-///
-/// Layers are ordered in processing order according to the enum, with the cumulative outputs being passed to the next step.
-pub enum InputType {
-    /// Default choice, which weights closer values exponentially more.
-    ///
-    /// Output will not be influenced easily by distant input nodes if there is one close to the output node.
-    INTERP,
-    /// Additive layers adds the nodes influence into the result of the `InputType::INTERP` step.
-    ///
-    /// Uses linear scaling based off of the `InputNode.radius`
-    ADDITIVE,
-    /// Subtractive layers subtracts the nodes influence into the result of the `InputType::INTERP` step.
-    ///
-    /// Uses linear scaling based off of the `InputNode.radius`
-    SUBTRACTIVE,
+pub struct Slot {
+    pub muted: bool,
+    pub source: InputType,
+    pub layer: InputLayer,
+    pub weight: f32,
+    pub value: f32,
+    #[serde(skip)]
+    pub history: SmallVec<[(f32, Instant); 3]>,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+/// Represents information at a point in space that will go into computing outputs.
+/// 
+/// To have a Greedy layer drive multiple devices it must have the ALL group tag present. 
+pub struct InputNode {
+    pub muted: bool,
+    pub location: Vec3,
+    /// A slot is an single input value.
+    #[specta(type = Vec<Slot>)]
+    pub slots: SmallVec<[Slot; DEFAULT_NODE_SLOTS]>,
+    pub radius: f32,
+    /// purely for convenience, should be determined by the map.
+    pub interpolation_layer: InterpolationLayer,
+    pub groups: NodeGroup,
+    /// The most recently calculated output value of this node.
+    pub value: f32,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+#[repr(u8)]
+/// Describes how this node should affect the layers. 
+pub enum InterpolationLayer {
+    /// Grabs any nodes within it's radius,forcefully drives it at this value.
+    Greedy,
+    /// Exponentially weights nodes within it's radius, nodes at 0 pull to zero.
+    #[default]
+    Default,
+    /// Weights nodes according to their proximity to this node
+    Linear,
+    /// Drives **all** nodes exactly at output without regard to distance.
+    Global,
 }
 
 impl InputNode {
     /// Factory for creating InputNode's
-    ///
-    /// id: Unique id
-    ///
-    /// node: Fully generated HapticNode in standard space
-    ///
-    /// tags: Use these to find groups of InputNodes
-    ///
-    /// **NOTE:** Initializes intensity to 0.0, set the intensity using class functions
     pub fn new(
-        node: HapticNode,
-        tags: Vec<String>,
-        id: NodeId,
+        location: Vec3,
+        groups: NodeGroup,
+        layer: InterpolationLayer,
+        slots: SmallVec<[Slot; DEFAULT_NODE_SLOTS]>,
         radius: f32,
-        input_type: InputType,
     ) -> InputNode {
         return InputNode {
-            id: id,
-            haptic_node: node,
-            intensity: 0.0,
-            radius: radius,
-            tags: tags,
-            input_type: input_type,
+            muted: false,
+            location,
+            slots,
+            radius,
+            interpolation_layer: layer,
+            groups,
+            value: 0.0,
         };
     }
 
-    pub fn always_apply(&self) -> bool {
-        self.haptic_node.groups.contains(&super::NodeGroup::All)
+    pub const fn always_apply(&self) -> bool {
+        self.groups.intersects(NodeGroup::All)
     }
 
     pub fn set_position(&mut self, pos: Vec3) {
-        self.haptic_node.x = pos.x;
-        self.haptic_node.y = pos.y;
-        self.haptic_node.z = pos.z;
+        self.location.x = pos.x;
+        self.location.y = pos.y;
+        self.location.z = pos.z;
+    }
+
+    pub fn mute(&mut self, val: bool) {
+        self.muted = val;
     }
 
     pub fn set_radius(&mut self, radius: f32) {
@@ -84,20 +110,5 @@ impl InputNode {
 
     pub fn get_radius(&self) -> f32 {
         self.radius
-    }
-
-    /// sets the intensity of this node
-    pub fn set_intensity(&mut self, intensity: f32) {
-        self.intensity = intensity;
-    }
-
-    /// gets the intensity of this node
-    pub fn get_intensity(&self) -> f32 {
-        self.intensity
-    }
-
-    /// Gets our unique ID
-    pub fn get_id(&self) -> &NodeId {
-        &self.id
     }
 }

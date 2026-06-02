@@ -1,43 +1,107 @@
-use crate::mapping::haptic_node::HapticNode;
-use glam::Vec3;
+use crate::mapping::{groups::NodeGroup, haptic_node::HapticNode, input_node::InterpolationLayer};
+use glam::{Vec3, Vec4};
+
+pub type UuidString = String;
 
 /// Filled with values from a config json file.
 /// Provides all information needed to fully define the avatar prefab.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GameMap {
+    pub schema_version: String,
     pub nodes: Vec<ConfNode>,
-    pub meta: ConfMetadata,
+    pub identification: ConfIdent,
 }
 
 /// Haptic Node information from the game config
 /// Contains more information than the default HapticNode to help with locating
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfNode {
-    pub node_data: HapticNode,
-    pub address: String,
-    pub is_external_address: bool,
+    pub location: Vec3,
+    pub interaction_tags: NodeGroup,
+    pub parent_bone: TargetBone,
+    pub interpolation_layer: InterpolationLayer,
+    /// The radius that will be used during interpolation
     pub radius: f32,
-    pub target_bone: TargetBone,
-    #[serde(default)] // was added on to the spec, so defaults to unavailable.
-    pub ray: Option<RayNode>,
+    pub inputs: Vec<Input>,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
-pub struct RayNode {
-    pub rotation_offset: Vec3,
-    pub position_offset: Vec3,
-    pub size: f32,
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// describes an input source.
+pub struct Input {
+    pub weight: f32,
+    pub address: String,
+    pub vrc_prefix: String,
+    pub external_source: bool,
+    pub source: InputType,
+    pub layer: InputLayer,
+    pub shape: InputShape,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// Whether this input source should be interpreted as weight or velocity.
+/// Should be moved to mapping if it ends up in there.
+pub enum InputType {
+    Weight,
+    Velocity,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// How this input interacts within it's own sources.
+/// 
+/// Gate(Max((Additive + Subtractive) * Multiplicative, Minimum of Max Layer), Maximum of Min Layer) Clamped to 0.0-1.0 (Overridden by first Override layer)
+pub enum InputLayer {
+    /// Additive and subtractive combine to create base cumulative values.
+    Additive,
+    Subtractive,
+    /// multiplies by cumulative value
+    Multiplicative,
+    /// Takes Either cumulative or this value, whichever is bigger
+    Max,
+    /// Takes Either cumulative or this value, whichever is smaller
+    Gate,
+    /// Should be use sparingly, could very much so disrupt the outputs.
+    Override,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// The shape that is used in game, gives us some special ways to interpolate some shapes.
+pub enum InputShape {
+    Sphere{radius: f32},
+    Capsule{radius: f32, length: f32, rotation: Vec4},
+    Ray{len: f32, offset: f32},
 }
 
 /// Metadata from the json config
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-pub struct ConfMetadata {
+#[serde(rename_all = "camelCase")]
+pub struct ConfIdent {
     pub map_name: String,
     pub map_version: u32,
+    pub map_author: String,
+    pub author_id: String,
+    pub custom_repository: CustomRepo,
+}
+
+/// where to retrieve different versions of this map
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomRepo {
+    pub author: String,
+    pub map_name: String,
     pub map_author: String,
 }
 
@@ -45,293 +109,62 @@ pub struct ConfMetadata {
 /// (HumanBodyBones from Unity,)
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum TargetBone {
-    /// <summary>
-    ///   <para>This is the Hips bone.</para>
-    /// </summary>
     Hips,
-    /// <summary>
-    ///   <para>This is the Left Upper Leg bone.</para>
-    /// </summary>
     LeftUpperLeg,
-    /// <summary>
-    ///   <para>This is the Right Upper Leg bone.</para>
-    /// </summary>
     RightUpperLeg,
-    /// <summary>
-    ///   <para>This is the Left Knee bone.</para>
-    /// </summary>
     LeftLowerLeg,
-    /// <summary>
-    ///   <para>This is the Right Knee bone.</para>
-    /// </summary>
     RightLowerLeg,
-    /// <summary>
-    ///   <para>This is the Left Ankle bone.</para>
-    /// </summary>
     LeftFoot,
-    /// <summary>
-    ///   <para>This is the Right Ankle bone.</para>
-    /// </summary>
     RightFoot,
-    /// <summary>
-    ///   <para>This is the first Spine bone.</para>
-    /// </summary>
     Spine,
-    /// <summary>
-    ///   <para>This is the Chest bone.</para>
-    /// </summary>
     Chest,
-    /// <summary>
-    ///   <para>This is the Neck bone.</para>
-    /// </summary>
     Neck,
-    /// <summary>
-    ///   <para>This is the Head bone.</para>
-    /// </summary>
     Head,
-    /// <summary>
-    ///   <para>This is the Left Shoulder bone.</para>
-    /// </summary>
     LeftShoulder,
-    /// <summary>
-    ///   <para>This is the Right Shoulder bone.</para>
-    /// </summary>
     RightShoulder,
-    /// <summary>
-    ///   <para>This is the Left Upper Arm bone.</para>
-    /// </summary>
     LeftUpperArm,
-    /// <summary>
-    ///   <para>This is the Right Upper Arm bone.</para>
-    /// </summary>
     RightUpperArm,
-    /// <summary>
-    ///   <para>This is the Left Elbow bone.</para>
-    /// </summary>
     LeftLowerArm,
-    /// <summary>
-    ///   <para>This is the Right Elbow bone.</para>
-    /// </summary>
     RightLowerArm,
-    /// <summary>
-    ///   <para>This is the Left Wrist bone.</para>
-    /// </summary>
     LeftHand,
-    /// <summary>
-    ///   <para>This is the Right Wrist bone.</para>
-    /// </summary>
     RightHand,
-    /// <summary>
-    ///   <para>This is the Left Toes bone.</para>
-    /// </summary>
     LeftToes,
-    /// <summary>
-    ///   <para>This is the Right Toes bone.</para>
-    /// </summary>
     RightToes,
-    /// <summary>
-    ///   <para>This is the Left Eye bone.</para>
-    /// </summary>
     LeftEye,
-    /// <summary>
-    ///   <para>This is the Right Eye bone.</para>
-    /// </summary>
     RightEye,
-    /// <summary>
-    ///   <para>This is the Jaw bone.</para>
-    /// </summary>
     Jaw,
-    /// <summary>
-    ///   <para>This is the left thumb 1st phalange.</para>
-    /// </summary>
     LeftThumbProximal,
-    /// <summary>
-    ///   <para>This is the left thumb 2nd phalange.</para>
-    /// </summary>
     LeftThumbIntermediate,
-    /// <summary>
-    ///   <para>This is the left thumb 3rd phalange.</para>
-    /// </summary>
     LeftThumbDistal,
-    /// <summary>
-    ///   <para>This is the left index 1st phalange.</para>
-    /// </summary>
     LeftIndexProximal,
-    /// <summary>
-    ///   <para>This is the left index 2nd phalange.</para>
-    /// </summary>
     LeftIndexIntermediate,
-    /// <summary>
-    ///   <para>This is the left index 3rd phalange.</para>
-    /// </summary>
     LeftIndexDistal,
-    /// <summary>
-    ///   <para>This is the left middle 1st phalange.</para>
-    /// </summary>
     LeftMiddleProximal,
-    /// <summary>
-    ///   <para>This is the left middle 2nd phalange.</para>
-    /// </summary>
     LeftMiddleIntermediate,
-    /// <summary>
-    ///   <para>This is the left middle 3rd phalange.</para>
-    /// </summary>
     LeftMiddleDistal,
-    /// <summary>
-    ///   <para>This is the left ring 1st phalange.</para>
-    /// </summary>
     LeftRingProximal,
-    /// <summary>
-    ///   <para>This is the left ring 2nd phalange.</para>
-    /// </summary>
     LeftRingIntermediate,
-    /// <summary>
-    ///   <para>This is the left ring 3rd phalange.</para>
-    /// </summary>
     LeftRingDistal,
-    /// <summary>
-    ///   <para>This is the left little 1st phalange.</para>
-    /// </summary>
     LeftLittleProximal,
-    /// <summary>
-    ///   <para>This is the left little 2nd phalange.</para>
-    /// </summary>
     LeftLittleIntermediate,
-    /// <summary>
-    ///   <para>This is the left little 3rd phalange.</para>
-    /// </summary>
     LeftLittleDistal,
-    /// <summary>
-    ///   <para>This is the right thumb 1st phalange.</para>
-    /// </summary>
     RightThumbProximal,
-    /// <summary>
-    ///   <para>This is the right thumb 2nd phalange.</para>
-    /// </summary>
     RightThumbIntermediate,
-    /// <summary>
-    ///   <para>This is the right thumb 3rd phalange.</para>
-    /// </summary>
     RightThumbDistal,
-    /// <summary>
-    ///   <para>This is the right index 1st phalange.</para>
-    /// </summary>
     RightIndexProximal,
-    /// <summary>
-    ///   <para>This is the right index 2nd phalange.</para>
-    /// </summary>
     RightIndexIntermediate,
-    /// <summary>
-    ///   <para>This is the right index 3rd phalange.</para>
-    /// </summary>
     RightIndexDistal,
-    /// <summary>
-    ///   <para>This is the right middle 1st phalange.</para>
-    /// </summary>
     RightMiddleProximal,
-    /// <summary>
-    ///   <para>This is the right middle 2nd phalange.</para>
-    /// </summary>
     RightMiddleIntermediate,
-    /// <summary>
-    ///   <para>This is the right middle 3rd phalange.</para>
-    /// </summary>
     RightMiddleDistal,
-    /// <summary>
-    ///   <para>This is the right ring 1st phalange.</para>
-    /// </summary>
     RightRingProximal,
-    /// <summary>
-    ///   <para>This is the right ring 2nd phalange.</para>
-    /// </summary>
     RightRingIntermediate,
-    /// <summary>
-    ///   <para>This is the right ring 3rd phalange.</para>
-    /// </summary>
     RightRingDistal,
-    /// <summary>
-    ///   <para>This is the right little 1st phalange.</para>
-    /// </summary>
     RightLittleProximal,
-    /// <summary>
-    ///   <para>This is the right little 2nd phalange.</para>
-    /// </summary>
     RightLittleIntermediate,
-    /// <summary>
-    ///   <para>This is the right little 3rd phalange.</para>
-    /// </summary>
     RightLittleDistal,
-    /// <summary>
-    ///   <para>This is the Upper Chest bone.</para>
-    /// </summary>
     UpperChest,
-    /// <summary>
-    ///   <para>This is the Last bone index delimiter.</para>
-    /// </summary>
     LastBone,
-}
-
-impl ToString for TargetBone {
-    fn to_string(&self) -> String {
-        let str = match self {
-            TargetBone::Hips => "Hips",
-            TargetBone::LeftUpperLeg => "LeftUpperLeg",
-            TargetBone::RightUpperLeg => "RightUpperLeg",
-            TargetBone::LeftLowerLeg => "LeftLowerLeg",
-            TargetBone::RightLowerLeg => "RightLowerLeg",
-            TargetBone::LeftFoot => "LeftFoot",
-            TargetBone::RightFoot => "RightFoot",
-            TargetBone::Spine => "Spine",
-            TargetBone::Chest => "Chest",
-            TargetBone::Neck => "Neck",
-            TargetBone::Head => "Head",
-            TargetBone::LeftShoulder => "LeftShoulder",
-            TargetBone::RightShoulder => "RightShoulder",
-            TargetBone::LeftUpperArm => "LeftUpperArm",
-            TargetBone::RightUpperArm => "RightUpperArm",
-            TargetBone::LeftLowerArm => "LeftLowerArm",
-            TargetBone::RightLowerArm => "RightLowerArm",
-            TargetBone::LeftHand => "LeftHand",
-            TargetBone::RightHand => "RightHand",
-            TargetBone::LeftToes => "LeftToes",
-            TargetBone::RightToes => "RightToes",
-            TargetBone::LeftEye => "LeftEye",
-            TargetBone::RightEye => "RightEye",
-            TargetBone::Jaw => "Jaw",
-            TargetBone::LeftThumbProximal => "LeftThumbProximal",
-            TargetBone::LeftThumbIntermediate => "LeftThumbIntermediate",
-            TargetBone::LeftThumbDistal => "LeftThumbDistal",
-            TargetBone::LeftIndexProximal => "LeftIndexProximal",
-            TargetBone::LeftIndexIntermediate => "LeftIndexIntermediate",
-            TargetBone::LeftIndexDistal => "LeftIndexDistal",
-            TargetBone::LeftMiddleProximal => "LeftMiddleProximal",
-            TargetBone::LeftMiddleIntermediate => "LeftMiddleIntermediate",
-            TargetBone::LeftMiddleDistal => "LeftMiddleDistal",
-            TargetBone::LeftRingProximal => "LeftRingProximal",
-            TargetBone::LeftRingIntermediate => "LeftRingIntermediate",
-            TargetBone::LeftRingDistal => "LeftRingDistal",
-            TargetBone::LeftLittleProximal => "LeftLittleProximal",
-            TargetBone::LeftLittleIntermediate => "LeftLittleIntermediate",
-            TargetBone::LeftLittleDistal => "LeftLittleDistal",
-            TargetBone::RightThumbProximal => "RightThumbProximal",
-            TargetBone::RightThumbIntermediate => "RightThumbIntermediate",
-            TargetBone::RightThumbDistal => "RightThumbDistal",
-            TargetBone::RightIndexProximal => "RightIndexProximal",
-            TargetBone::RightIndexIntermediate => "RightIndexIntermediate",
-            TargetBone::RightIndexDistal => "RightIndexDistal",
-            TargetBone::RightMiddleProximal => "RightMiddleProximal",
-            TargetBone::RightMiddleIntermediate => "RightMiddleIntermediate",
-            TargetBone::RightMiddleDistal => "RightMiddleDistal",
-            TargetBone::RightRingProximal => "RightRingProximal",
-            TargetBone::RightRingIntermediate => "RightRingIntermediate",
-            TargetBone::RightRingDistal => "RightRingDistal",
-            TargetBone::RightLittleProximal => "RightLittleProximal",
-            TargetBone::RightLittleIntermediate => "RightLittleIntermediate",
-            TargetBone::RightLittleDistal => "RightLittleDistal",
-            TargetBone::UpperChest => "UpperChest",
-            TargetBone::LastBone => "LastBone",
-        };
-        str.to_string()
-    }
 }

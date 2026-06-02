@@ -1,15 +1,14 @@
 use x40_vest::{x40_vest_back, x40_vest_front};
 use x6_head::x6_headset;
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use glam::Vec3;
 
 use super::game::network::event_map::{
     AudioFilePattern, HapticMapping, PatternLine, PatternLocation,
 };
-use crate::mapping::event::Event;
+use crate::mapping::event::{Event, Frames, MaybeConst, Steps};
 /// Contains all the index -> position matricies for bhaptics devices.
-use crate::mapping::event::EventEffectType;
 
 pub mod x40_vest;
 pub mod x6_head;
@@ -39,47 +38,76 @@ pub fn to_position(device: PatternLocation, index: usize) -> Vec3 {
 }
 
 /// Turns a Haptic Pattern into a batch of events with a shared duration.
-pub fn pattern_to_events(mapping: HapticMapping) -> Vec<Event> {
+pub fn pattern_to_event(mapping: HapticMapping) -> Option<Event> {
     let name = mapping.key.clone();
-    let tags = vec!["Bhaptics".to_string(), format!("Bhaptics_{}", name)];
+    let duration = mapping.event_time / 10; // 10ms per event tick. 
+    let frames = build_frames(mapping.audio_file_patterns, duration);
 
-    let audio_patterns = build_audio_pattern(mapping.audio_file_patterns, name, tags);
-
-    // only return audio patterns for now.
-    return audio_patterns;
+    match Event::new(name.clone(), frames, duration as u64) {
+        Ok(e) => Some(e),
+        Err(e) => {
+            log::error!("unable to create event: {name}: {e:?}");
+            None
+        }
+    }
 }
 
-fn build_audio_pattern(
+fn build_frames(
     patterns: Vec<AudioFilePattern>,
-    name: String,
-    tags: Vec<String>,
-) -> Vec<Event> {
-    let mut audio_events: Vec<Event> = Vec::new();
+    duration: u32,
+) -> Frames {
+    let mut nodes: Vec<Steps> = Vec::new();
 
-    // all clips inside all patterns
+    let mut ratios = Vec::new();
+    let mut line_count = Vec::new();
+
+    // Clips for all supported devices
     for audio_pattern in patterns {
+        // down to which device this is for
         for (location, pattern_lines) in audio_pattern.clip.patterns {
-            let dur = Duration::from_millis(audio_pattern.clip.duration as u64);
-            let motor_steps = convert_to_steps(&location, &pattern_lines);
+            //audio_pattern.clip.duration // time this pattern should take (ms)
 
-            // itterate over each motor for this location.
-            for (index, steps) in motor_steps.iter().enumerate() {
-                if let Some(motor_id) = location.to_id(index) {
-                    let effect = EventEffectType::SingleNode(motor_id);
+            // down to each motor 
+            for (mtr_idx, line) in pattern_lines.iter().enumerate() {
+                let loc = location.to_position(mtr_idx);
 
-                    if let Ok(event) =
-                        Event::new(name.clone(), effect, steps.to_vec(), dur, tags.clone())
-                    {
-                        audio_events.push(event);
-                    } else {
-                        log::error!("Couldn't add event: {:?}:{:?}", name, location);
-                    }
-                } // `motor_steps` should not exceed `location.motor_count()`.
+                let values: Vec<f32> = line.0.iter().map(|byte| {
+                    *byte as f32 / 125.0
+                }).collect(); // scale byte to 1.0 -0.0 float
+
+                let scaling = audio_pattern.clip.duration / values.len() as u32;
+                line_count.push(values.len());
+                ratios.push(scaling);
+
+                let epsilon = 0.001f32;
+                if match values.first() { // all constant (this motor isn't targeted)
+                    Some(&first) => values.iter().all(|&x| (x - first).abs() <= epsilon),
+                    None => true,
+                } {
+                    nodes.push(Steps {
+                        position: MaybeConst::new_const(loc),
+                        muted: MaybeConst::new_const(false),
+                        value: MaybeConst::new_const(*values.first().unwrap_or(&0.0f32)),
+                        weight: MaybeConst::Const(1.0),
+                        radius: MaybeConst::Const(0.0375f32)
+                    });
+                } else {
+                    nodes.push(Steps {
+                        position: MaybeConst::new_const(loc),
+                        muted: MaybeConst::new_const(false),
+                        value: MaybeConst::Var(Arc::new(*values.as_array().unwrap_or(&[]))),
+                        weight: MaybeConst::Const(1.0),
+                        radius: MaybeConst::Const(0.0375f32)
+                    });
+                }
             }
         }
     }
 
-    return audio_events;
+    log::trace!("Clip: {:?} ms/frame", ratios);
+    log::trace!("Scaling: {:?}", duration / (line_count.iter().sum::<usize>() / line_count.len() as usize) as u32);
+
+    return Frames { nodes: nodes};
 }
 
 /// Returns nested vector [device_motor_index][time_step] = value @ timestamp for a device motor.

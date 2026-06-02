@@ -1,49 +1,92 @@
-use super::{haptic_node::HapticNode, input_node::InputNode, NodeId, NodeGroup};
-use crate::mapping::input_node::InputType;
+use crate::mapping::{EventDuration, EventInstant, NodeKey, Nodes, input_node::InputNode};
 use glam::Vec3;
-use std::time::{Duration, SystemTime};
+use slotmap::SlotMap;
+use std::{usize, sync::Arc};
 
-/// Describes what effect an event should have.
+
+//const _: [u8; std::mem::size_of::<MaybeConst<()>>()] = [];
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum EventEffectType {
-    /// Will try to set this node id to this value,
-    /// Does not remove node after finished.
-    SingleNode(NodeId),
-    /// Same as single node, but with a list of them.
-    MultipleNodes(Vec<NodeId>),
-    /// Effects all InputNodes with the given tag.
-    Tags(Vec<String>),
-    /// Inserts a node at the given location, automatically removes node when event expires.
-    Location(Vec3),
-    /// Divides locations between the duration of the event and moves the node to that location.
-    MovingLocation(Vec<Vec3>),
+#[derive(serde::Serialize, Debug, Clone)]
+pub enum MaybeConst<T> 
+where 
+    T: Clone ,
+{
+    /// Is not constant, an index for each frame. 
+    /// Will behave like constant after running out of frames.
+    Var(Arc<[T]>),
+    /// Will be constant for the duration of this event.
+    Const(T),
+}
+
+impl<T: Clone> MaybeConst<T> {
+    /// create constant variant.
+    pub const fn new_const(val: T) -> Self {
+        Self::Const(val)
+    }
+
+    /// create variable with steps.
+    pub const fn new(val: Arc<[T]>) -> Self{
+        Self::Var(val)
+    }
+
+    pub const fn is_const(&self) -> bool {
+        match self {
+            Self::Const(_) => true,
+            Self::Var(_) => false,
+        }
+    }
+
+    /// Gets the initial value of the value.
+    pub fn first(&self) -> &T {
+        match self {
+            Self::Const(v) => v,
+            Self::Var(l) => &l[0]
+        }
+    }
+
+    pub fn get(&self, idx: usize) -> Option<&'_ T> {
+        match self {
+            Self::Const(_) => None,
+            Self::Var(l) => l.get(idx)
+        }
+    }
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, Debug, Clone)]
+/// A collection of values and consts, Constant values will only be initialized.
+pub struct Frames {
+    pub nodes: Vec<Steps>,
+}
+
+impl Frames {
+    pub fn new(nodes: Vec<Steps>) -> Self {
+        Self { nodes }
+    }
+}
+
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, Debug, Clone)]
+pub struct Steps {
+    pub position: MaybeConst<Vec3>,
+    pub muted: MaybeConst<bool>,
+    pub value: MaybeConst<f32>,
+    pub weight: MaybeConst<f32>,
+    pub radius: MaybeConst<f32>,
 }
 
 /// Represents a haptic event that takes place over time.
-/// 
-/// Depends on `EventEffectType`
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, Debug, Clone)]
 pub struct Event {
     /// user facing name
     pub name: String,
-    /// how should this event effect the input map
-    pub effect: EventEffectType,
-    /// The different outputs that should be output at different times.
-    pub steps: Vec<f32>,
-    /// The total duration of this event.
-    ///
-    /// Steps will be distributed across this duration.
-    pub duration: Duration,
-    /// Tags that will be inserted to each node created by this event.
-    pub tags: Vec<String>,
-    /// radius of effect this event will have
-    pub radius: f32,
-    managed_nodes: Vec<NodeId>, // nodes we have control over.
-    time_step: Duration,
-    steps_completed: usize,
-    start_time: Option<SystemTime>,
+    /// lots of identical events can be triggered.
+    pub frames: Frames,
+    /// The total duration of this even in event ticks (100hz)
+    /// 
+    /// Nodes will be active in the map for this long and modified by the frames inserted.
+    pub duration: EventDuration,
 }
 
 impl Event {
@@ -61,195 +104,66 @@ impl Event {
     /// associated with a given event source.
     pub fn new(
         name: String,
-        effect: EventEffectType,
-        steps: Vec<f32>,
-        duration: Duration,
-        tags: Vec<String>,
+        frames: Frames,
+        duration: EventDuration,
     ) -> Result<Event, CreateEventError> {
-        if steps.len() < 1 {
+        if duration < 1 {
             return Err(CreateEventError::NotEnoughSteps);
-        }
-
-        let time_step = duration.clone().div_f32(steps.len() as f32);
-        if time_step.as_millis() < 9 {
-            // for rounding safety, rather permissive than error.
-            return Err(CreateEventError::TooSmallTimestep);
-        }
-
-        if tags.is_empty() {
-            log::warn!("Event without tags are not recommended: {}", name);
         }
 
         let ev = Event {
             name: name,
-            effect: effect,
-            steps: steps.clone(),
+            frames: frames,
             duration: duration,
-            tags: tags,
-            radius: 0.10,
-            managed_nodes: Vec::new(),
-            time_step: time_step,
-            steps_completed: 0,
-            start_time: None,
         };
 
         return Ok(ev);
     }
 
-    /// Propogates the changes this event represents into the gameMap at this time.
-    ///
-    /// Returns whether this event should be removed from the pool.
-    pub fn tick(&mut self, mut input_nodes: &mut Vec<InputNode>) -> bool {
-        // will return early if initiation isn't needed.
-        self.initiate(&mut input_nodes);
-
-        // get current time.
-        let now = SystemTime::now();
-        let start = self.start_time.get_or_insert(now);
-        let elapsed = match now.duration_since(*start) {
-            Ok(d) => d,
-            // I hate timing errors.
-            Err(_) => Duration::ZERO,
-        };
-
-        let should_have_fired = (elapsed.as_nanos() / self.time_step.as_nanos()) as usize;
-
-        // apply effects if we need to.
-        while self.steps_completed <= should_have_fired && self.steps_completed < self.steps.len() {
-            let value = self.steps[self.steps_completed];
-            self.apply_effect(value, &mut input_nodes);
-            self.steps_completed += 1;
-        }
-
-        // if the final effects have happened, clean up our stuff.
-        if elapsed >= self.duration {
-            self.cleanup(&mut input_nodes);
-            return true;
-        }
-
-        false
+    pub fn num_nodes(&self) -> usize {
+        self.frames.nodes.len()
     }
 
-    /// Initiates the input_nodes state to handle our event.
-    ///
-    /// Returns early if start_time is already defined.
-    fn initiate(&mut self, input_nodes: &mut Vec<InputNode>) {
-        if self.start_time.is_some() {
-            return;
-        } // already started
-          //log::trace!("Starting event: {}", self.name);
+    /// Produces mutations to the map via the tx module.
+    /// Not allowed to mutate self, event is a parent that is static for this map epoch.
+    /// Only mutate the keys
+    pub fn tick(&self, nodes: &mut SlotMap<NodeKey, InputNode>, keys: &[NodeKey], since_start: EventInstant) {
 
-        match &self.effect {
-            EventEffectType::Location(pos) => {
-                let id = NodeId::new();
-                let haptic_node = HapticNode {
-                    x: pos.x,
-                    y: pos.y,
-                    z: pos.z,
-                    groups: vec![NodeGroup::All],
-                };
-                input_nodes.push(
-                    InputNode::new(
-                        haptic_node,
-                        self.tags.clone(),
-                        id.clone(),
-                        self.radius,
-                        InputType::INTERP,
-                    ),
-                );
-                self.managed_nodes.push(id);
-            }
-            EventEffectType::MovingLocation(path) if !path.is_empty() => {
-                let id = NodeId::new();
-                let first = path.first().unwrap(); // verified non-zero at new() function
-                let haptic_node = HapticNode {
-                    x: first.x,
-                    y: first.y,
-                    z: first.z,
-                    groups: vec![NodeGroup::All],
-                };
-                input_nodes.push(
-                    InputNode::new(
-                        haptic_node,
-                        self.tags.clone(),
-                        id.clone(),
-                        self.radius,
-                        InputType::INTERP,
-                    ),
-                );
-                self.managed_nodes.push(id);
-            }
-            _ => {}
-        }
+        let frames = &self.frames;
+        for (idx, steps) in frames.nodes.iter().enumerate() {
+            let Some(key) = keys.get(idx) else {
+                log::error!("unable to find key for index: {idx}");
+                continue;
+            };
 
-        self.start_time = Some(SystemTime::now());
-    }
+            let Some(node) = nodes.get_mut(*key) else {
+                log::error!("unable to retrieve matching node for: {idx}");
+                continue;
+            };
 
-    /// Applies the described effect at for a given value.
-    fn apply_effect(&self, value: f32, input_nodes: &mut Vec<InputNode>) {
-        match &self.effect {
-            EventEffectType::SingleNode(id) => {
-                if let Some(mut node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
-                    node.set_intensity(value);
-                }
+            if let Some(&muted) = steps.muted.get(since_start as usize) {
+                node.muted = muted;
             }
-            EventEffectType::MultipleNodes(ids) => {
-                for id in ids {
-                    if let Some(mut node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
-                        node.set_intensity(value);
-                    }
-                }
+            if let Some(&weight) = steps.weight.get(since_start as usize) {
+                node.slots[0].weight = weight;
             }
-            EventEffectType::Tags(tags) => {
-                input_nodes
-                    .iter_mut()
-                    .filter(|kv| tags.iter().any(|t| kv.tags.contains(t)))
-                    .for_each(|mut kv| kv.set_intensity(value));
+            if let Some(&value) = steps.value.get(since_start as usize) {
+                node.slots[0].value = value;
             }
-            EventEffectType::Location(_) => {
-                let id = self.managed_nodes.first().unwrap(); // initiate is called first, which garuntees atleast one managed node.
-                if let Some(node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
-                    node.set_intensity(value);
-                }
+            if let Some(&pos) = steps.position.get(since_start as usize) {
+                node.location = pos;
             }
-            EventEffectType::MovingLocation(waypoints) => {
-                let idx = self.steps_completed.min(waypoints.len() - 1);
-
-                let id = self.managed_nodes.first().unwrap(); // initiate is called first, which garuntees atleast one managed node.
-                if let Some(node) = input_nodes.iter_mut().find(|d| d.get_id() == id) {
-                    node.set_position(waypoints[idx]);
-                    node.set_intensity(value);
-                }
+            if let Some(&rad) = steps.radius.get(since_start as usize) {
+                node.radius = rad;
             }
+            
         }
     }
 
-    /// cleans up the leftover nodes when an event is finished.
-    fn cleanup(&self, input_nodes: &mut Vec<InputNode>) {
-        //log::trace!("Finished event: {}", self.name);
-        match &self.effect {
-            EventEffectType::Location(_) | EventEffectType::MovingLocation(_) => {
-                // Remove transient node(s) that were spawned only for this event
-                for ids in &self.managed_nodes {
-                    input_nodes.retain(|d| d.get_id() != ids);
-                }
-            }
-            EventEffectType::SingleNode(id) => {
-                if let Some(node) = input_nodes.iter_mut().find(|n| n.get_id() == id ) {
-                    node.set_intensity(0.);
-                }
-            }
-            _ => { /* nothing to remove */ }
-        }
-    }
 }
 
 #[derive(Debug)]
 pub enum CreateEventError {
     /// must contain atleast one step to execute.
     NotEnoughSteps,
-    /// duration/steps must result in atleast a 10ms period.
-    TooSmallTimestep,
-    /// empty tags are not allowed, mainly for debugging.
-    EmptyTags,
 }

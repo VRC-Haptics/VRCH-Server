@@ -58,7 +58,8 @@ where
             let arr: [u8; 8] = chunk
                 .try_into()
                 .map_err(|_| D::Error::custom("Chunk conversion failed"))?;
-            Ok(HapticNode::from_bytes(arr))
+            HapticNode::from_bytes(arr)
+                .ok_or_else(|| D::Error::custom("Invalid node_map entry"))
         })
         .collect::<Result<Vec<_>, D::Error>>()?;
 
