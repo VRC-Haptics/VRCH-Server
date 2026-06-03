@@ -40,7 +40,7 @@ export default function RawDeviceInfo({ deviceId, device }: RawDeviceInfoProps) 
         <div className="ml-4 max-h-48 overflow-auto">
           {info.nodes.map((node, i) => (
             <p key={i}>
-              <strong>#{i}:</strong> ({node.x.toFixed(3)}, {node.y.toFixed(3)}, {node.z.toFixed(3)}) — {node.groups.join(", ")}
+              <strong>#{i}:</strong> ({node.loc[0].toFixed(3)}, {node.loc[1].toFixed(3)}, {node.loc[2].toFixed(3)}) — {node.groups}
             </p>
           ))}
         </div>

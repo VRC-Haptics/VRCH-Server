@@ -118,7 +118,7 @@ async def ramp_loop(addrs: list[str], avatar_id: str, target_ip: str, target_por
             now = asyncio.get_event_loop().time()
             t = (now - t0) % 1.0
             value = 1.0 - abs(2.0 * t - 1.0)
-            client.send_message(addr, float(value))
+            client.send_message(addr, float(0.0))#float(value))
             if i < n - 1:
                 await asyncio.sleep(stagger)
 

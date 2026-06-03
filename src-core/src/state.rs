@@ -4,16 +4,14 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::PathBuf,
-    sync::{Arc, LazyLock, OnceLock, atomic::AtomicBool},
+    sync::{atomic::AtomicBool, Arc, LazyLock, OnceLock},
     time::Duration,
 };
 
-use crate::{
-    devices::DeviceId, log_err, mapping::interp::InterpState 
-};
+use crate::{devices::DeviceId, log_err, mapping::interp::InterpState};
 
 // not intended to be accessed publicly. Use functions below
-static CONFIG: LazyLock<Config> = LazyLock::new(|| {load_config().unwrap_or_default()});
+static CONFIG: LazyLock<Config> = LazyLock::new(|| load_config().unwrap_or_default());
 /// init by set_config_dir
 static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
 /// init by load_config
@@ -35,7 +33,6 @@ pub fn set_config_dir(path: PathBuf) {
     log_err!(CONFIG_DIR.set(path));
 }
 
-
 /// ONLY USED AT PROGRAM START. NOT A GENERAL USE FUNCTION.
 pub async fn init_save_loop() {
     tokio::spawn(async move {
@@ -56,13 +53,14 @@ pub fn mark_dirty() {
 
 /// Heavy function, persists a snapshot of our config to the disk.
 pub fn save_config() {
-    let path = CONFIG_FILE.get().expect("Should have initialized config before calling save loop");
+    let path = CONFIG_FILE
+        .get()
+        .expect("Should have initialized config before calling save loop");
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
     let _ = fs::write(path, serde_json::to_string_pretty(get_config()).unwrap());
 }
-
 
 /// returns bare static reference to global app configuration (state)
 pub fn get_config() -> &'static Config {
@@ -82,9 +80,14 @@ pub fn get_device(id: &DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
         .find(|(_, d)| d.load().id == *id)
     else {
         let idx = update_device(Arc::new(PerDevice::default(id.clone())));
-        return (idx.clone(), CONFIG
-            .devices
-            .states.get(idx).expect("The device should have just been created."))
+        return (
+            idx.clone(),
+            CONFIG
+                .devices
+                .states
+                .get(idx)
+                .expect("The device should have just been created."),
+        );
     };
     existing
 }
@@ -109,10 +112,20 @@ pub fn update_device(state: Arc<PerDevice>) -> usize {
 ///
 /// This is never intended to be moved at runtime and references to the children are of static lifetime.
 pub struct Config {
+    pub server: ArcSwap<ServerSettings>,
     pub mapping_menu: ArcSwap<StandardMenu>,
     pub devices: Devices,
     pub vrc_settings: ArcSwap<VrcSettings>,
     pub ui: ArcSwap<UiSettings>,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerSettings {
+    pub enable_vrc: bool,
+    pub enable_ble_bhaptic: bool,
+    pub enable_bhaptic_game: bool,
+    pub enable_wifi_vrch: bool,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -171,7 +184,11 @@ impl serde::Serialize for Devices {
         Proxy {
             ota_repositories: self.ota_repositories.lock().clone(),
             wifi_device_timeout: self.wifi_device_timeout.load_full().as_ref().clone(),
-            states: self.states.iter().map(|(_, d)| d.load_full().as_ref().clone()).collect(),
+            states: self
+                .states
+                .iter()
+                .map(|(_, d)| d.load_full().as_ref().clone())
+                .collect(),
         }
         .serialize(serializer)
     }
@@ -190,7 +207,11 @@ impl<'de> serde::Deserialize<'de> for Devices {
             pub states: Vec<PerDevice>,
         }
 
-        let Proxy { ota_repositories, wifi_device_timeout, states } = Proxy::deserialize(deserializer)?;
+        let Proxy {
+            ota_repositories,
+            wifi_device_timeout,
+            states,
+        } = Proxy::deserialize(deserializer)?;
 
         let arc_states = AppendVec::new();
         for state in states {
@@ -208,17 +229,23 @@ impl<'de> serde::Deserialize<'de> for Devices {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            server: ArcSwap::new(Arc::new(ServerSettings {
+                enable_vrc: true,
+                enable_ble_bhaptic: true,
+                enable_bhaptic_game: true,
+                enable_wifi_vrch: true,
+            })),
             devices: Devices {
                 ota_repositories: parking_lot::Mutex::new(vec![GitRepo {
-                owner: "VRC-Haptics".into(),
-                name: "VRCH-Firmware".into(),
-            }]),
+                    owner: "VRC-Haptics".into(),
+                    name: "VRCH-Firmware".into(),
+                }]),
                 wifi_device_timeout: ArcSwap::new(Arc::new(3.0)),
                 states: AppendVec::new(),
             },
             mapping_menu: ArcSwap::new(Arc::new(StandardMenu::default())),
             vrc_settings: ArcSwap::new(Arc::new(VrcSettings::default())),
-            ui: ArcSwap::new(Arc::new(UiSettings::default()))
+            ui: ArcSwap::new(Arc::new(UiSettings::default())),
         }
     }
 }

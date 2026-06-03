@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 target/*
+/src-tauri/dhat-heap.json
 
 # Executable files (with exceptions)
 *.exe

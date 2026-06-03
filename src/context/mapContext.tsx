@@ -1,8 +1,8 @@
 import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { MapInfo, commands } from '../bindings';
+import { Snapshot, commands } from '../bindings';
 
 interface GlobalMapValue {
-    globalMap: MapInfo | null;
+    globalMap: Snapshot | null;
 }
 
 export const mapContext = createContext<GlobalMapValue>({ globalMap: null });
@@ -10,13 +10,16 @@ export const mapContext = createContext<GlobalMapValue>({ globalMap: null });
 export const useMapContext = () => useContext(mapContext);
 
 export const MapProvider = ({ children }: { children: ReactNode }) => {
-  const [mapInfo, setMapInfo] = useState<MapInfo | null>(null);
+  const [mapInfo, setMapInfo] = useState<Snapshot | null>(null);
 
   useEffect(() => {
     const fetchMap = async () => {
       try {
         const newInfo = await commands.getCoreMap();
-        setMapInfo(newInfo);
+        if (newInfo.status === "ok") {
+          setMapInfo(newInfo.data);
+        }
+        
       } catch (error) {
         console.error("Failed to fetch core map:", error);
       }

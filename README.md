@@ -22,10 +22,15 @@ To connect to a Quest standalone VRC instance the computer running this manager 
 #### Development
 - `pnpm i` -> Installs dependencies (both rust and node)
 - `pnpm run tauri dev` -> Start the dev server. 
+- `pnpm tauri dev --features dhat-heap` -> dhat profiling.
 
 #### Build:
 - `pnpm i` -> Installs dependencies (both rust and node)
 - `pnpm run tauri build` -> Builds installer under: `./src-tauri/target/release/bundle/<some_subfolder>`
+
+#### Frontend:
+ - `pnpm run typecheck` -> checks all typescript ui files.
+ - `pnpm run typecheck:watch` -> watches type changes, (dedicated terminal)
 
 #### Sidecars:
 This project has a few sidecars

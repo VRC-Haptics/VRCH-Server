@@ -1,16 +1,16 @@
 // local modules
 use crate::{devices::{
     Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, update::Firmware, //update::{Firmware, UpdateMethod}
-}, mapping::{MapHandle, MapInfo}, state::{self, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}, glam::Vec3};
-use crate::mapping::event::Event;
+}, mapping::MapHandle, state::{self, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}, glam::Vec3};
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::{InputEventMessage};
 use crate::log_err;
 
 use crate::vrc::{config::GameMap};
+use haptic_core::mapping::{EventKey, NodeField, NodeKey, Snapshot};
 //standard imports
 use runas::Command;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tokio::time::Duration;
 
 #[tauri::command]
@@ -46,30 +46,16 @@ pub async fn start_device_update(
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_tags_radius(
-    tag: String,
+pub fn set_nodes_radius(
+    keys: Vec<NodeKey>,
     radius: f32,
     map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
-    map.has_tag_mut(&tag, |n| {
-        n.set_radius(radius);
-    });
+    for key in keys {
+        log_err!(map.send_event(InputEventMessage::UpdateNodeField { key: key, field: NodeField::Radius(radius)}));
+    };
 
     Ok(())
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn set_node_radius(
-    id: String,
-    radius: f32,
-    map: tauri::State<'_, MapHandle>,
-) -> Result<(), String> {
-    if map.with_node_mut(&id.into(), |n| n.set_radius(radius)).is_some() {
-        return Ok(());
-    } else {
-        return Err("Failed to get device".into());
-    }
 }
 
 const EPSILON: f32 = 0.001;
@@ -117,29 +103,18 @@ pub fn swap_conf_nodes(
         .unwrap_or_else(|| Err(format!("No device with id: {:?}", device_id)))
 }
 
+const PLAY_POINT: LazyLock<Option<EventKey>> = LazyLock::new(|| None);
+
 /// Plays the specified point for the duration in seconds at the power percentage of intensity.
 #[tauri::command]
 #[specta::specta]
-pub fn play_point(
-    feedback_location: (f32, f32, f32), // xyz location to insert point
+pub async fn play_point(
+    feedback_location: Vec3, // xyz location to insert point
     power: f32,                         // the power percentage to play 1 = no change
     duration: f32,                      // When should this point be removed.
     map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
-    let event = Event::new(
-        "Play Point".to_string(),
-        crate::mapping::event::EventEffectType::Location(Vec3 {
-            x: feedback_location.0,
-            y: feedback_location.1,
-            z: feedback_location.2,
-        }),
-        vec![power],
-        Duration::from_secs_f32(duration),
-        vec!["UI".to_string()],
-    )
-    .expect("unable to create play point event");
-
-    log_err!(map.send_event_blocking(InputEventMessage::StartEvent(event)));
+    log_err!(map.send_event(InputEventMessage::QuickEvent { duration: (duration * 100.) as u64, power: power, location: feedback_location }));
     return Ok(());
 }
 
@@ -184,8 +159,8 @@ pub fn get_device_list(dev: tauri::State<'_, DeviceHandle>) -> Vec<(DeviceId, Op
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> VrcInfo {
-    vrc.get_info()
+pub async fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> Result<Arc<VrcInfo>, ()> {
+    Ok(vrc.get_info().await)
 }
 
 #[tauri::command]
@@ -213,8 +188,8 @@ pub fn set_device_info(dev: tauri::State<'_, DeviceHandle>, id: DeviceId, inf: D
 /// Gets the core haptics map that is used to drive feedback.
 #[tauri::command]
 #[specta::specta]
-pub fn get_core_map(map: tauri::State<'_, MapHandle>) -> MapInfo {
-    map.get_state()
+pub async fn get_core_map(map: tauri::State<'_, MapHandle>) -> Result<Snapshot, ()> {
+    Ok(map.get_state().await.as_ref().clone())
 }
 
 #[tauri::command]
@@ -234,7 +209,7 @@ pub async fn upload_device_map(
     let haptic_nodes: Vec<HapticNode> = upload
         .nodes
         .into_iter()
-        .map(|node| node.node_data)
+        .map(|node| HapticNode { loc: node.location, groups: node.interaction_tags })
         .collect();
 
     let res = device.with_device_mut(&id.clone().into(), |d| {

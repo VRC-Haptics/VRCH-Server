@@ -1,841 +1,2243 @@
 {
-    "nodes": [
+  "$schema": "https://vrc-haptics.github.io/mapping-schema/schema/v0.0.1/map.schema.json",
+  "schemaVersion": "v0.0.1",
+  "identification": {
+    "authorName": "Average",
+    "mapName": "nardo-generic-vest",
+    "mapVersion": 1
+  },
+  "nodes": [
+    {
+      "location": [
+        0.12790000438690186,
+        1.3513000011444092,
+        0.05119999870657921
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1599999964237213,
+      "inputs": [
         {
-            "node_data": {
-                "x": 0.12790000438690186,
-                "y": 1.3513000011444092,
-                "z": 0.05119999870657921,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/KYBu3jmg2I",
-            "is_external_address": false,
-            "radius": 0.1599999964237213,
-            "target_bone": "Chest"
+          "address": "KYBu3jmg2I",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1599999964237213
+          }
         },
         {
-            "node_data": {
-                "x": 0.04479999840259552,
-                "y": 1.357300043106079,
-                "z": 0.05660000070929527,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/2R58xgRSBU",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.13429999351501466,
-                "y": 1.2687000036239625,
-                "z": 0.10980000346899033,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/2oKUC63vTR",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.04639999940991402,
-                "y": 1.2687000036239625,
-                "z": 0.10980000346899033,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/wwrjycJrku",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.10890000313520432,
-                "y": 1.1649999618530274,
-                "z": 0.06989999860525131,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/6H78fvIuAp",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.04149999842047691,
-                "y": 1.1649999618530274,
-                "z": 0.1145000010728836,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/Jh9DCSJFGR",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.09769999980926514,
-                "y": 1.110200047492981,
-                "z": 0.08630000054836273,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/Hg65VqTT0E",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.03449999913573265,
-                "y": 1.110200047492981,
-                "z": 0.10750000178813935,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/dri7hSNvMC",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.09769999980926514,
-                "y": 1.0210000276565552,
-                "z": 0.08630000054836273,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/GQU3V3HiBb",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.032999999821186069,
-                "y": 1.0210000276565552,
-                "z": 0.10360000282526016,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/1ImPxI6flZ",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.09769999980926514,
-                "y": 0.9359999895095825,
-                "z": 0.08630000054836273,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/pLvk9UK3Vh",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": 0.029899999499320985,
-                "y": 0.9359999895095825,
-                "z": 0.10949999839067459,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/Y7v2eiAwME",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": 0.14800000190734864,
-                "y": 1.25,
-                "z": -0.013000000268220902,
-                "groups": [
-                    "TorsoRight"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/uMOZRth0Hn",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.14800000190734864,
-                "y": 1.125599980354309,
-                "z": 0.014000000432133675,
-                "groups": [
-                    "TorsoRight"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/0tqihE0KIi",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.14800000190734864,
-                "y": 1.0255000591278077,
-                "z": 0.014000000432133675,
-                "groups": [
-                    "TorsoRight"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/dgZsxyWcmo",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.14800000190734864,
-                "y": 0.9334999918937683,
-                "z": -0.013000000268220902,
-                "groups": [
-                    "TorsoRight"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/wPevch0cHy",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": 0.050700001418590549,
-                "y": 1.4112999439239503,
-                "z": -0.05400000140070915,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/c4cjQphERU",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.15600000321865083,
-                "y": 1.3955999612808228,
-                "z": -0.0560000017285347,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/3PYKJK8aLB",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.050700001418590549,
-                "y": 1.313599944114685,
-                "z": -0.11060000211000443,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/nBFIaduE80",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.12200000137090683,
-                "y": 1.313599944114685,
-                "z": -0.11060000211000443,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/ITFUaInkS6",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": 0.050700001418590549,
-                "y": 1.2200000286102296,
-                "z": -0.11060000211000443,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/i1ozTZvDjt",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Head"
-        },
-        {
-            "node_data": {
-                "x": 0.14229999482631684,
-                "y": 1.2200000286102296,
-                "z": -0.08879999816417694,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/sYdPlxD19x",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.050700001418590549,
-                "y": 1.1089999675750733,
-                "z": -0.10000000149011612,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/4vsA3kDAKY",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.12250000238418579,
-                "y": 1.1089999675750733,
-                "z": -0.07959999889135361,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/f5ga0TSELI",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.050700001418590549,
-                "y": 1.030400037765503,
-                "z": -0.08060000091791153,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/deqi4xXg1X",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.09480000287294388,
-                "y": 1.030400037765503,
-                "z": -0.07069999724626541,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/0c3CLSalIC",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": 0.050700001418590549,
-                "y": 0.9672999978065491,
-                "z": -0.09030000120401383,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/ihYNFrts23",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": 0.13179999589920045,
-                "y": 0.9672999978065491,
-                "z": -0.05790000036358833,
-                "groups": [
-                    "TorsoRight",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/mTH0OkZXQF",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": -0.12790000438690186,
-                "y": 1.3513000011444092,
-                "z": 0.05119999870657921,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/J9OXHe98vo",
-            "is_external_address": false,
-            "radius": 0.1599999964237213,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.04479999840259552,
-                "y": 1.357300043106079,
-                "z": 0.05660000070929527,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/FYNr7IMdj2",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.13429999351501466,
-                "y": 1.2687000036239625,
-                "z": 0.10980000346899033,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/MSx2iBxuKS",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.04639999940991402,
-                "y": 1.2687000036239625,
-                "z": 0.10980000346899033,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/ktgZ55yVbE",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.10890000313520432,
-                "y": 1.1649999618530274,
-                "z": 0.06989999860525131,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/IW0Z6MpvUs",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.04149999842047691,
-                "y": 1.1649999618530274,
-                "z": 0.1145000010728836,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/N97qG7WFqF",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.09769999980926514,
-                "y": 1.110200047492981,
-                "z": 0.08630000054836273,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/FRsbX9rc1O",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.03449999913573265,
-                "y": 1.110200047492981,
-                "z": 0.10750000178813935,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/BHoxYFIV3w",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.09769999980926514,
-                "y": 1.0210000276565552,
-                "z": 0.08630000054836273,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/nq3hFnYwhx",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.032999999821186069,
-                "y": 1.0210000276565552,
-                "z": 0.10360000282526016,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/pFKdsF7Xwq",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.09769999980926514,
-                "y": 0.9359999895095825,
-                "z": 0.08630000054836273,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/pUTy9PJvaZ",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": -0.029899999499320985,
-                "y": 0.9359999895095825,
-                "z": 0.10949999839067459,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoFront"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/9GsTTWeUPS",
-            "is_external_address": false,
-            "radius": 0.12999999523162843,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": -0.14800000190734864,
-                "y": 1.25,
-                "z": -0.013000000268220902,
-                "groups": [
-                    "TorsoLeft"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/QxePZfXr5i",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.14800000190734864,
-                "y": 1.125599980354309,
-                "z": 0.014000000432133675,
-                "groups": [
-                    "TorsoLeft"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/C7NF6sNycb",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.14800000190734864,
-                "y": 1.0255000591278077,
-                "z": 0.014000000432133675,
-                "groups": [
-                    "TorsoLeft"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/fdHVws8L8L",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.14800000190734864,
-                "y": 0.9334999918937683,
-                "z": -0.013000000268220902,
-                "groups": [
-                    "TorsoLeft"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/7tj4ZvSo8d",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": -0.050700001418590549,
-                "y": 1.4112999439239503,
-                "z": -0.05400000140070915,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/hC2aZvrulg",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.15600000321865083,
-                "y": 1.3955999612808228,
-                "z": -0.0560000017285347,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/qYH03GxEDC",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.050700001418590549,
-                "y": 1.313599944114685,
-                "z": -0.11060000211000443,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/4J2MOYm9HL",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.12200000137090683,
-                "y": 1.313599944114685,
-                "z": -0.11060000211000443,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/xmhHBrVNNq",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Chest"
-        },
-        {
-            "node_data": {
-                "x": -0.050700001418590549,
-                "y": 1.2200000286102296,
-                "z": -0.11060000211000443,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/xLDDCV7KNz",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.14229999482631684,
-                "y": 1.2200000286102296,
-                "z": -0.08879999816417694,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/oruwX3ViYb",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.050700001418590549,
-                "y": 1.1089999675750733,
-                "z": -0.10000000149011612,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/28eDd9Pzu2",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.12250000238418579,
-                "y": 1.1089999675750733,
-                "z": -0.07959999889135361,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/nANx59yOxp",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.050700001418590549,
-                "y": 1.030400037765503,
-                "z": -0.08060000091791153,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/Idhx0ahPZq",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.09480000287294388,
-                "y": 1.030400037765503,
-                "z": -0.07069999724626541,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/h1xvsiHk3o",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Spine"
-        },
-        {
-            "node_data": {
-                "x": -0.050700001418590549,
-                "y": 0.9672999978065491,
-                "z": -0.09030000120401383,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/xAUiPZygEg",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Hips"
-        },
-        {
-            "node_data": {
-                "x": -0.13179999589920045,
-                "y": 0.9672999978065491,
-                "z": -0.05790000036358833,
-                "groups": [
-                    "TorsoLeft",
-                    "TorsoBack"
-                ]
-            },
-            "address": "/avatar/parameters/Haptics/Nodes/ZQLMUf5f4V",
-            "is_external_address": false,
-            "radius": 0.1899999976158142,
-            "target_bone": "Hips"
+          "address": "KYBu3jmg2I",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1599999964237213
+          }
         }
-    ],
-    "meta": {
-        "map_name": "nardo-generic-vest",
-        "map_author": "Average",
-        "map_version": 1
+      ]
+    },
+    {
+      "location": [
+        0.04479999840259552,
+        1.357300043106079,
+        0.05660000070929527
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "2R58xgRSBU",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "2R58xgRSBU",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.13429999351501465,
+        1.2687000036239624,
+        0.10980000346899033
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "2oKUC63vTR",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "2oKUC63vTR",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.04639999940991402,
+        1.2687000036239624,
+        0.10980000346899033
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "wwrjycJrku",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "wwrjycJrku",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.10890000313520432,
+        1.1649999618530273,
+        0.06989999860525131
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "6H78fvIuAp",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "6H78fvIuAp",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.04149999842047691,
+        1.1649999618530273,
+        0.1145000010728836
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "Jh9DCSJFGR",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "Jh9DCSJFGR",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.09769999980926514,
+        1.110200047492981,
+        0.08630000054836273
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "Hg65VqTT0E",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "Hg65VqTT0E",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.03449999913573265,
+        1.110200047492981,
+        0.10750000178813934
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "dri7hSNvMC",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "dri7hSNvMC",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.09769999980926514,
+        1.0210000276565552,
+        0.08630000054836273
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "GQU3V3HiBb",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "GQU3V3HiBb",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.032999999821186066,
+        1.0210000276565552,
+        0.10360000282526016
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "1ImPxI6flZ",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "1ImPxI6flZ",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.09769999980926514,
+        0.9359999895095825,
+        0.08630000054836273
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "pLvk9UK3Vh",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "pLvk9UK3Vh",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.029899999499320984,
+        0.9359999895095825,
+        0.10949999839067459
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoFront"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "Y7v2eiAwME",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "Y7v2eiAwME",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.14800000190734863,
+        1.25,
+        -0.013000000268220901
+      ],
+      "interactionTags": [
+        "TorsoRight"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "uMOZRth0Hn",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "uMOZRth0Hn",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.14800000190734863,
+        1.125599980354309,
+        0.014000000432133675
+      ],
+      "interactionTags": [
+        "TorsoRight"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "0tqihE0KIi",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "0tqihE0KIi",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.14800000190734863,
+        1.0255000591278076,
+        0.014000000432133675
+      ],
+      "interactionTags": [
+        "TorsoRight"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "dgZsxyWcmo",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "dgZsxyWcmo",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.14800000190734863,
+        0.9334999918937683,
+        -0.013000000268220901
+      ],
+      "interactionTags": [
+        "TorsoRight"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "wPevch0cHy",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "wPevch0cHy",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.050700001418590546,
+        1.4112999439239502,
+        -0.05400000140070915
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "c4cjQphERU",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "c4cjQphERU",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.15600000321865082,
+        1.3955999612808228,
+        -0.0560000017285347
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "3PYKJK8aLB",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "3PYKJK8aLB",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.050700001418590546,
+        1.313599944114685,
+        -0.11060000211000443
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "nBFIaduE80",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "nBFIaduE80",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.12200000137090683,
+        1.313599944114685,
+        -0.11060000211000443
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "ITFUaInkS6",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "ITFUaInkS6",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.050700001418590546,
+        1.2200000286102295,
+        -0.11060000211000443
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "head",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "i1ozTZvDjt",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "i1ozTZvDjt",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.14229999482631683,
+        1.2200000286102295,
+        -0.08879999816417694
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "sYdPlxD19x",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "sYdPlxD19x",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.050700001418590546,
+        1.1089999675750732,
+        -0.10000000149011612
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "4vsA3kDAKY",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "4vsA3kDAKY",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.12250000238418579,
+        1.1089999675750732,
+        -0.07959999889135361
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "f5ga0TSELI",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "f5ga0TSELI",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.050700001418590546,
+        1.030400037765503,
+        -0.08060000091791153
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "deqi4xXg1X",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "deqi4xXg1X",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.09480000287294388,
+        1.030400037765503,
+        -0.07069999724626541
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "0c3CLSalIC",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "0c3CLSalIC",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.050700001418590546,
+        0.9672999978065491,
+        -0.09030000120401382
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "ihYNFrts23",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "ihYNFrts23",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        0.13179999589920044,
+        0.9672999978065491,
+        -0.05790000036358833
+      ],
+      "interactionTags": [
+        "TorsoRight",
+        "TorsoBack"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "mTH0OkZXQF",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "mTH0OkZXQF",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.12790000438690186,
+        1.3513000011444092,
+        0.05119999870657921
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1599999964237213,
+      "inputs": [
+        {
+          "address": "J9OXHe98vo",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1599999964237213
+          }
+        },
+        {
+          "address": "J9OXHe98vo",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1599999964237213
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.04479999840259552,
+        1.357300043106079,
+        0.05660000070929527
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "FYNr7IMdj2",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "FYNr7IMdj2",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.13429999351501465,
+        1.2687000036239624,
+        0.10980000346899033
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "MSx2iBxuKS",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "MSx2iBxuKS",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.04639999940991402,
+        1.2687000036239624,
+        0.10980000346899033
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "ktgZ55yVbE",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "ktgZ55yVbE",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.10890000313520432,
+        1.1649999618530273,
+        0.06989999860525131
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "IW0Z6MpvUs",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "IW0Z6MpvUs",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.04149999842047691,
+        1.1649999618530273,
+        0.1145000010728836
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "N97qG7WFqF",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "N97qG7WFqF",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.09769999980926514,
+        1.110200047492981,
+        0.08630000054836273
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "FRsbX9rc1O",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "FRsbX9rc1O",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.03449999913573265,
+        1.110200047492981,
+        0.10750000178813934
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "BHoxYFIV3w",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "BHoxYFIV3w",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.09769999980926514,
+        1.0210000276565552,
+        0.08630000054836273
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "nq3hFnYwhx",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "nq3hFnYwhx",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.032999999821186066,
+        1.0210000276565552,
+        0.10360000282526016
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "pFKdsF7Xwq",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "pFKdsF7Xwq",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.09769999980926514,
+        0.9359999895095825,
+        0.08630000054836273
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "pUTy9PJvaZ",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "pUTy9PJvaZ",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.029899999499320984,
+        0.9359999895095825,
+        0.10949999839067459
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoFront"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.12999999523162842,
+      "inputs": [
+        {
+          "address": "9GsTTWeUPS",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        },
+        {
+          "address": "9GsTTWeUPS",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.12999999523162842
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.14800000190734863,
+        1.25,
+        -0.013000000268220901
+      ],
+      "interactionTags": [
+        "TorsoLeft"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "QxePZfXr5i",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "QxePZfXr5i",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.14800000190734863,
+        1.125599980354309,
+        0.014000000432133675
+      ],
+      "interactionTags": [
+        "TorsoLeft"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "C7NF6sNycb",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "C7NF6sNycb",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.14800000190734863,
+        1.0255000591278076,
+        0.014000000432133675
+      ],
+      "interactionTags": [
+        "TorsoLeft"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "fdHVws8L8L",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "fdHVws8L8L",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.14800000190734863,
+        0.9334999918937683,
+        -0.013000000268220901
+      ],
+      "interactionTags": [
+        "TorsoLeft"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "7tj4ZvSo8d",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "7tj4ZvSo8d",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.050700001418590546,
+        1.4112999439239502,
+        -0.05400000140070915
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "hC2aZvrulg",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "hC2aZvrulg",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.15600000321865082,
+        1.3955999612808228,
+        -0.0560000017285347
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "qYH03GxEDC",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "qYH03GxEDC",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.050700001418590546,
+        1.313599944114685,
+        -0.11060000211000443
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "4J2MOYm9HL",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "4J2MOYm9HL",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.12200000137090683,
+        1.313599944114685,
+        -0.11060000211000443
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "chest",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "xmhHBrVNNq",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "xmhHBrVNNq",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.050700001418590546,
+        1.2200000286102295,
+        -0.11060000211000443
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "xLDDCV7KNz",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "xLDDCV7KNz",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.14229999482631683,
+        1.2200000286102295,
+        -0.08879999816417694
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "oruwX3ViYb",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "oruwX3ViYb",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.050700001418590546,
+        1.1089999675750732,
+        -0.10000000149011612
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "28eDd9Pzu2",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "28eDd9Pzu2",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.12250000238418579,
+        1.1089999675750732,
+        -0.07959999889135361
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "nANx59yOxp",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "nANx59yOxp",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.050700001418590546,
+        1.030400037765503,
+        -0.08060000091791153
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "Idhx0ahPZq",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "Idhx0ahPZq",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.09480000287294388,
+        1.030400037765503,
+        -0.07069999724626541
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "spine",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "h1xvsiHk3o",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "h1xvsiHk3o",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.050700001418590546,
+        0.9672999978065491,
+        -0.09030000120401382
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "xAUiPZygEg",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "xAUiPZygEg",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
+    },
+    {
+      "location": [
+        -0.13179999589920044,
+        0.9672999978065491,
+        -0.05790000036358833
+      ],
+      "interactionTags": [
+        "TorsoLeft",
+        "TorsoBack"
+      ],
+      "parentBone": "hips",
+      "interpolationLayer": "default",
+      "radius": 0.1899999976158142,
+      "inputs": [
+        {
+          "address": "ZQLMUf5f4V",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "weight",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        },
+        {
+          "address": "ZQLMUf5f4V",
+          "vrcPrefix": "/avatar/parameters/Haptics/Nodes/",
+          "externalSource": false,
+          "source": "velocity",
+          "layer": "additive",
+          "weight": 1,
+          "shape": {
+            "type": "sphere",
+            "radius": 0.1899999976158142
+          }
+        }
+      ]
     }
+  ]
 }

@@ -3,14 +3,6 @@ members = [
     "src-tauri",
     "src-elevated-register",
     "src-proxy",
+    "src-core",
 ]
 resolver = "2"
-
-
-[profile.profiling]
-inherits = "release"
-debug = true
-
-[profile.release]
-debug = 2
-strip = false

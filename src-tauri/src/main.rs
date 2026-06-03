@@ -4,6 +4,10 @@
 // Keep Futures from being left un-awaited. Use crate::log_err for convenient handling.
 #![deny(unused_must_use)]
 
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 // make local modules available
 mod commands;
 
@@ -51,10 +55,20 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcGame>>) {
     }
 }*/
 
-
 #[tokio::main]
 async fn main() {
     tauri::async_runtime::set(tokio::runtime::Handle::current());
+
+    // Start heap profiling. Held until RunEvent::Exit (see below) because on
+    // Windows the event loop never returns to main, so a plain `_guard`
+    #[cfg(feature = "dhat-heap")]
+    let mut profiler = Some(
+        dhat::Profiler::builder()
+            // absolute path so you can actually find it from a Tauri cwd
+            .file_name("dhat-heap.json")
+            .build(),
+    );
+
 
     let builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
@@ -74,8 +88,7 @@ async fn main() {
             bhaptics_launch_vrch,
             commands::play_point,
             commands::swap_conf_nodes,
-            commands::set_tags_radius,
-            commands::set_node_radius,
+            commands::set_nodes_radius,
             commands::get_device_esp_model,
             commands::start_device_update,
         ]);
@@ -86,7 +99,7 @@ async fn main() {
         .expect("Failed to export typescript bindings");
 
     // init logging and stuff first
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             println!("Instance already open, shutting down.");
             let _ = app
@@ -108,9 +121,10 @@ async fn main() {
                     file_name: Some("logs".to_string()),
                 }))
                 .filter(|metadata| {
-                    !metadata.target().starts_with("mio")
+                    !metadata.target().starts_with("mio") // TODO: Fix this
                         && !metadata.target().starts_with("reqwest")
                         && !metadata.target().starts_with("btleplug")
+                        && !metadata.target().starts_with("hyper_util")
                 })
                 .max_file_size(500_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))
@@ -136,9 +150,13 @@ async fn main() {
                     panic!(); // TODO: This should be done better.
                 });
                 let (vrc, map, bh, device) = haptic_core::start_server(root).await;
-                handle.manage(vrc);
+                if let Some(vrc) = vrc {
+                    handle.manage(vrc);
+                }
+                if let Some(bh) =  bh {
+                    handle.manage(bh);
+                }
                 handle.manage(map);
-                handle.manage(bh);
                 handle.manage(device);
             });
 
@@ -149,7 +167,31 @@ async fn main() {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {
                 close_app(window);
             }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        }).build(tauri::generate_context!()).expect("Error building tauri application");
+
+    // Ctrl+C: request a normal Tauri exit so RunEvent::Exit fires on the main
+    // thread and drops the profiler there (the Profiler never leaves main, so
+    // no Send bound is needed). Reuses the existing write path below.
+    #[cfg(feature = "dhat-heap")]
+    {
+        let exit_handle = app.handle().clone();
+        tauri::async_runtime::spawn(async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                println!("dhat: Ctrl+C received, exiting to flush profile");
+                exit_handle.exit(0);
+            }
+        });
+    }
+
+    app.run(move |_app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            // Drop the profiler here so dhat actually writes dhat-heap.json,
+            // since the event loop won't unwind back into main on Windows.
+            #[cfg(feature = "dhat-heap")]
+            if let Some(p) = profiler.take() {
+                drop(p);
+                println!("dhat: wrote dhat-heap.json");
+            }
+        }
+    });
 }

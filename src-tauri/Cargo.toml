@@ -18,6 +18,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "vr_haptics_player"
 path = "src/main.rs"
 
+[features]
+dhat-heap = ["dep:dhat"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -45,6 +48,7 @@ tokio = {version = "1.42.1", features = ["rt-multi-thread", "full"] }
 dunce = "1.0.5"
 log = "0.4.27"
 runas = "1.2.0"
+dhat = { version = "0.3", optional = true }
 
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

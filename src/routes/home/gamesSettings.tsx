@@ -145,11 +145,11 @@ export default function VrcInfoCard() {
                 return (
                   <>
                     <span className="font-medium">Map Name:</span>
-                    <span>{conf.meta.map_name}</span>
+                    <span>{conf.identification.mapName}</span>
                     <span className="font-medium">Version:</span>
-                    <span>{conf.meta.map_version}</span>
+                    <span>{conf.identification.mapVersion}</span>
                     <span className="font-medium">Author:</span>
-                    <span>{conf.meta.map_author}</span>
+                    <span>{conf.identification.authorName}</span>
                     <div className="col-span-2 mt-2">
                       <HapticNodesSummary nodes={vrcInfo.avatar!.configs.flatMap(c => c.nodes)} />
                     </div>

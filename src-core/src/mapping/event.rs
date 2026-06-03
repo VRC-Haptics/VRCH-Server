@@ -6,7 +6,7 @@ use std::{usize, sync::Arc};
 
 //const _: [u8; std::mem::size_of::<MaybeConst<()>>()] = [];
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub enum MaybeConst<T> 
 where 
     T: Clone ,
@@ -16,6 +16,18 @@ where
     Var(Arc<[T]>),
     /// Will be constant for the duration of this event.
     Const(T),
+}
+
+impl<T: Clone> From<T> for MaybeConst<T> {
+    fn from(val: T) -> Self {
+        Self::Const(val)
+    }
+}
+
+impl<T: Clone> From<Arc<[T]>> for MaybeConst<T> {
+    fn from(val: Arc<[T]>) -> Self {
+        Self::Var(val)
+    }
 }
 
 impl<T: Clone> MaybeConst<T> {
@@ -53,7 +65,7 @@ impl<T: Clone> MaybeConst<T> {
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
 /// A collection of values and consts, Constant values will only be initialized.
 pub struct Frames {
     pub nodes: Vec<Steps>,
@@ -67,7 +79,7 @@ impl Frames {
 
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct Steps {
     pub position: MaybeConst<Vec3>,
     pub muted: MaybeConst<bool>,
@@ -77,7 +89,8 @@ pub struct Steps {
 }
 
 /// Represents a haptic event that takes place over time.
-#[derive(serde::Serialize, Debug, Clone)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
 pub struct Event {
     /// user facing name
     pub name: String,

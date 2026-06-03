@@ -43,7 +43,7 @@ pub struct InputNode {
     pub muted: bool,
     pub location: Vec3,
     /// A slot is an single input value.
-    #[specta(type = Vec<Slot>)]
+    #[cfg_attr(feature = "specta", specta(type = Vec<Slot>))]
     pub slots: SmallVec<[Slot; DEFAULT_NODE_SLOTS]>,
     pub radius: f32,
     /// purely for convenience, should be determined by the map.

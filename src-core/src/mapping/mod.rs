@@ -7,7 +7,7 @@ pub mod interp;
 
 use crate::{
     log_err,
-    mapping::input_node::{InterpolationLayer, SlotKey}, vrc::config::{Input, InputLayer},
+    mapping::{event::{Frames, Steps}, input_node::{InterpolationLayer, SlotKey}}, vrc::config::{Input, InputLayer},
 };
 use arc_swap::{ArcSwap, Guard};
 use nohash_hasher::IntMap;
@@ -18,10 +18,9 @@ use uuid::Uuid;
 use std::{collections::HashMap, default, sync::Arc, time::Duration};
 use tokio::{
     sync::{
-        mpsc::{self, error::SendError},
-        oneshot, Notify,
+        Notify, mpsc::{self, error::SendError, unbounded_channel}, oneshot
     },
-    time::{interval, Instant},
+    time::{Instant, interval},
 };
 
 use event::Event;
@@ -41,13 +40,12 @@ pub type EventDuration = u64;
 pub struct MapHandle {
     pub snapshot: Arc<ArcSwap<Snapshot>>,
     event_sender: mpsc::UnboundedSender<InputEventMessage>,
-    map_dirty: Arc<Notify>,
 }
 
 impl MapHandle {
     /// marks that some change has been made and should be propagated to devices
     pub fn mark_dirty(&self) {
-        self.map_dirty.notify_one();
+        log_err!(self.event_sender.send(InputEventMessage::MapDirty));
     }
 
     /// Gets new snapshot if it is dirty, returns
@@ -75,7 +73,6 @@ impl Clone for MapHandle {
         Self {
             snapshot: self.snapshot.clone(),
             event_sender: self.event_sender.clone(),
-            map_dirty: self.map_dirty.clone(),
         }
     }
 }
@@ -144,15 +141,17 @@ struct InputMap {
     dirty_since_snap: bool,
     snapshot: Arc<ArcSwap<Snapshot>>,
     /// Whether input mapping has changed in a way that should require device output updates
-    map_dirty: Arc<Notify>,
+    map_dirty: bool,
     event_marker: EventId,
+    quick_event: Option<EventKey>,
     /// last map tick they were triggered.
     events: Vec<Event>,
     /// When "Triggered" it creates an event instance.
     event_instance: Vec<(EventInstant, EventKey, EventId)>,
 }
 
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
 pub struct EventKey(usize);
 
 
@@ -172,10 +171,13 @@ struct NodeKeyDef {
     version: u32,
 }
 
-#[derive(Default, Clone)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
 struct Nodes {
     /// List of event's active nodes.
+    #[cfg_attr(feature = "specta", specta(type = std::collections::HashMap<EventId, Vec<NodeKey>>))]
     transient: IntMap<EventId, Vec<NodeKey>>,
+    #[cfg_attr(feature = "specta", specta(type = Vec<Option<InputNode>>))]
     nodes: SlotMap<NodeKey, InputNode>,
     active_streaming: Vec<NodeKey>
 }
@@ -230,12 +232,47 @@ impl Nodes {
     }
 }
 
-#[derive(Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
 pub struct Snapshot {
     instant: EventInstant,
     active_events: Vec<(EventInstant, EventKey, EventId)>,
     events: Vec<Event>,
     input_nodes: Nodes,
+}
+
+#[derive(Default)]
+struct ArmStat {
+    count: u64,
+    total_ns: u128,
+    max_ns: u128,
+}
+
+impl ArmStat {
+    #[inline]
+    fn record(&mut self, ns: u128) {
+        self.count += 1;
+        self.total_ns += ns;
+        if ns > self.max_ns {
+            self.max_ns = ns;
+        }
+    }
+    fn avg_us(&self) -> f64 {
+        if self.count == 0 {
+            0.0
+        } else {
+            (self.total_ns as f64 / self.count as f64) / 1000.0
+        }
+    }
+}
+
+#[derive(Default)]
+struct LoopStats {
+    dirty: ArmStat,
+    device: ArmStat,
+    events: ArmStat,
+    msg: ArmStat,
+    max_backlog: usize,
 }
 
 impl InputMap {
@@ -256,16 +293,16 @@ impl InputMap {
             snapshot: snapshot.clone(),
             event_recv: rx,
             event_send: tx.clone(),
-            map_dirty: Arc::clone(&dirty_flag),
+            map_dirty: false,
             events: Vec::new(),
-            event_marker: 0,
+            event_marker: 15,
+            quick_event: None,
             event_instance: Vec::new(),
         };
 
         let handle = MapHandle {
             event_sender: tx,
             snapshot: snapshot,
-            map_dirty: dirty_flag,
         };
 
         return (map, handle);
@@ -280,26 +317,62 @@ impl InputMap {
         let period = Duration::from_millis(10);
         let mut event_interval = interval(period.clone());
         let mut last_tick = Instant::now();
+
+        let mut stats = LoopStats::default();
+        let mut last_report = Instant::now();
         loop {
+            // sample backlog before we block on select
+            let backlog = self.event_recv.len();
+            if backlog > stats.max_backlog {
+                stats.max_backlog = backlog;
+            }
+
             tokio::select! {
-                _ = self.map_dirty.notified() => {
-                    self.update_devices(); // gather input state and push to devices
-                }
                 msg = dev_rx.recv() => {
+                    let t = Instant::now();
                     handle_device(self, msg);
+                    stats.device.record(t.elapsed().as_nanos());
                 }
                 instant = event_interval.tick() => {
                     let diff = instant.duration_since(last_tick);
                     if diff > period + Duration::from_millis(2) {
                         log::warn!("Late event Tick: {:?}", diff);
                     }
-                    handle_events(self).await;
-                    last_tick = instant;
 
+                    if self.map_dirty {
+                        let t = Instant::now();
+                        self.update_devices();
+                        self.map_dirty = false;
+                        stats.dirty.record(t.elapsed().as_nanos());
+                    }
+                    
+                    if self.event_instance.len() > 0 {
+                        let t = Instant::now();
+                        handle_events(self).await;
+                        stats.events.record(t.elapsed().as_nanos());
+                        
+                    }
+                    last_tick = instant;
                 }
                 msg = self.event_recv.recv() => {
+                    let t = Instant::now();
                     handle_msg(self, msg);
+                    stats.msg.record(t.elapsed().as_nanos());
                 }
+            }
+
+            #[cfg(debug_assertions)]
+            if last_report.elapsed() >= Duration::from_secs(1) {
+                log::info!(
+                    "[map] msg/s={} (avg {:.1}us max {:.1}us) | events/s={} (avg {:.1}us max {:.1}us) | dirty/s={} (avg {:.1}us) | dev/s={} | backlog_max={}",
+                    stats.msg.count, stats.msg.avg_us(), stats.msg.max_ns as f64 / 1000.0,
+                    stats.events.count, stats.events.avg_us(), stats.events.max_ns as f64 / 1000.0,
+                    stats.dirty.count, stats.dirty.avg_us(),
+                    stats.device.count,
+                    stats.max_backlog,
+                );
+                stats = LoopStats::default();
+                last_report = Instant::now();
             }
         }
 
@@ -326,8 +399,7 @@ impl InputMap {
             }
 
             map.now += 1;
-            map.map_dirty.notify_one();
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            map.map_dirty = true;
         }
 
         fn handle_device(map: &mut InputMap, msg: Option<DeviceOutEvents>) {
@@ -367,17 +439,24 @@ impl InputMap {
         fn handle_msg(map: &mut InputMap, msg: Option<InputEventMessage>) {
             match msg {
                 Some(msg) => match msg {
+                    InputEventMessage::MapDirty => {
+                        map.map_dirty = true;
+                    }
                     InputEventMessage::CancelEvents => {
                         map.input_nodes.transient.clear();
+                        map.event_instance.clear();
                         map.dirty_since_snap = true;
-                        map.map_dirty.notify_one();
+                        map.map_dirty = true;
                     }
                     InputEventMessage::Flush => {
                         map.dirty_since_snap = true;
+                        map.input_nodes.transient.clear();
+                        map.input_nodes.nodes.clear();
                         map.input_nodes.active_streaming.clear();
                         map.events.clear();
                         map.generation += 1;
-                        map.map_dirty.notify_one();
+                        map.quick_event = None;
+                        map.map_dirty = true;
                     }
                     InputEventMessage::RequestInfo { reply } => {
                         if map.dirty_since_snap {
@@ -426,7 +505,8 @@ impl InputMap {
                             map.dirty_since_snap = true;
                             slot.value = value;
                             slot.weight = weight;
-                            slot.muted = muted
+                            slot.muted = muted;
+                            map.map_dirty = true;
                         } else {
                             log::error!("unable to find Slot #{} on key", key.slot_idx);
                         }
@@ -442,7 +522,7 @@ impl InputMap {
                             NodeField::Muted(m) => node.mute(m),
                             NodeField::Radius(r) => node.radius = r,
                         }
-
+                        map.map_dirty = true;
                         map.dirty_since_snap = true;
                     }
                     InputEventMessage::UpdateSlotField { key, field } => {
@@ -458,6 +538,7 @@ impl InputMap {
                                 SlotField::Value(v) => slot.value = v,
                                 SlotField::Weight(w) => slot.weight = w,
                             }
+                            map.map_dirty = true;
                             map.dirty_since_snap = true;
                         } else {
                             log::error!("unable to find Slot #{} on key", key.slot_idx);
@@ -480,6 +561,50 @@ impl InputMap {
                         map.events.push(*event);
 
                         log_err!(reply.send(EventKey(idx)));
+                    }
+                    InputEventMessage::QuickEvent { duration, power, location } => {
+                        let key = match &map.quick_event {
+                            Some(key) => {
+                                let Some(event) =map.events.get_mut(key.0) else {
+                                    log::error!("Unable to retrieve event key");
+                                    return;
+                                };
+                                event.duration = duration;
+                                let Some(slot) = event.frames.nodes.get_mut(0) else {
+                                    return;
+                                };
+                                slot.position = location.into();
+                                slot.value = power.into();
+
+                                key.clone()
+                            }
+                            None => {
+                                let step = Steps {
+                                    position: location.into(),
+                                    muted: false.into(),
+                                    value: power.into(),
+                                    weight: 1.0.into(),
+                                    radius: 0.0375.into(),
+                                };
+
+                                let event = Event {
+                                    name: "QuickTrigger".to_string(),
+                                    frames: Frames::new(vec![step]),
+                                    duration: duration,
+                                };
+
+                                let (tx, rx) = oneshot::channel();
+                                handle_msg(map,Some(InputEventMessage::RegisterEvent{ event: Box::new(event), reply: tx }));
+                                let Ok(key) = rx.blocking_recv() else {
+                                    return;
+                                };
+
+                                map.quick_event = Some(key.clone());
+                                key
+                            }
+                        };
+
+                        handle_msg(map, Some(InputEventMessage::StartEvent(key.clone())));
                     }
                 },
                 None => {
@@ -536,7 +661,10 @@ fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &mut Vec<Mapping
 //const _: [u8; std::mem::size_of::<InputEventMessage>()] = [];
 
 pub enum InputEventMessage {
+    /// Treats the map as if it has been changed on next map tick.
+    MapDirty,
     /// increments generation, flushes all nodes.
+    /// USE WITH CAUTION. INVALIDATES ALL nodeKeys, SlotKeys, and EventKeys
     Flush,
     /// updates the snapshot info if dirty since last call.
     RequestInfo {
@@ -571,6 +699,7 @@ pub enum InputEventMessage {
     RegisterEvent{ event: Box<Event>, reply: oneshot::Sender<EventKey> },
     /// Call a registered event.
     StartEvent(EventKey),
+    QuickEvent{ duration: u64, power: f32, location: Vec3 },
     CancelEvents,
 }
 

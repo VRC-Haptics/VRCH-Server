@@ -76,6 +76,7 @@ pub enum InputLayer {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(tag = "type")]
 /// The shape that is used in game, gives us some special ways to interpolate some shapes.
 pub enum InputShape {
     Sphere{radius: f32},
@@ -90,9 +91,9 @@ pub enum InputShape {
 pub struct ConfIdent {
     pub map_name: String,
     pub map_version: u32,
-    pub map_author: String,
-    pub author_id: String,
-    pub custom_repository: CustomRepo,
+    pub author_name: String,
+    pub author_id: Option<String>,
+    pub custom_repository: Option<CustomRepo>,
 }
 
 /// where to retrieve different versions of this map

@@ -134,31 +134,35 @@ impl ApiManager {
             .filter_map(Result::ok)
         {
             if entry.file_type().is_file() {
-                if let Ok(content) = fs::read_to_string(entry.path()) {
-                    if let Ok(game_map) = serde_json::from_str::<GameMap>(&content) {
-                        let map = LocalAvailableMap {
-                            author: game_map.identification.map_author,
-                            name: game_map.identification.map_name,
-                            version: game_map.identification.map_version,
-                            path: entry.clone().into_path(),
-                        };
+                match fs::read_to_string(entry.path()) {
+                    Ok(content) => match serde_json::from_str::<GameMap>(&content) {
+                        Ok(game_map) => {
+                            let map = LocalAvailableMap {
+                                author: game_map.identification.author_name,
+                                name: game_map.identification.map_name,
+                                version: game_map.identification.map_version,
+                                path: entry.clone().into_path(),
+                            };
 
-                        if !new_local_maps.insert(map) {
-                            log::warn!(
-                                "Duplicate config files, Will be ignored: {:?}",
-                                entry.file_name()
-                            );
+                            if !new_local_maps.insert(map) {
+                                log::warn!(
+                                    "Duplicate config files, Will be ignored: {:?}",
+                                    entry.file_name()
+                                );
+                            }
                         }
-                    } else {
-                        log::warn!("Unable to load file as config: {:?}", entry.file_name());
-                    }
-                } else {
-                    log::warn!("Unable to read file: {:?}", entry.path());
+                        // Surface the real reason instead of discarding it.
+                        Err(e) => log::warn!(
+                            "Unable to parse {:?} as GameMap: {}",
+                            entry.file_name(),
+                            e
+                        ),
+                    },
+                    Err(e) => log::warn!("Unable to read file {:?}: {}", entry.path(), e),
                 }
             }
         }
 
-        // Update the shared state
         let mut maps = local_maps.lock().await;
         *maps = new_local_maps;
     }
@@ -307,28 +311,32 @@ impl ApiManager {
             .filter_map(Result::ok)
         {
             if entry.file_type().is_file() {
-                if let Ok(content) = fs::read_to_string(entry.path()) {
-                    // Deserialize JSON content into GameMap
-                    if let Ok(game_map) = serde_json::from_str::<GameMap>(&content) {
-                        let map = LocalAvailableMap {
-                            author: game_map.identification.map_author,
-                            name: game_map.identification.map_name,
-                            version: game_map.identification.map_version,
-                            path: entry.clone().into_path(),
-                        };
+                match fs::read_to_string(entry.path()) {
+                    Ok(content) => match serde_json::from_str::<GameMap>(&content) {
+                        Ok(game_map) => {
+                            let map = LocalAvailableMap {
+                                author: game_map.identification.author_name,
+                                name: game_map.identification.map_name,
+                                version: game_map.identification.map_version,
+                                path: entry.clone().into_path(),
+                            };
 
-                        if !new_local_maps.insert(map) {
-                            log::trace!("{:?}", &new_local_maps);
-                            log::warn!(
-                                "Duplicate config files, Will be ignored: {:?}",
-                                entry.file_name()
-                            );
+                            if !new_local_maps.insert(map) {
+                                log::trace!("{:?}", &new_local_maps);
+                                log::warn!(
+                                    "Duplicate config files, Will be ignored: {:?}",
+                                    entry.file_name()
+                                );
+                            }
                         }
-                    } else {
-                        log::warn!("Unable to load file as config: {:?}", entry.file_name());
-                    }
-                } else {
-                    log::warn!("Unable to load string from file: {:?}", entry.path());
+                        // Log WHY it failed instead of discarding the error.
+                        Err(e) => log::warn!(
+                            "Unable to parse {:?} as GameMap: {}",
+                            entry.path(),
+                            e
+                        ),
+                    },
+                    Err(e) => log::warn!("Unable to read file {:?}: {}", entry.path(), e),
                 }
             }
         }

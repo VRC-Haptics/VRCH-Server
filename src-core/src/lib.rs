@@ -4,19 +4,19 @@
 
 // make local modules available
 pub mod api;
-pub mod file;
-mod network;
 pub mod bhaptics;
 pub mod devices;
+pub mod file;
 pub mod mapping;
+mod network;
 pub mod osc;
 pub mod state;
 pub mod util;
-pub(crate) mod wrappers;
 pub mod vrc;
+pub(crate) mod wrappers;
 
 // rexports
-pub use glam; 
+pub use glam;
 
 // local modules
 use api::ApiManager;
@@ -33,13 +33,11 @@ use tokio::sync::Mutex;
 
 use crate::bhaptics::game::BhapticHandle;
 use crate::devices::Device;
-use crate::devices::{DeviceHandle, bhaptics::start_ble};
-use crate::file::{AppRoot, ROOT_DIR, resolve_dir};
+use crate::devices::{bhaptics::start_ble, DeviceHandle};
+use crate::file::{resolve_dir, AppRoot, ROOT_DIR};
 use crate::mapping::start_interp_map;
-use crate::{
-    mapping::MapHandle,
-    vrc::VrcHandle,
-};
+use crate::state::get_config;
+use crate::{mapping::MapHandle, vrc::VrcHandle};
 
 #[macro_export]
 /// Handles an unhandled result by printing if it failed. Optionally add context after the input to use this message instead of the default.
@@ -74,26 +72,45 @@ macro_rules! log_err {
 pub static API_MANAGER: OnceLock<Mutex<ApiManager>> = OnceLock::new();
 pub static DEVICE_MANAGER: OnceCell<DeviceHandle> = OnceCell::new();
 
-async fn start_async_tasks(manager: DeviceHandle) -> (VrcHandle, MapHandle, BhapticHandle) {
+async fn start_async_tasks(manager: DeviceHandle) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>) {
+    let conf = get_config().server.load();
+
     // initialize input map.
     let map_handle = start_interp_map(&manager).await;
 
     // TODO: Move into device manager init.
-    log_err!(start_ble(manager.get_device_channel(), Duration::from_secs(1)).await);
-    let bhaptic = bhaptics::game::start_bhaptics(map_handle.clone()).await;
+    if conf.enable_ble_bhaptic {
+        log_err!(start_ble(manager.get_device_channel(), Duration::from_secs(1)).await);
+    }
+    let bhaptic = if conf.enable_bhaptic_game {
+        Some(bhaptics::game::start_bhaptics(map_handle.clone()).await)
+    } else {
+        None
+    };
 
     //start_apps
-    let mut vrc = VrcGame::new(map_handle.clone(), API_MANAGER.get().expect("ApiManager should be initialized before use")).await;
-    let vrc_handle = vrc.get_handle();
-    tokio::spawn(async move {
-        vrc.run().await;
-    });
+    let vrc = if conf.enable_vrc {
+        let mut vrc = VrcGame::new(
+            map_handle.clone(),
+            API_MANAGER
+                .get()
+                .expect("ApiManager should be initialized before use"),
+        )
+        .await;
+        let vrc_handle = vrc.get_handle();
+        tokio::spawn(async move {
+            vrc.run().await;
+        });
+        Some(vrc_handle)
+    } else {
+        None
+    };
 
-    (vrc_handle, map_handle, bhaptic)
+    return (vrc, map_handle, bhaptic);
 }
 
 /// Handles spawning the various components of the haptic server.
-pub async fn start_server(root: AppRoot) -> (VrcHandle, MapHandle, BhapticHandle, DeviceHandle) {
+pub async fn start_server(root: AppRoot) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
     log_err!(ROOT_DIR.set(root));
 
     // map fetching api points to cache in the cache folder
@@ -106,7 +123,11 @@ pub async fn start_server(root: AppRoot) -> (VrcHandle, MapHandle, BhapticHandle
     state::init_save_loop().await;
 
     {
-        let mut api = API_MANAGER.get().expect("ApiManager should be intialized before use").lock().await;
+        let mut api = API_MANAGER
+            .get()
+            .expect("ApiManager should be intialized before use")
+            .lock()
+            .await;
         api.refresh_caches().await;
     }
 
@@ -122,11 +143,10 @@ pub async fn start_server(root: AppRoot) -> (VrcHandle, MapHandle, BhapticHandle
     (vrc, map, bh, device_handle)
 }
 
-
-/// Starts the various components of the server and returns their handles. 
-/// 
+/// Starts the various components of the server and returns their handles.
+///
 /// Same as start_server but does not rely on an existing runtime.
-pub fn start_server_blocking(root: AppRoot) -> (VrcHandle, MapHandle, BhapticHandle, DeviceHandle) {
+pub fn start_server_blocking(root: AppRoot) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
     let _running_handle = std::thread::spawn(move || {

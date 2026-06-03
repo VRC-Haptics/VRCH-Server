@@ -5,9 +5,9 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	getDeviceList: () => __TAURI_INVOKE<([DeviceId, DeviceInfo | null])[]>("get_device_list"),
-	getVrcInfo: () => __TAURI_INVOKE<VrcInfo>("get_vrc_info"),
+	getVrcInfo: () => typedError<VrcInfo, null>(__TAURI_INVOKE("get_vrc_info")),
 	// Gets the core haptics map that is used to drive feedback.
-	getCoreMap: () => __TAURI_INVOKE<MapInfo>("get_core_map"),
+	getCoreMap: () => typedError<Snapshot, null>(__TAURI_INVOKE("get_core_map")),
 	// sets all vrc relevant info. It is all behind an arcswap so it is the same cost to set all or one of them.
 	setVrc: (mult: number, ratio: number, samples: number, smoothS: {
 	secs: number,
@@ -30,21 +30,22 @@ export const commands = {
 	playPoint: (feedbackLocation: [number, number, number], power: number, duration: number) => typedError<null, null>(__TAURI_INVOKE("play_point", { feedbackLocation, power, duration })),
 	// Swaps the haptic node indices on the given device id
 	swapConfNodes: (deviceId: string, pos1: [number, number, number], pos2: [number, number, number]) => typedError<null, string>(__TAURI_INVOKE("swap_conf_nodes", { deviceId, pos1, pos2 })),
-	setTagsRadius: (tag: string, radius: number) => typedError<null, null>(__TAURI_INVOKE("set_tags_radius", { tag, radius })),
-	setNodeRadius: (id: string, radius: number) => typedError<null, string>(__TAURI_INVOKE("set_node_radius", { id, radius })),
+	setNodesRadius: (keys: NodeKeyDef[], radius: number) => typedError<null, null>(__TAURI_INVOKE("set_nodes_radius", { keys, radius })),
 	getDeviceEspModel: (id: string) => typedError<ESP32Model, string>(__TAURI_INVOKE("get_device_esp_model", { id })),
 	// typescript seems to throw a fit with formats here. So invoke bypasses most of this. EUUUGH
 	startDeviceUpdate: (fw: Firmware) => typedError<null, string>(__TAURI_INVOKE("start_device_update", { fw })),
 };
 
 /* Types */
+export type AddrInfo = ({ Slot: [SlotKey, SlotFieldKind] }) & { Node?: never } | ({ Node: [NodeKeyDef, NodeFieldKind] }) & { Slot?: never };
+
 /**
  *  Abstraction over raw VRC parameters.
  * 
  *  Represents all relevant *Descriptive* data. Does not contain any relevant high-speed or low latency datat.
  */
 export type Avatar = {
-	// The avatar reffered to by the VRC api
+	// The avatar referred to by the VRC api
 	id: string,
 	// the names of the prefabs from the avatar parameter
 	prefab_names: string[],
@@ -60,44 +61,13 @@ export type BhapticInfo = {
 
 export type BhapticsModel = "TacsuitX16";
 
-/**
- *  A node cached by vrc, is an intermdieary between an `InputNode`.
- *  
- *  Provides simple methods for extracting values
- */
-export type CacheNode = {
-	/**
-	 *  Ring buffer of values we have recieved.
-	 *  Front items are the most recent.
-	 */
-	values: ([SpectaOscType, {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-}])[],
-	// Keep track of ray's seperately
-	ray_values: ([SpectaOscType, {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-}])[],
-	/**
-	 *  contains the OscType that this CacheNode accepts.
-	 *  The payload should be considered the default value if the cache is empty.
-	 */
-	osc_type: SpectaOscType,
-	// the max_len of entries we will keep track of.
-	max_len: number,
-	// The state of haptics returned from this node.
-	smoothing_time: {
-		secs: number,
-		nanos: number,
-	},
-};
-
 // Metadata from the json config
-export type ConfMetadata = {
-	map_name: string,
-	map_version: number,
-	map_author: string,
+export type ConfIdent = {
+	mapName: string,
+	mapVersion: number,
+	authorName: string,
+	authorId: string | null,
+	customRepository: CustomRepo | null,
 };
 
 /**
@@ -105,12 +75,20 @@ export type ConfMetadata = {
  *  Contains more information than the default HapticNode to help with locating
  */
 export type ConfNode = {
-	node_data: HapticNode,
-	address: string,
-	is_external_address: boolean,
+	location: [number, number, number],
+	interactionTags: NodeGroup,
+	parentBone: TargetBone,
+	interpolationLayer: InterpolationLayer,
+	// The radius that will be used during interpolation
 	radius: number,
-	target_bone: TargetBone,
-	ray?: RayNode | null,
+	inputs: Input[],
+};
+
+// where to retrieve different versions of this map
+export type CustomRepo = {
+	author: string,
+	mapName: string,
+	mapAuthor: string,
 };
 
 export type DeviceId = string;
@@ -134,58 +112,21 @@ export type ESP32Model =
 // ESP32-S2 with 32MB flash  
 "ESP32S2FH32" | "ESP32S3" | "ESP32C3" | "ESP32C2" | "ESP32C6" | "ESP8266" | "Unknown";
 
-/**
- *  Represents a haptic event that takes place over time.
- *  
- *  Depends on `EventEffectType`
- */
+// Represents a haptic event that takes place over time.
 export type Event = {
 	// user facing name
 	name: string,
-	// how should this event effect the input map
-	effect: EventEffectType,
-	// The different outputs that should be output at different times.
-	steps: number[],
+	// lots of identical events can be triggered.
+	frames: Frames,
 	/**
-	 *  The total duration of this event.
-	 * 
-	 *  Steps will be distributed across this duration.
+	 *  The total duration of this even in event ticks (100hz)
+	 *  
+	 *  Nodes will be active in the map for this long and modified by the frames inserted.
 	 */
-	duration: {
-		secs: number,
-		nanos: number,
-	},
-	// Tags that will be inserted to each node created by this event.
-	tags: string[],
-	// radius of effect this event will have
-	radius: number,
-	managed_nodes: NodeId[],
-	time_step: {
-		secs: number,
-		nanos: number,
-	},
-	steps_completed: number,
-	start_time: {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-} | null,
+	duration: number,
 };
 
-// Describes what effect an event should have.
-export type EventEffectType = 
-/**
- *  Will try to set this node id to this value,
- *  Does not remove node after finished.
- */
-({ SingleNode: NodeId }) & { Location?: never; MovingLocation?: never; MultipleNodes?: never; Tags?: never } | 
-// Same as single node, but with a list of them.
-({ MultipleNodes: NodeId[] }) & { Location?: never; MovingLocation?: never; SingleNode?: never; Tags?: never } | 
-// Effects all InputNodes with the given tag.
-({ Tags: string[] }) & { Location?: never; MovingLocation?: never; MultipleNodes?: never; SingleNode?: never } | 
-// Inserts a node at the given location, automatically removes node when event expires.
-({ Location: [number, number, number] }) & { MovingLocation?: never; MultipleNodes?: never; SingleNode?: never; Tags?: never } | 
-// Divides locations between the duration of the event and moves the node to that location.
-({ MovingLocation: ([number, number, number])[] }) & { Location?: never; MultipleNodes?: never; SingleNode?: never; Tags?: never };
+export type EventKey = number;
 
 // Bundle containing all user-required information to start a firmware update.
 export type Firmware = {
@@ -197,13 +138,19 @@ export type Firmware = {
 	bytes: number[],
 };
 
+// A collection of values and consts, Constant values will only be initialized.
+export type Frames = {
+	nodes: Steps[],
+};
+
 /**
  *  Filled with values from a config json file.
  *  Provides all information needed to fully define the avatar prefab.
  */
 export type GameMap = {
+	schemaVersion: string,
 	nodes: ConfNode[],
-	meta: ConfMetadata,
+	identification: ConfIdent,
 };
 
 export type GitRepo = {
@@ -214,83 +161,105 @@ export type GitRepo = {
 /**
  *  Struct defining all needed properties for a haptic node.
  *  Used for mapping from one haptic model to another.
- *  Units are in Meters: Y is vertical, X is aligned with the Right Arm, Z is towards the front.
+ *  Units are in Meters-ish: Y is vertical, X is aligned with the Right Arm, Z is towards the front.
  *  Standard location is zeroed at the reference models feet, directly below the viewpoint.
  */
 export type HapticNode = {
-	// Standard Location in x (meters)
-	x: number,
-	// Standard Location in y (meters)
-	y: number,
-	// Standard Location in z (meters)
-	z: number,
+	loc: [number, number, number],
 	// The NodeGroups this node should influence or take influence from
-	groups: NodeGroup[],
+	groups: NodeGroup,
 };
 
-// All information needed to compute an OuputNode of any given location
+// describes an input source.
+export type Input = {
+	weight: number,
+	address: string,
+	vrcPrefix: string,
+	externalSource: boolean,
+	source: InputType,
+	layer: InputLayer,
+	shape: InputShape,
+};
+
+/**
+ *  How this input interacts within it's own sources.
+ *  
+ *  Gate(Max((Additive + Subtractive) * Multiplicative, Minimum of Max Layer), Maximum of Min Layer) Clamped to 0.0-1.0 (Overridden by first Override layer)
+ */
+export type InputLayer = 
+// Additive and subtractive combine to create base cumulative values.
+"additive" | "subtractive" | 
+// multiplies by cumulative value
+"multiplicative" | 
+// Takes Either cumulative or this value, whichever is bigger
+"max" | 
+// Takes Either cumulative or this value, whichever is smaller
+"gate" | 
+// Should be use sparingly, could very much so disrupt the outputs.
+"override";
+
+/**
+ *  Represents information at a point in space that will go into computing outputs.
+ *  
+ *  To have a Greedy layer drive multiple devices it must have the ALL group tag present. 
+ */
 export type InputNode = {
-	// id Unique to this InputNode
-	id: NodeId,
-	// Contains the standard location and NodeGroup tags for calculating outputs
-	haptic_node: HapticNode,
-	// The feedback strength at this location
-	intensity: number,
-	// The radius that this node will impact
+	muted: boolean,
+	location: [number, number, number],
+	// A slot is an single input value.
+	slots: Slot[],
 	radius: number,
-	// used to identify/modify/remove groups of InputNodes. (tags are not NodeGroups)  
-	tags: string[],
-	// how this input node should be interpreted
-	input_type: InputType,
+	// purely for convenience, should be determined by the map.
+	interpolation_layer: InterpolationLayer,
+	groups: NodeGroup,
+	// The most recently calculated output value of this node.
+	value: number,
 };
 
-/**
- *  Describes how an `InputNode` should be used during interpolation.
- * 
- *  Layers are ordered in processing order according to the enum, with the cumulative outputs being passed to the next step.
- */
-export type InputType = 
-/**
- *  Default choice, which weights closer values exponentially more.
- * 
- *  Output will not be influenced easily by distant input nodes if there is one close to the output node.
- */
-"INTERP" | 
-/**
- *  Additive layers adds the nodes influence into the result of the `InputType::INTERP` step.
- * 
- *  Uses linear scaling based off of the `InputNode.radius`
- */
-"ADDITIVE" | 
-/**
- *  Subtractive layers subtracts the nodes influence into the result of the `InputType::INTERP` step.
- * 
- *  Uses linear scaling based off of the `InputNode.radius`
- */
-"SUBTRACTIVE";
+// The shape that is used in game, gives us some special ways to interpolate some shapes.
+export type InputShape = { type: "sphere"; radius: number } | { type: "capsule"; radius: number; length: number; rotation: [number, number, number, number] } | { type: "ray"; len: number; offset: number };
 
-// Snapshot of map state.
-export type MapInfo = {
-	nodes: InputNode[],
-	events: Event[],
+/**
+ *  Whether this input source should be interpreted as weight or velocity.
+ *  Should be moved to mapping if it ends up in there.
+ */
+export type InputType = "weight" | "velocity";
+
+// Describes how this node should affect the layers. 
+export type InterpolationLayer = 
+// Grabs any nodes within it's radius,forcefully drives it at this value.
+"greedy" | 
+// Exponentially weights nodes within it's radius, nodes at 0 pull to zero.
+"default" | 
+// Weights nodes according to their proximity to this node
+"linear" | 
+// Drives **all** nodes exactly at output without regard to distance.
+"global";
+
+export type MaybeConst<T> = 
+/**
+ *  Is not constant, an index for each frame. 
+ *  Will behave like constant after running out of frames.
+ */
+({ Var: T[] }) & { Const?: never } | 
+// Will be constant for the duration of this event.
+({ Const: T }) & { Var?: never };
+
+export type NodeFieldKind = "Muted" | "Location" | "Radius";
+
+export type NodeGroup = number;
+
+export type NodeKeyDef = {
+	idx: number,
+	version: number,
 };
 
-/**
- *  Descriptors for location groups.
- *  Allows for segmented Interpolation
- */
-export type NodeGroup = "Head" | "UpperArmRight" | "UpperArmLeft" | "LowerArmRight" | "LowerArmLeft" | "TorsoRight" | "TorsoLeft" | "TorsoFront" | "TorsoBack" | "UpperLegRight" | "UpperLegLeft" | "LowerLegRight" | "LowerLegLeft" | "FootRight" | "FootLeft" | 
-/**
- *  A meta tag reserved for in-server use only.
- *  Should not be exported to devices or imported from games.
- */
-"All";
-
-/**
- *  Id unique to the node it references.
- *  if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
- */
-export type NodeId = string;
+export type Nodes = {
+	// List of event's active nodes.
+	transient: { [key in number]: NodeKeyDef[] },
+	nodes: (InputNode | null)[],
+	active_streaming: NodeKeyDef[],
+};
 
 export type OscAccessLevel = "Refused" | "OnlyRead" | "OnlyWrite" | "Full";
 
@@ -310,10 +279,27 @@ export type OscPath = string;
 
 export type OtaPassword = string;
 
-export type RayNode = {
-	rotation_offset: [number, number, number],
-	position_offset: [number, number, number],
-	size: number,
+export type Slot = {
+	muted: boolean,
+	source: InputType,
+	layer: InputLayer,
+	weight: number,
+	value: number,
+};
+
+export type SlotFieldKind = "Value" | "Weight" | "Muted";
+
+// Points to an input slot, within a node, within an interpolation layer.
+export type SlotKey = {
+	node: NodeKeyDef,
+	slot_idx: number,
+};
+
+export type Snapshot = {
+	instant: number,
+	active_events: ([number, EventKey, number])[],
+	events: Event[],
+	input_nodes: Nodes,
 };
 
 export type SpectaOscType = ({ Int: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Float: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ String: string }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; Time?: never } | ({ Long: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Midi?: never; String?: never; Time?: never } | ({ Double: number }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Char: string }) & { Array?: never; Blob?: never; Bool?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Bool: boolean }) & { Array?: never; Blob?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | "Nil" | "Inf" | ({ Blob: number[] }) & { Array?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never } | ({ Time: {
@@ -331,347 +317,19 @@ export type SpectaOscType = ({ Int: number }) & { Array?: never; Blob?: never; B
 	data2: number,
 } }) & { Array?: never; Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; String?: never; Time?: never } | ({ Array: SpectaOscType[] }) & { Blob?: never; Bool?: never; Char?: never; Color?: never; Double?: never; Float?: never; Int?: never; Long?: never; Midi?: never; String?: never; Time?: never };
 
+export type Steps = {
+	position: MaybeConst<[number, number, number]>,
+	muted: MaybeConst<boolean>,
+	value: MaybeConst<number>,
+	weight: MaybeConst<number>,
+	radius: MaybeConst<number>,
+};
+
 /**
  *  The bone that the node is parented to in the prefab.
  *  (HumanBodyBones from Unity,)
  */
-export type TargetBone = 
-/**
- *  <summary>
- *    <para>This is the Hips bone.</para>
- *  </summary>
- */
-"Hips" | 
-/**
- *  <summary>
- *    <para>This is the Left Upper Leg bone.</para>
- *  </summary>
- */
-"LeftUpperLeg" | 
-/**
- *  <summary>
- *    <para>This is the Right Upper Leg bone.</para>
- *  </summary>
- */
-"RightUpperLeg" | 
-/**
- *  <summary>
- *    <para>This is the Left Knee bone.</para>
- *  </summary>
- */
-"LeftLowerLeg" | 
-/**
- *  <summary>
- *    <para>This is the Right Knee bone.</para>
- *  </summary>
- */
-"RightLowerLeg" | 
-/**
- *  <summary>
- *    <para>This is the Left Ankle bone.</para>
- *  </summary>
- */
-"LeftFoot" | 
-/**
- *  <summary>
- *    <para>This is the Right Ankle bone.</para>
- *  </summary>
- */
-"RightFoot" | 
-/**
- *  <summary>
- *    <para>This is the first Spine bone.</para>
- *  </summary>
- */
-"Spine" | 
-/**
- *  <summary>
- *    <para>This is the Chest bone.</para>
- *  </summary>
- */
-"Chest" | 
-/**
- *  <summary>
- *    <para>This is the Neck bone.</para>
- *  </summary>
- */
-"Neck" | 
-/**
- *  <summary>
- *    <para>This is the Head bone.</para>
- *  </summary>
- */
-"Head" | 
-/**
- *  <summary>
- *    <para>This is the Left Shoulder bone.</para>
- *  </summary>
- */
-"LeftShoulder" | 
-/**
- *  <summary>
- *    <para>This is the Right Shoulder bone.</para>
- *  </summary>
- */
-"RightShoulder" | 
-/**
- *  <summary>
- *    <para>This is the Left Upper Arm bone.</para>
- *  </summary>
- */
-"LeftUpperArm" | 
-/**
- *  <summary>
- *    <para>This is the Right Upper Arm bone.</para>
- *  </summary>
- */
-"RightUpperArm" | 
-/**
- *  <summary>
- *    <para>This is the Left Elbow bone.</para>
- *  </summary>
- */
-"LeftLowerArm" | 
-/**
- *  <summary>
- *    <para>This is the Right Elbow bone.</para>
- *  </summary>
- */
-"RightLowerArm" | 
-/**
- *  <summary>
- *    <para>This is the Left Wrist bone.</para>
- *  </summary>
- */
-"LeftHand" | 
-/**
- *  <summary>
- *    <para>This is the Right Wrist bone.</para>
- *  </summary>
- */
-"RightHand" | 
-/**
- *  <summary>
- *    <para>This is the Left Toes bone.</para>
- *  </summary>
- */
-"LeftToes" | 
-/**
- *  <summary>
- *    <para>This is the Right Toes bone.</para>
- *  </summary>
- */
-"RightToes" | 
-/**
- *  <summary>
- *    <para>This is the Left Eye bone.</para>
- *  </summary>
- */
-"LeftEye" | 
-/**
- *  <summary>
- *    <para>This is the Right Eye bone.</para>
- *  </summary>
- */
-"RightEye" | 
-/**
- *  <summary>
- *    <para>This is the Jaw bone.</para>
- *  </summary>
- */
-"Jaw" | 
-/**
- *  <summary>
- *    <para>This is the left thumb 1st phalange.</para>
- *  </summary>
- */
-"LeftThumbProximal" | 
-/**
- *  <summary>
- *    <para>This is the left thumb 2nd phalange.</para>
- *  </summary>
- */
-"LeftThumbIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the left thumb 3rd phalange.</para>
- *  </summary>
- */
-"LeftThumbDistal" | 
-/**
- *  <summary>
- *    <para>This is the left index 1st phalange.</para>
- *  </summary>
- */
-"LeftIndexProximal" | 
-/**
- *  <summary>
- *    <para>This is the left index 2nd phalange.</para>
- *  </summary>
- */
-"LeftIndexIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the left index 3rd phalange.</para>
- *  </summary>
- */
-"LeftIndexDistal" | 
-/**
- *  <summary>
- *    <para>This is the left middle 1st phalange.</para>
- *  </summary>
- */
-"LeftMiddleProximal" | 
-/**
- *  <summary>
- *    <para>This is the left middle 2nd phalange.</para>
- *  </summary>
- */
-"LeftMiddleIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the left middle 3rd phalange.</para>
- *  </summary>
- */
-"LeftMiddleDistal" | 
-/**
- *  <summary>
- *    <para>This is the left ring 1st phalange.</para>
- *  </summary>
- */
-"LeftRingProximal" | 
-/**
- *  <summary>
- *    <para>This is the left ring 2nd phalange.</para>
- *  </summary>
- */
-"LeftRingIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the left ring 3rd phalange.</para>
- *  </summary>
- */
-"LeftRingDistal" | 
-/**
- *  <summary>
- *    <para>This is the left little 1st phalange.</para>
- *  </summary>
- */
-"LeftLittleProximal" | 
-/**
- *  <summary>
- *    <para>This is the left little 2nd phalange.</para>
- *  </summary>
- */
-"LeftLittleIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the left little 3rd phalange.</para>
- *  </summary>
- */
-"LeftLittleDistal" | 
-/**
- *  <summary>
- *    <para>This is the right thumb 1st phalange.</para>
- *  </summary>
- */
-"RightThumbProximal" | 
-/**
- *  <summary>
- *    <para>This is the right thumb 2nd phalange.</para>
- *  </summary>
- */
-"RightThumbIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the right thumb 3rd phalange.</para>
- *  </summary>
- */
-"RightThumbDistal" | 
-/**
- *  <summary>
- *    <para>This is the right index 1st phalange.</para>
- *  </summary>
- */
-"RightIndexProximal" | 
-/**
- *  <summary>
- *    <para>This is the right index 2nd phalange.</para>
- *  </summary>
- */
-"RightIndexIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the right index 3rd phalange.</para>
- *  </summary>
- */
-"RightIndexDistal" | 
-/**
- *  <summary>
- *    <para>This is the right middle 1st phalange.</para>
- *  </summary>
- */
-"RightMiddleProximal" | 
-/**
- *  <summary>
- *    <para>This is the right middle 2nd phalange.</para>
- *  </summary>
- */
-"RightMiddleIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the right middle 3rd phalange.</para>
- *  </summary>
- */
-"RightMiddleDistal" | 
-/**
- *  <summary>
- *    <para>This is the right ring 1st phalange.</para>
- *  </summary>
- */
-"RightRingProximal" | 
-/**
- *  <summary>
- *    <para>This is the right ring 2nd phalange.</para>
- *  </summary>
- */
-"RightRingIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the right ring 3rd phalange.</para>
- *  </summary>
- */
-"RightRingDistal" | 
-/**
- *  <summary>
- *    <para>This is the right little 1st phalange.</para>
- *  </summary>
- */
-"RightLittleProximal" | 
-/**
- *  <summary>
- *    <para>This is the right little 2nd phalange.</para>
- *  </summary>
- */
-"RightLittleIntermediate" | 
-/**
- *  <summary>
- *    <para>This is the right little 3rd phalange.</para>
- *  </summary>
- */
-"RightLittleDistal" | 
-/**
- *  <summary>
- *    <para>This is the Upper Chest bone.</para>
- *  </summary>
- */
-"UpperChest" | 
-/**
- *  <summary>
- *    <para>This is the Last bone index delimiter.</para>
- *  </summary>
- */
-"LastBone";
+export type TargetBone = "hips" | "leftUpperLeg" | "rightUpperLeg" | "leftLowerLeg" | "rightLowerLeg" | "leftFoot" | "rightFoot" | "spine" | "chest" | "neck" | "head" | "leftShoulder" | "rightShoulder" | "leftUpperArm" | "rightUpperArm" | "leftLowerArm" | "rightLowerArm" | "leftHand" | "rightHand" | "leftToes" | "rightToes" | "leftEye" | "rightEye" | "jaw" | "leftThumbProximal" | "leftThumbIntermediate" | "leftThumbDistal" | "leftIndexProximal" | "leftIndexIntermediate" | "leftIndexDistal" | "leftMiddleProximal" | "leftMiddleIntermediate" | "leftMiddleDistal" | "leftRingProximal" | "leftRingIntermediate" | "leftRingDistal" | "leftLittleProximal" | "leftLittleIntermediate" | "leftLittleDistal" | "rightThumbProximal" | "rightThumbIntermediate" | "rightThumbDistal" | "rightIndexProximal" | "rightIndexIntermediate" | "rightIndexDistal" | "rightMiddleProximal" | "rightMiddleIntermediate" | "rightMiddleDistal" | "rightRingProximal" | "rightRingIntermediate" | "rightRingDistal" | "rightLittleProximal" | "rightLittleIntermediate" | "rightLittleDistal" | "upperChest" | "lastBone";
 
 /**
  *  Which method to use.
@@ -696,7 +354,7 @@ export type VrcInfo = {
 	avatar: Avatar | null,
 	velocity_ratio: number,
 	velocity_mult: number,
-	cached: ([OscPath, CacheNode])[],
+	watched: ([string, AddrInfo])[],
 	available: OscInfo[],
 };
 

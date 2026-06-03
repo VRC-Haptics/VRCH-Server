@@ -26,7 +26,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
   const handlePlay = async () => {
     if (selectedIndices.length < 1) return;
     const node = nodes[selectedIndices[0]];
-    const result = await commands.playPoint([node.x, node.y, node.z], 1.0, 2.0);
+    const result = await commands.playPoint(node.loc, 1.0, 2.0);
     if (result.status === "error") console.error("play_point failed:", result.error);
   };
 
@@ -37,8 +37,8 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
     if (selectedIndices.length !== 2) return;
     const n1 = nodes[selectedIndices[0]];
     const n2 = nodes[selectedIndices[1]];
-    const pos1: [number, number, number] = [n1.x, n1.y, n1.z];
-    const pos2: [number, number, number] = [n2.x, n2.y, n2.z];
+    const pos1: [number, number, number] = n1.loc;
+    const pos2: [number, number, number] = n2.loc;
     const result = await commands.swapConfNodes(deviceId, pos1, pos2);
     if (result.status === "error") console.error("swap_conf_nodes failed:", result.error);
   };
@@ -58,7 +58,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
               {nodes.map((node, idx) => (
                 <mesh
                   key={idx}
-                  position={[-node.x, node.y, node.z]}
+                  position={[-node.loc[0], node.loc[1], node.loc[2]]}
                   onClick={e => { e.stopPropagation(); handleSelect(idx); }}
                   onPointerOver={() => setHoveredIdx(idx)}
                   onPointerOut={() => setHoveredIdx(null)}
@@ -70,7 +70,7 @@ export const DisplayHapticNodes: React.FC<DisplayHapticNodesProps> = ({ deviceId
                       pointerEvents: 'none', whiteSpace: 'nowrap', fontSize: '12px',
                       background: '#000', color: '#fff', padding: '2px 4px', borderRadius: '4px',
                     }}>
-                      {node.groups.join(', ')}:{idx}
+                      {node.groups}:{idx}
                     </Html>
                   )}
                 </mesh>

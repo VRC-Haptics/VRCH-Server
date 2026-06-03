@@ -9,6 +9,7 @@ pub mod wifi;
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
 use parking_lot::{Mutex, RwLock};
+use warp::filters::method::get;
 use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -18,7 +19,7 @@ use wifi::{WifiDevice, WifiDeviceInfo};
 
 use crate::{
     devices::{bhaptics::{BhapticBle, BhapticInfo}, wifi::start_wifi_devices},
-    mapping::haptic_node::HapticNode,
+    mapping::haptic_node::HapticNode, state::get_config,
 };
 
 pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
@@ -240,7 +241,12 @@ pub async fn init_device_manager(manager: &mut DeviceManager) {
     };
 
     // initialize our device listeners
-    start_wifi_devices(&mut manager.get_handle()).await;
+    let conf = get_config().server.load();
+    if conf.enable_wifi_vrch {
+        start_wifi_devices(&mut manager.get_handle()).await;
+    } else {
+        log::warn!("Skipping wifi devices, disabled from config");
+    }
 
     // spawn our channel manager
     let clone = manager.shutdown.clone();

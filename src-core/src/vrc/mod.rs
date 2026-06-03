@@ -14,7 +14,7 @@ use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, Nod
 use crate::osc::server::OscServer;
 use crate::state::{self, VrcSettings};
 use crate::vrc::config::InputType;
-use arc_swap::{Cache};
+use arc_swap::{ArcSwap, Cache, Guard};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
@@ -85,25 +85,12 @@ pub struct VrcHandle {
     tx: Sender<MsgToMainVrc>,
     osc_buffer: Arc<std::sync::Mutex<Vec<OscMessage>>>,
     flush_scheduled: Arc<std::sync::atomic::AtomicBool>,
-    info: Arc<AtomicArc<VrcInfo>>,
+    info: Arc<ArcSwap<VrcInfo>>,
 }
 
 impl VrcHandle {
     pub fn send_osc_msg_rcv(&self, msg: OscMessage) {
-        {
-            let mut guard = self.osc_buffer.lock().unwrap();
-            guard.push(msg);
-        }
-
-        // Schedule a flush if one isn't already pending
-        if !self.flush_scheduled.swap(true, std::sync::atomic::Ordering::AcqRel) {
-            let handle = self.clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(50)).await;
-                handle.flush_osc();
-                handle.flush_scheduled.store(false, std::sync::atomic::Ordering::Release);
-            });
-        }
+        log_err!(self.tx.try_send(MsgToMainVrc::Osc(msg)));
     }
 
     fn flush_osc(&self) {
@@ -123,16 +110,11 @@ impl VrcHandle {
         log_err!(self.tx.send(msg).await);
     }
 
-    pub fn get_info(&self) -> VrcInfo {
-        let settings = state::get_config().vrc_settings.load();
-        let mut new = VrcInfo::clone(&self.info.load());
-        new.velocity_ratio = settings.velocity_ratio;
-        new.velocity_mult = settings.velocity_mult;
-        new
-    }
-
-    pub fn get_info_ref(&self) -> ArcBorrow<VrcInfo> {
-        self.info.load()
+    pub async fn get_info(&self) -> Arc<VrcInfo> {
+        let (tx, rx) = oneshot::channel();
+        self.blocking_send(MsgToMainVrc::Info(tx));
+        log_err!(rx.await);
+        self.info.load_full()
     }
 }
 
@@ -157,7 +139,7 @@ pub enum AddrInfo
 
 pub struct VrcGame {
     recv_port: u16,
-    ui_info: Arc<AtomicArc<VrcInfo>>,
+    ui_info: Arc<ArcSwap<VrcInfo>>,
     handle: VrcHandle,
     /// Holds data from http server about the given avatar
     pub avatar: Option<Avatar>,
@@ -165,18 +147,22 @@ pub struct VrcGame {
     ///
     /// NOTE: The values actual values contained in this struct are out of date by up to 2 seconds.
     pub available_parameters: Arc<DashMap<OscPath, OscInfo>>,
-    pub watched: FxHashMap<String, AddrInfo>,
+    pub watched: FxHashMap<String, SmallVec<[AddrInfo; 2]>>,
     rx: Receiver<MsgToMainVrc>,
     map: MapHandle,
     /// The OSC server we receive updates from
     osc_server: OscServer,
     /// Spawns our own OSCQuery advertising
     query_server: Option<OscQueryServer>,
+    dirty: bool,
 }
 
 /// I hate naming things
+//const _: [u8; std::mem::size_of::<MsgToMainVrc>()] = [];
 #[derive(Debug)]
 pub enum MsgToMainVrc {
+    Info(oneshot::Sender<()>),
+    Osc(OscMessage),
     /// message is received from the OSC server
     OscBatch(Vec<OscMessage>),
     /// A new avatar configuration was detected
@@ -188,7 +174,7 @@ impl VrcGame {
     pub async fn new(map_handle: MapHandle, api: &'static Mutex<ApiManager>) -> VrcGame {
         log::trace!("Starting VRC");
         let (tx, rx) = channel(50);
-        let info = Arc::new(AtomicArc::new(VrcInfo::default().into()));
+        let info = Arc::new(ArcSwap::new(Arc::new(VrcInfo::default().into())));
         let handle = VrcHandle {
             tx: tx.clone(),
             info: Arc::clone(&info),
@@ -218,6 +204,7 @@ impl VrcGame {
             map: map_handle,
             available_parameters: Arc::clone(&param_avail),
             watched: FxHashMap::default(),
+            dirty: false,
         };
 
         // Start the thread that handles finding available vrc parameters
@@ -249,11 +236,20 @@ impl VrcGame {
             };
 
             match msg {
+                MsgToMainVrc::Info(tx) => {
+                    self.update_info(); // updates if dirty
+                    log_err!(tx.send(())); // marks we are done updating
+                }
                 MsgToMainVrc::OscBatch(batch) => {
                     let cfg = settings.load();
                     self.process_osc_batch(&batch, cfg);
 
-                    self.update_info();
+                    self.dirty = true;
+                }
+                MsgToMainVrc::Osc(msg) => {
+                    let cfg = settings.load();
+                    self.process_msg(&msg, cfg);
+                    self.dirty = true;
                 }
                 MsgToMainVrc::NewAvatar(avi) => {
                     //clear current input nodes
@@ -276,20 +272,20 @@ impl VrcGame {
 
                             for (addr, idx) in pairs {
                                 let key = SlotKey::new(resp, idx);
-                                let old = self.watched.insert(addr.clone(), AddrInfo::Slot(key, SlotFieldKind::Value));
-                                if let Some(old) = old {
-                                    log::warn!("Duplicate nodes with address: `{addr}`:{old:?}");
-                                };
+                                self.watched
+                                    .entry(addr.clone())
+                                    .or_default()
+                                    .push(AddrInfo::Slot(key, SlotFieldKind::Value));
                             }
                         }
                     }
-                    self.update_info();
+                    self.dirty = true;
                 }
                 MsgToMainVrc::VrcDisconnected => {
                     log::warn!("Vrc Disconnected");
                     self.avatar = None;
                     self.available_parameters.clear();
-                    self.update_info();
+                    self.dirty = true;
                 }
             }
         }
@@ -297,6 +293,10 @@ impl VrcGame {
 
     /// clones all our info into a new instance that will be swapped out.
     fn update_info(&mut self) {
+        if !self.dirty {
+            return;
+        }
+
         let current = &self.ui_info;
         let changed = VrcInfo {
             is_connected: !self.available_parameters.is_empty(),
@@ -306,10 +306,13 @@ impl VrcGame {
             avatar: self.avatar.clone(),
             velocity_mult: 0.0, // these will be filled out by touching the state in the handle function
             velocity_ratio: 0.0,
-            watched: self.watched.iter().map(|(s, i) | {(s.clone(), i.clone())}).collect(),
+            watched: self.watched.iter()
+                .flat_map(|(s, infos)| infos.iter().map(move |i| (s.clone(), i.clone())))
+                .collect(),
         };
 
         current.swap(Arc::new(changed));
+        self.dirty = false;
     }
 
     fn process_osc_batch(&self, batch: &[OscMessage], cfg: &VrcSettings) {
@@ -325,11 +328,42 @@ impl VrcGame {
             let addr = remove_version(&msg.addr);
             let Some(arg) = msg.args.first() else { return };
 
-            let Some(key) = self.watched.get(&addr) else {
+            let Some(infos) = self.watched.get(&addr) else {
                 continue; // not one we watch for.
             };
 
-            match key {
+            for info in infos {
+                match info {
+                    AddrInfo::Slot(s, kind) => {
+                        let msg = match kind {
+                            SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(try_f32(arg.clone())) },
+                            SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(try_f32(arg.clone())) },
+                            SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(try_bool(arg.clone())) },
+                        };
+                        log_err!(self.map.send_event(msg));
+                    },
+                    AddrInfo::Node(n, kind) => {
+                        let msg = match kind {
+                            NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(try_vec(arg.clone())) },
+                            NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(try_f32(arg.clone())) },
+                            NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(try_bool(arg.clone())) },
+                        };
+                        log_err!(self.map.send_event(msg));
+                    }
+                }
+            }
+        }
+    }
+
+    fn process_msg(&self, msg: &OscMessage, cfg: &VrcSettings) {
+        let addr = remove_version(&msg.addr);
+        let Some(arg) = msg.args.first() else { return };
+        let Some(infos) = self.watched.get(&addr) else {
+            return; // not one we watch for.
+        };
+
+        for info in infos {
+            match info {
                 AddrInfo::Slot(s, kind) => {
                     let msg = match kind {
                         SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(try_f32(arg.clone())) },
@@ -348,6 +382,7 @@ impl VrcGame {
                 }
             }
         }
+        
     }
 }
 
