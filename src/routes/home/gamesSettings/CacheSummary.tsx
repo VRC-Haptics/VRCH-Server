@@ -8,18 +8,31 @@ interface OscSummaryProps {
 function oscValueToString(v: SpectaOscType): string {
   if (v === "Nil") return "Nil";
   if (v === "Inf") return "Inf";
-  if (v.Float !== undefined) return v.Float.toFixed(4);
-  if (v.Double !== undefined) return v.Double.toFixed(4);
-  if (v.Int !== undefined) return String(v.Int);
-  if (v.Long !== undefined) return String(v.Long);
-  if (v.Bool !== undefined) return String(v.Bool);
-  if (v.String !== undefined) return `"${v.String}"`;
-  if (v.Char !== undefined) return `'${v.Char}'`;
-  if (v.Blob !== undefined) return `blob[${v.Blob.length}]`;
-  if (v.Array !== undefined) return `[${v.Array.map(oscValueToString).join(", ")}]`;
-  if (v.Color !== undefined) return `rgba(${v.Color.r}, ${v.Color.g}, ${v.Color.b}, ${v.Color.a})`;
-  if (v.Time !== undefined) return `${v.Time.seconds}.${v.Time.fractional}`;
-  if (v.Midi !== undefined) return `midi(${v.Midi.status},${v.Midi.data1},${v.Midi.data2})`;
+
+  const num = (n: number | null | undefined) =>
+    n == null ? "null" : Number.isFinite(n) ? n.toFixed(4) : String(n);
+
+  if ("Float" in v) return num(v.Float);
+  if ("Double" in v) return num(v.Double);
+  if ("Int" in v) return v.Int == null ? "null" : String(v.Int);
+  if ("Long" in v) return v.Long == null ? "null" : String(v.Long);
+  if ("Bool" in v) return String(v.Bool);
+  if ("String" in v) return v.String == null ? "null" : `"${v.String}"`;
+  if ("Char" in v) return v.Char == null ? "null" : `'${v.Char}'`;
+  if ("Blob" in v) return v.Blob == null ? "blob[null]" : `blob[${v.Blob.length}]`;
+  if ("Array" in v)
+    return v.Array == null ? "[]" : `[${v.Array.map(oscValueToString).join(", ")}]`;
+  if ("Color" in v)
+    return v.Color == null
+      ? "rgba(null)"
+      : `rgba(${v.Color.r}, ${v.Color.g}, ${v.Color.b}, ${v.Color.a})`;
+  if ("Time" in v)
+    return v.Time == null ? "time(null)" : `${v.Time.seconds}.${v.Time.fractional}`;
+  if ("Midi" in v)
+    return v.Midi == null
+      ? "midi(null)"
+      : `midi(${v.Midi.status},${v.Midi.data1},${v.Midi.data2})`;
+
   return "?";
 }
 

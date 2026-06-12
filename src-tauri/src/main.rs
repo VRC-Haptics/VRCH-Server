@@ -125,6 +125,8 @@ async fn main() {
                         && !metadata.target().starts_with("reqwest")
                         && !metadata.target().starts_with("btleplug")
                         && !metadata.target().starts_with("hyper_util")
+                        && !metadata.target().starts_with("tokio_tungstenite")
+                        && !metadata.target().starts_with("tungstenite")
                 })
                 .max_file_size(500_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))

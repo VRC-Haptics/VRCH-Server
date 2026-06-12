@@ -9,7 +9,6 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
-use std::thread;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
 
@@ -81,7 +80,7 @@ pub async fn start_filling_available_parameters(
         while let Some((port, ip)) = receiver.recv().await {
             log::debug!("VRC discovery: {}:{}", ip, port);
             run_vrc_http_polling(port, &ip, &params, vrc.clone(), &api).await;
-            vrc.send(MsgToMainVrc::VrcDisconnected).await;
+            vrc.send(MsgToMainVrc::VrcDisconnected);
         }
 
         unsafe {
@@ -247,7 +246,7 @@ async fn run_vrc_http_polling(
                     let new_id = mid.string().unwrap();
 
                     let new_avatar = Box::pin(create_avatar(params, new_id.to_string(), &api)).await;
-                    vrc.send(MsgToMainVrc::NewAvatar(new_avatar)).await;
+                    vrc.send(MsgToMainVrc::NewAvatar(new_avatar));
                 }
             }
             Err(err) => {

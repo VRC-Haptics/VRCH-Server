@@ -32,7 +32,7 @@ impl HapticNode {
             return true;
         }
 
-        let overlap = self.groups & *group;
+        let overlap = self.groups.intersection(*group);
         if overlap.is_empty() {
             return false;
         }

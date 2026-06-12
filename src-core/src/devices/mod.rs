@@ -4,7 +4,7 @@ pub mod serial;
 pub mod bhaptics;
 pub mod update;
 pub mod wifi;
-//pub mod device;
+pub mod websocket;
 
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
@@ -18,7 +18,7 @@ use tokio_util::sync::CancellationToken;
 use wifi::{WifiDevice, WifiDeviceInfo};
 
 use crate::{
-    devices::{bhaptics::{BhapticBle, BhapticInfo}, wifi::start_wifi_devices},
+    devices::{bhaptics::{BhapticBle, BhapticInfo}, websocket::{WebsocketDevice, WebsocketDeviceInfo}, wifi::start_wifi_devices},
     mapping::haptic_node::HapticNode, state::get_config,
 };
 
@@ -27,57 +27,52 @@ pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
 #[enum_dispatch]
 #[derive(Debug)]
 /// All Haptic Devices implement the `Device` trait
-/// and are not garunteed to provide anything else.
+/// and are not guaranteed to provide anything else.
 ///
 /// Individual exposed functions for each device type are prone to change,
 /// and are not stable in the least.
 pub enum HapticDevice {
     Wifi(WifiDevice),
     BhapticBle(BhapticBle),
+    Websocket(WebsocketDevice),
 }
 
 /// Info container for each device type
 /// 
-/// An informattion that should be in all variants should be made so via the below impl.
+/// An information that should be in all variants should be made so via the below impl.
 /// Don't manually dip into each variant please.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceInfo {
     Wifi(WifiDeviceInfo),
-    BhapticBle(BhapticInfo)
+    BhapticBle(BhapticInfo),
+    Websocket(WebsocketDeviceInfo),
 }
 
 impl DeviceInfo {
     pub fn get_nodes(&self) -> &Vec<HapticNode> {
         match self {
-            DeviceInfo::Wifi(inf) => {
-                return &inf.nodes;
-            },
-            DeviceInfo::BhapticBle(inf) => {
-                return &inf.nodes;
-            }
+            DeviceInfo::Wifi(inf) => &inf.nodes,
+            DeviceInfo::BhapticBle(inf) => &inf.nodes,
+            DeviceInfo::Websocket(inf) => &inf.nodes,
         }
     }
 
-    /// updates the nodes on this info instance. Does not do anything like send them to teh device or update the configuration.
+    /// updates the nodes on this info instance. Does not send them to the device.
     pub fn set_nodes(&mut self, new: Vec<HapticNode>) {
         match self {
-            DeviceInfo::Wifi(ref mut inf) => {
-                inf.nodes = new;
-            },
-            DeviceInfo::BhapticBle(ref mut inf) => {
-                inf.nodes = new;
-            }
+            DeviceInfo::Wifi(ref mut inf) => inf.nodes = new,
+            DeviceInfo::BhapticBle(ref mut inf) => inf.nodes = new,
+            DeviceInfo::Websocket(ref mut inf) => inf.nodes = new,
         }
     }
 
     pub fn get_esp32(&self) -> ESP32Model {
         match self {
-            DeviceInfo::Wifi(wif) => {
-                wif.esp_model.clone()
-            },
+            DeviceInfo::Wifi(wif) => wif.esp_model.clone(),
             DeviceInfo::BhapticBle(_) => ESP32Model::Unknown,
+            DeviceInfo::Websocket(_) => ESP32Model::Unknown,
         }
     }
 }
@@ -87,7 +82,7 @@ impl DeviceInfo {
 pub trait Device {
     /// Returns device id that should be unique to this device
     ///
-    /// Since id is required to index it should be available at device initalization
+    /// Since id is required to index it should be available at device initialization
     fn get_id(&self) -> DeviceId;
     /// Returns the info related to this device.
     /// All info should not be required at device start and will be edited as the device lives on.
@@ -192,7 +187,7 @@ impl DeviceHandle {
 /// A thin, thread safe abstraction layer over physical devices,
 /// AFTER the `init_device_manager` has been called.
 ///
-/// # USE initialiaztion function at top of main.
+/// # USE initialization function at top of main.
 pub struct DeviceManager {
     // Requires Arc to keep fully asynchronus
     devices: Arc<DashMap<DeviceId, HapticDevice>>,

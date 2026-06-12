@@ -1,7 +1,7 @@
 use crate::mapping::{EventDuration, EventInstant, NodeKey, Nodes, input_node::InputNode};
 use glam::Vec3;
 use slotmap::SlotMap;
-use std::{usize, sync::Arc};
+use std::{sync::Arc, time::Instant, usize};
 
 
 //const _: [u8; std::mem::size_of::<MaybeConst<()>>()] = [];
@@ -161,7 +161,7 @@ impl Event {
                 node.slots[0].weight = weight;
             }
             if let Some(&value) = steps.value.get(since_start as usize) {
-                node.slots[0].value = value;
+                node.slots[0].history.push_at(value, Instant::now());
             }
             if let Some(&pos) = steps.position.get(since_start as usize) {
                 node.location = pos;

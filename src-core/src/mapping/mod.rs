@@ -7,11 +7,12 @@ pub mod interp;
 
 use crate::{
     log_err,
-    mapping::{event::{Frames, Steps}, input_node::{InterpolationLayer, SlotKey}}, vrc::config::{Input, InputLayer},
+    mapping::{event::{Frames, Steps}, input_node::{InterpolationLayer, SlotKey}}, vrc::config::{Input, InputLayer, InputType},
 };
 use arc_swap::{ArcSwap, Guard};
 use nohash_hasher::IntMap;
 use parking_lot::RwLock;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use slotmap::SlotMap;
 use strum::EnumDiscriminants;
 use uuid::Uuid;
@@ -39,7 +40,7 @@ pub type EventDuration = u64;
 /// Implements cheap clone, can be shared between threads safely.
 pub struct MapHandle {
     pub snapshot: Arc<ArcSwap<Snapshot>>,
-    event_sender: mpsc::UnboundedSender<InputEventMessage>,
+    pub event_sender: mpsc::UnboundedSender<InputEventMessage>,
 }
 
 impl MapHandle {
@@ -173,7 +174,7 @@ struct NodeKeyDef {
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
-struct Nodes {
+pub struct Nodes {
     /// List of event's active nodes.
     #[cfg_attr(feature = "specta", specta(type = std::collections::HashMap<EventId, Vec<NodeKey>>))]
     transient: IntMap<EventId, Vec<NodeKey>>,
@@ -184,6 +185,7 @@ struct Nodes {
 
 impl Nodes {
     /// Updates nodes' final output value.
+    /// Gets called each update, be careful.
     pub fn update_nodes(&mut self) {
         // TODO: Add velocity calculations/handling
         for key in self.active_streaming.iter().chain(self.transient.values().flatten()) {
@@ -197,7 +199,7 @@ impl Nodes {
             let mut max = 0.0_f32;
             let mut min = 1.0_f32;
             for slot in node.slots.iter_mut() {
-                let val = slot.value;
+                let val = slot.history.latest().unwrap_or(0.0);
                 let weighted = val * slot.weight;
 
                 match slot.layer {
@@ -222,7 +224,7 @@ impl Nodes {
                     }
                     InputLayer::Override => {
                         node.value = weighted;
-                        break;
+                        break; // no need to go further
                     }
                 }
             }
@@ -316,7 +318,7 @@ impl InputMap {
 
         let period = Duration::from_millis(10);
         let mut event_interval = interval(period.clone());
-        let mut last_tick = Instant::now();
+        let mut last_tick = tokio::time::Instant::now();
 
         let mut stats = LoopStats::default();
         let mut last_report = Instant::now();
@@ -496,14 +498,14 @@ impl InputMap {
                     }
                     InputEventMessage::UpdateSlot { key, value, weight, muted, } => {
                         let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
-                            log::error!("Unable to find node with key");
+                            log::error!("Unable to find node with key (slot)");
                             return; // TODO: Replace with continue when drain introduced.
                         };
 
                         // check on node insert that it has at least one slot.
                         if let Some(slot) = node.slots.get_mut(key.slot_idx as usize)  {
                             map.dirty_since_snap = true;
-                            slot.value = value;
+                            slot.history.push_at(value, std::time::Instant::now());
                             slot.weight = weight;
                             slot.muted = muted;
                             map.map_dirty = true;
@@ -535,7 +537,7 @@ impl InputMap {
                         if let Some(slot) = node.slots.get_mut(key.slot_idx as usize)  {
                             match field {
                                 SlotField::Muted(m) => slot.muted = m,
-                                SlotField::Value(v) => slot.value = v,
+                                SlotField::Value(v) => slot.history.push_at(v, std::time::Instant::now()),
                                 SlotField::Weight(w) => slot.weight = w,
                             }
                             map.map_dirty = true;
@@ -618,13 +620,14 @@ impl InputMap {
     fn update_devices(&mut self) {
         // Calculate internal node values from slots.
         self.input_nodes.update_nodes();
-        for device in self.devices.iter() {
+
+        let _: () = self.devices.par_iter().map(|d | {
             // could be done in parallel here. but few devices means not efficient (probably)
-            let (_, settings) = state::get_device(&device.id);
-            device.update_buffer(&self.input_nodes, &settings.load());
+            let (_, settings) = state::get_device(&d.id);
+            d.update_buffer(&self.input_nodes, &settings.load());
             self.device_manager
-                .with_device(&device.id, |d| d.buffer_updated());
-        }
+                .with_device(&d.id, |d| d.buffer_updated());
+        }).collect();
     }
 }
 
@@ -632,6 +635,18 @@ impl InputMap {
 fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &mut Vec<MappingDevice>) {
     if let Some(info) = dev.with_device(&id, |d| d.info()) {
         match info {
+            DeviceInfo::Websocket(w) => {
+                let Some(device) = devices.iter_mut().find(|d| d.id == id) else {
+                    // if device not found on our list, just continue.
+                    return;
+                };
+
+                device.nodes = w.nodes;
+                let out_len = device.outputs.read().len();
+                if device.nodes.len() != out_len {
+                    log::error!("Output buffer not same length on device: {}", w.name);
+                }
+            }
             DeviceInfo::Wifi(i) => {
                 let Some(device) = devices.iter_mut().find(|d| d.id == id) else {
                     // if device not found on our list, just continue.

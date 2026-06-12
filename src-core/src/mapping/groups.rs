@@ -60,16 +60,31 @@ impl NodeGroup {
             }
         }
 
+        // NOTE: bitflags_match! matches on EXACT equality, not match-style
+        // or-patterns. Each arm must therefore be a single flag — never
+        // `A | B | ...`, which would only match the exact combined bit set.
+        // to_points is contracted to be called per-flag (see interacts).
         bitflags_match!(*self, {
             NodeGroup::Head => Some((
                 Vec3::new(0., 1.70700002, 0.0529999994),
                 Vec3::new(0., 1.43400002, -0.0130000003),
             )),
 
-            NodeGroup::TorsoRight
-            | NodeGroup::TorsoLeft
-            | NodeGroup::TorsoFront
-            | NodeGroup::TorsoBack => Some((
+            // All four torso faces share the same central vertical axis;
+            // front/back and left/right are resolved by within_half_angle.
+            NodeGroup::TorsoRight => Some((
+                Vec3::new(0., 0.735000014, -0.00800000038),
+                Vec3::new(0., 1.43400002, -0.0130000003),
+            )),
+            NodeGroup::TorsoLeft => Some((
+                Vec3::new(0., 0.735000014, -0.00800000038),
+                Vec3::new(0., 1.43400002, -0.0130000003),
+            )),
+            NodeGroup::TorsoFront => Some((
+                Vec3::new(0., 0.735000014, -0.00800000038),
+                Vec3::new(0., 1.43400002, -0.0130000003),
+            )),
+            NodeGroup::TorsoBack => Some((
                 Vec3::new(0., 0.735000014, -0.00800000038),
                 Vec3::new(0., 1.43400002, -0.0130000003),
             )),
@@ -94,7 +109,6 @@ impl NodeGroup {
                 Vec3::new(0.226300001, 0.0199999996, 0.0320000015),
             )),
 
-            // Mirror the right-side definitions:
             NodeGroup::UpperArmLeft => mirror_x(NodeGroup::UpperArmRight.to_points()),
             NodeGroup::LowerArmLeft => mirror_x(NodeGroup::LowerArmRight.to_points()),
             NodeGroup::UpperLegLeft => mirror_x(NodeGroup::UpperLegRight.to_points()),

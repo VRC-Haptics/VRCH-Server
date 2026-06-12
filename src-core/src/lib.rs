@@ -25,14 +25,12 @@ use vrc::VrcGame;
 
 //standard imports
 use once_cell::sync::OnceCell;
-use std::panic::{set_hook, take_hook};
-use std::path::PathBuf;
-use std::sync::{Arc, LazyLock, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::sync::Mutex;
 
 use crate::bhaptics::game::BhapticHandle;
-use crate::devices::Device;
+use crate::devices::websocket::start_websocket_devices;
 use crate::devices::{bhaptics::start_ble, DeviceHandle};
 use crate::file::{resolve_dir, AppRoot, ROOT_DIR};
 use crate::mapping::start_interp_map;
@@ -81,6 +79,9 @@ async fn start_async_tasks(manager: DeviceHandle) -> (Option<VrcHandle>, MapHand
     // TODO: Move into device manager init.
     if conf.enable_ble_bhaptic {
         log_err!(start_ble(manager.get_device_channel(), Duration::from_secs(1)).await);
+    }
+    if conf.enable_websocket_devices {
+        start_websocket_devices(manager.get_device_channel()).await;
     }
     let bhaptic = if conf.enable_bhaptic_game {
         Some(bhaptics::game::start_bhaptics(map_handle.clone()).await)

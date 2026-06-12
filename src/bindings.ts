@@ -96,10 +96,10 @@ export type DeviceId = string;
 /**
  *  Info container for each device type
  *  
- *  An informattion that should be in all variants should be made so via the below impl.
+ *  An information that should be in all variants should be made so via the below impl.
  *  Don't manually dip into each variant please.
  */
-export type DeviceInfo = { variant: "Wifi"; value: WifiDeviceInfo } | { variant: "BhapticBle"; value: BhapticInfo };
+export type DeviceInfo = { variant: "Wifi"; value: WifiDeviceInfo } | { variant: "BhapticBle"; value: BhapticInfo } | { variant: "Websocket"; value: WebsocketDeviceInfo };
 
 // The firmware type returned from the device.
 export type ESP32Model = 
@@ -233,6 +233,8 @@ export type InterpolationLayer =
 "default" | 
 // Weights nodes according to their proximity to this node
 "linear" | 
+// Weights all outputs at  in its radius.
+"area" | 
 // Drives **all** nodes exactly at output without regard to distance.
 "global";
 
@@ -284,7 +286,6 @@ export type Slot = {
 	source: InputType,
 	layer: InputLayer,
 	weight: number,
-	value: number,
 };
 
 export type SlotFieldKind = "Value" | "Weight" | "Muted";
@@ -356,6 +357,12 @@ export type VrcInfo = {
 	velocity_mult: number,
 	watched: ([string, AddrInfo])[],
 	available: OscInfo[],
+};
+
+export type WebsocketDeviceInfo = {
+	id: DeviceId,
+	name: string,
+	nodes: HapticNode[],
 };
 
 export type WifiDeviceInfo = {

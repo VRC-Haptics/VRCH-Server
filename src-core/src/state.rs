@@ -122,6 +122,7 @@ pub struct Config {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerSettings {
+    pub enable_websocket_devices: bool,
     pub enable_vrc: bool,
     pub enable_ble_bhaptic: bool,
     pub enable_bhaptic_game: bool,
@@ -230,6 +231,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             server: ArcSwap::new(Arc::new(ServerSettings {
+                enable_websocket_devices: true,
                 enable_vrc: true,
                 enable_ble_bhaptic: true,
                 enable_bhaptic_game: true,

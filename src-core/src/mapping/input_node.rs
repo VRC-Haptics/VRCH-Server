@@ -22,6 +22,8 @@ impl SlotKey {
     }
 }
 
+const WINDOW: usize = 3;
+
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct Slot {
@@ -29,9 +31,114 @@ pub struct Slot {
     pub source: InputType,
     pub layer: InputLayer,
     pub weight: f32,
-    pub value: f32,
     #[serde(skip)]
-    pub history: SmallVec<[(f32, Instant); 3]>,
+    pub history: History,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, Debug, Clone, Copy, Default)]
+pub struct HistoryView {
+    pub values: [f32; WINDOW], // index 0 = newest
+    pub len: usize,
+    pub velocity: f32,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(into = "HistoryView")]
+pub struct History {
+    samples: [(f32, Instant); WINDOW], // index 0 = newest, .0 = value, .1 = time
+    len: usize,
+}
+
+impl Default for History {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<History> for HistoryView {
+    #[inline]
+    fn from(h: History) -> Self {
+        h.view()
+    }
+}
+
+impl History {
+    #[inline]
+    pub fn view(&self) -> HistoryView {
+        let mut values = [0.0f32; WINDOW];
+        for i in 0..self.len {
+            values[i] = self.samples[i].0;
+        }
+        HistoryView {
+            values,
+            len: self.len,
+            velocity: self.velocity(),
+        }
+    }
+
+    #[inline]
+    pub fn new() -> Self {
+        let now = Instant::now();
+        Self {
+            samples: [(0.0, now); WINDOW],
+            len: 0,
+        }
+    }
+
+    #[inline]
+    pub fn push_at(&mut self, value: f32, time: Instant) {
+        for i in (1..WINDOW).rev() {
+            self.samples[i] = self.samples[i - 1];
+        }
+        self.samples[0] = (value, time);
+        self.len = (self.len + 1).min(WINDOW);
+    }
+
+    #[inline]
+    pub fn velocity(&self) -> f32 {
+        if self.len < 2 {
+            return 0.0;
+        }
+        let new = self.samples[0];
+        let old = self.samples[1];
+        let dt = new.1.duration_since(old.1).as_secs_f32();
+        if dt <= 0.0 {
+            return 0.0;
+        }
+        (new.0 - old.0) / dt
+    }
+
+    #[inline]
+    pub fn speed_windowed(&self) -> f32 {
+        self.velocity_windowed().abs()
+    }
+
+    #[inline]
+    pub fn velocity_windowed(&self) -> f32 {
+        if self.len < 2 {
+            return 0.0;
+        }
+        let new = self.samples[0];
+        let old = self.samples[self.len - 1];
+        let dt = new.1.duration_since(old.1).as_secs_f32();
+        if dt <= 0.0 {
+            return 0.0;
+        }
+        (new.0 - old.0) / dt
+    }
+
+    #[inline]
+    pub fn latest(&self) -> Option<f32> {
+        (self.len > 0).then(|| self.samples[0].0)
+    }
+
+    /// Valid samples, newest-first. Each entry is (value, time).
+    #[inline]
+    pub fn history(&self) -> &[(f32, Instant)] {
+        &self.samples[..self.len]
+    }
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -66,6 +173,8 @@ pub enum InterpolationLayer {
     Default,
     /// Weights nodes according to their proximity to this node
     Linear,
+    /// Weights all outputs at  in its radius.
+    Area,
     /// Drives **all** nodes exactly at output without regard to distance.
     Global,
 }

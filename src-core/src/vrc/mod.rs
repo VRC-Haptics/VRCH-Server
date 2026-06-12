@@ -6,18 +6,19 @@ pub mod parsing;
 
 // crate dependencies
 use crate::api::ApiManager;
-use crate::mapping::input_node::{Slot, SlotKey};
+use crate::mapping::input_node::{History, Slot, SlotKey};
 use crate::mapping::{
     input_node::InputNode,
 };
 use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind};
 use crate::osc::server::OscServer;
 use crate::state::{self, VrcSettings};
-use crate::vrc::config::InputType;
+use crate::vrc::config::{Input, InputType};
 use arc_swap::{ArcSwap, Cache, Guard};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::oneshot;
 use crate::vrc::parsing::OscInfo;
 use crate::{log_err};
@@ -31,8 +32,9 @@ use osc_query::OscQueryServer;
 use parsing::remove_version;
 
 use rosc::{OscMessage, OscType};
+use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{net::Ipv4Addr, sync::Arc};
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
@@ -82,32 +84,22 @@ pub const VRC_TAG: &str = "VRC";
 
 /// Implements cheap clone, is threadsafe.
 pub struct VrcHandle {
-    tx: Sender<MsgToMainVrc>,
-    osc_buffer: Arc<std::sync::Mutex<Vec<OscMessage>>>,
+    tx: UnboundedSender<MsgToMainVrc>,
     flush_scheduled: Arc<std::sync::atomic::AtomicBool>,
     info: Arc<ArcSwap<VrcInfo>>,
 }
 
 impl VrcHandle {
     pub fn send_osc_msg_rcv(&self, msg: OscMessage) {
-        log_err!(self.tx.try_send(MsgToMainVrc::Osc(msg)));
-    }
-
-    fn flush_osc(&self) {
-        let batch = {
-            let mut guard = self.osc_buffer.lock().unwrap();
-            if guard.is_empty() { return; }
-            std::mem::take(&mut *guard)
-        };
-        let _ = self.tx.try_send(MsgToMainVrc::OscBatch(batch));
+        log_err!(self.tx.send(MsgToMainVrc::Osc(msg)));
     }
 
     pub fn blocking_send(&self, msg: MsgToMainVrc) {
-        log_err!(self.tx.try_send(msg));
+        log_err!(self.tx.send(msg));
     }
 
-    pub async fn send(&self, msg: MsgToMainVrc) {
-        log_err!(self.tx.send(msg).await);
+    pub fn send(&self, msg: MsgToMainVrc) {
+        log_err!(self.tx.send(msg));
     }
 
     pub async fn get_info(&self) -> Arc<VrcInfo> {
@@ -122,7 +114,6 @@ impl Clone for VrcHandle {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
-            osc_buffer: Arc::clone(&self.osc_buffer),
             flush_scheduled: Arc::clone(&self.flush_scheduled),
             info: Arc::clone(&self.info),
         }
@@ -137,6 +128,15 @@ pub enum AddrInfo
     Node(NodeKey, NodeFieldKind)
 }
 
+#[derive(Debug)]
+pub struct ValInstant(SmallVec<[AddrInfo; 2]>, Instant);
+
+impl Default for ValInstant {
+    fn default() -> Self {
+        Self (SmallVec::default(), Instant::now())
+    }
+}
+
 pub struct VrcGame {
     recv_port: u16,
     ui_info: Arc<ArcSwap<VrcInfo>>,
@@ -147,8 +147,8 @@ pub struct VrcGame {
     ///
     /// NOTE: The values actual values contained in this struct are out of date by up to 2 seconds.
     pub available_parameters: Arc<DashMap<OscPath, OscInfo>>,
-    pub watched: FxHashMap<String, SmallVec<[AddrInfo; 2]>>,
-    rx: Receiver<MsgToMainVrc>,
+    pub watched: FxHashMap<String, ValInstant>,
+    rx: UnboundedReceiver<MsgToMainVrc>,
     map: MapHandle,
     /// The OSC server we receive updates from
     osc_server: OscServer,
@@ -163,8 +163,6 @@ pub struct VrcGame {
 pub enum MsgToMainVrc {
     Info(oneshot::Sender<()>),
     Osc(OscMessage),
-    /// message is received from the OSC server
-    OscBatch(Vec<OscMessage>),
     /// A new avatar configuration was detected
     NewAvatar(Avatar),
     VrcDisconnected,
@@ -173,13 +171,12 @@ pub enum MsgToMainVrc {
 impl VrcGame {
     pub async fn new(map_handle: MapHandle, api: &'static Mutex<ApiManager>) -> VrcGame {
         log::trace!("Starting VRC");
-        let (tx, rx) = channel(50);
+        let (tx, rx) = unbounded_channel();
         let info = Arc::new(ArcSwap::new(Arc::new(VrcInfo::default().into())));
         let handle = VrcHandle {
             tx: tx.clone(),
             info: Arc::clone(&info),
             flush_scheduled: Arc::new(AtomicBool::new(false)),
-            osc_buffer: Arc::new(std::sync::Mutex::new(vec![])),
         };
         let param_avail = Arc::new(DashMap::new());
 
@@ -229,63 +226,82 @@ impl VrcGame {
     pub async fn run(&mut self) {
         log::trace!("Running VRC");
         let mut settings = Cache::new(&state::get_config().vrc_settings);
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
         loop {
-            let Some(msg) = self.rx.recv().await else {
-                log::warn!("Shutting down vrc game");
-                return;
-            };
-
-            match msg {
-                MsgToMainVrc::Info(tx) => {
-                    self.update_info(); // updates if dirty
-                    log_err!(tx.send(())); // marks we are done updating
+            tokio::select! {
+                _ = tick.tick() => {
+                    self.handle_dropped();
                 }
-                MsgToMainVrc::OscBatch(batch) => {
-                    let cfg = settings.load();
-                    self.process_osc_batch(&batch, cfg);
+                recv = self.rx.recv() => {
+                    let Some(msg) = recv else {
+                        log::warn!("Shutting down vrc game");
+                        return;
+                    };
 
-                    self.dirty = true;
-                }
-                MsgToMainVrc::Osc(msg) => {
-                    let cfg = settings.load();
-                    self.process_msg(&msg, cfg);
-                    self.dirty = true;
-                }
-                MsgToMainVrc::NewAvatar(avi) => {
-                    //clear current input nodes
-                    log_err!(self.map
-                        .send_event(InputEventMessage::Flush));
-
-                    let cfg = settings.load();
-                    let nodes = to_inputs(&avi, cfg);
-                    self.avatar = Some(avi);
-
-                    if !nodes.is_empty() {
-                        for (pairs, node) in nodes {
-                            let (tx, rx) = oneshot::channel();
+                    match msg {
+                        MsgToMainVrc::Info(tx) => {
+                            self.update_info(); // updates if dirty
+                            log_err!(tx.send(())); // marks we are done updating
+                        }
+                        MsgToMainVrc::Osc(msg) => {
+                            let cfg = settings.load();
+                            self.process_msg(&msg, cfg);
+                            self.dirty = true;
+                        }
+                        MsgToMainVrc::NewAvatar(avi) => {
+                            //clear current input nodes
                             log_err!(self.map
-                                .send_event(InputEventMessage::Register { node: node, reply: tx }));
-                            let Ok(resp) = rx.await else {
-                                log::error!("Error registering haptic node. Shutting down VRC Module");
-                                return;
-                            };
+                                .send_event(InputEventMessage::Flush));
 
-                            for (addr, idx) in pairs {
-                                let key = SlotKey::new(resp, idx);
-                                self.watched
-                                    .entry(addr.clone())
-                                    .or_default()
-                                    .push(AddrInfo::Slot(key, SlotFieldKind::Value));
+                            let cfg = settings.load();
+                            let nodes = to_inputs(&avi, cfg);
+                            self.avatar = Some(avi);
+
+                            if !nodes.is_empty() {
+                                for (pairs, node) in nodes {
+                                    let (tx, rx) = oneshot::channel();
+                                    log_err!(self.map
+                                        .send_event(InputEventMessage::Register { node: node, reply: tx }));
+                                    let Ok(resp) = rx.await else {
+                                        log::error!("Error registering haptic node. Shutting down VRC Module");
+                                        return;
+                                    };
+
+                                    for (addr, idx) in pairs {
+                                        let key = SlotKey::new(resp, idx);
+                                        self.watched
+                                            .entry(addr.clone())
+                                            .or_default().0
+                                            .push(AddrInfo::Slot(key, SlotFieldKind::Value));
+                                    }
+                                }
                             }
+                            self.dirty = true;
+                        }
+                        MsgToMainVrc::VrcDisconnected => {
+                            log::warn!("Vrc Disconnected");
+                            self.avatar = None;
+                            self.available_parameters.clear();
+                            self.dirty = true;
                         }
                     }
-                    self.dirty = true;
                 }
-                MsgToMainVrc::VrcDisconnected => {
-                    log::warn!("Vrc Disconnected");
-                    self.avatar = None;
-                    self.available_parameters.clear();
-                    self.dirty = true;
+            }
+        }
+    }
+
+    fn handle_dropped(&mut self) {
+        let now = Instant::now();
+        let tx = &self.map.event_sender.clone();
+        for comg in self.watched.values_mut() {
+            let val = &comg.0;
+            if now.checked_duration_since(comg.1).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(1) {
+                comg.1 = now;
+                for inf in val {
+                    let arg = OscType::Float(0.0); /// TODO: Make this actually work.
+                    Self::push_info(tx, inf, arg);
                 }
             }
         }
@@ -307,7 +323,7 @@ impl VrcGame {
             velocity_mult: 0.0, // these will be filled out by touching the state in the handle function
             velocity_ratio: 0.0,
             watched: self.watched.iter()
-                .flat_map(|(s, infos)| infos.iter().map(move |i| (s.clone(), i.clone())))
+                .flat_map(|(s, infos)| infos.0.iter().map(move |i| (s.clone(), i.clone())))
                 .collect(),
         };
 
@@ -315,74 +331,39 @@ impl VrcGame {
         self.dirty = false;
     }
 
-    fn process_osc_batch(&self, batch: &[OscMessage], cfg: &VrcSettings) {
-        let Some(avatar) = self.avatar.as_ref() else {
-            return;
-        };
-
-        if avatar.configs.is_empty() {
-            return;
-        };
-
-        for msg in batch {
-            let addr = remove_version(&msg.addr);
-            let Some(arg) = msg.args.first() else { return };
-
-            let Some(infos) = self.watched.get(&addr) else {
-                continue; // not one we watch for.
-            };
-
-            for info in infos {
-                match info {
-                    AddrInfo::Slot(s, kind) => {
-                        let msg = match kind {
-                            SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(try_f32(arg.clone())) },
-                            SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(try_f32(arg.clone())) },
-                            SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(try_bool(arg.clone())) },
-                        };
-                        log_err!(self.map.send_event(msg));
-                    },
-                    AddrInfo::Node(n, kind) => {
-                        let msg = match kind {
-                            NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(try_vec(arg.clone())) },
-                            NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(try_f32(arg.clone())) },
-                            NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(try_bool(arg.clone())) },
-                        };
-                        log_err!(self.map.send_event(msg));
-                    }
-                }
-            }
-        }
-    }
-
     fn process_msg(&self, msg: &OscMessage, cfg: &VrcSettings) {
         let addr = remove_version(&msg.addr);
         let Some(arg) = msg.args.first() else { return };
+
         let Some(infos) = self.watched.get(&addr) else {
             return; // not one we watch for.
         };
 
-        for info in infos {
-            match info {
-                AddrInfo::Slot(s, kind) => {
-                    let msg = match kind {
-                        SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(try_f32(arg.clone())) },
-                        SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(try_f32(arg.clone())) },
-                        SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(try_bool(arg.clone())) },
-                    };
-                    log_err!(self.map.send_event(msg));
-                },
-                AddrInfo::Node(n, kind) => {
-                    let msg = match kind {
-                        NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(try_vec(arg.clone())) },
-                        NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(try_f32(arg.clone())) },
-                        NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(try_bool(arg.clone())) },
-                    };
-                    log_err!(self.map.send_event(msg));
-                }
-            }
+        for info in &infos.0 {
+            Self::push_info(&self.map.event_sender, info, arg.clone());
         }
         
+    }
+
+    fn push_info(tx: &UnboundedSender<InputEventMessage>, info: &AddrInfo, arg: OscType) {
+        match info {
+            AddrInfo::Slot(s, kind) => {
+                let msg = match kind {
+                    SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(try_f32(arg.clone())) },
+                    SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(try_f32(arg.clone())) },
+                    SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(try_bool(arg.clone())) },
+                };
+                log_err!(tx.send(msg));
+            },
+            AddrInfo::Node(n, kind) => {
+                let msg = match kind {
+                    NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(try_vec(arg.clone())) },
+                    NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(try_f32(arg.clone())) },
+                    NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(try_bool(arg.clone())) },
+                };
+                log_err!(tx.send(msg));
+            }
+        }
     }
 }
 
@@ -468,8 +449,7 @@ fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)
                         source: i.source.clone(),
                         layer: i.layer.clone(),
                         weight: weight,
-                        value: 0.0,
-                        history: SmallVec::new(),
+                        history: History::default(),
                     }
                 );
             }).collect();
