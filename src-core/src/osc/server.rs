@@ -2,6 +2,7 @@ use std::fmt;
 use std::net::Ipv4Addr;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 
 use rosc::{OscMessage, OscPacket};
@@ -17,7 +18,7 @@ pub struct OscServer {
     #[serde(skip)]
     close_handle: Option<mpsc::Sender<()>>,
     #[serde(skip)]
-    on_receive: Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
+    on_receive: Arc<dyn Fn(OscMessage) + Send + Sync>,
 }
 
 impl fmt::Debug for OscServer {
@@ -43,7 +44,7 @@ impl OscServer {
             address,
             close_handle: None,
             filter_prefix: "".to_string(),
-            on_receive: Arc::new(Mutex::new(on_receive)),
+            on_receive: Arc::new(on_receive),
         }
     }
 
@@ -125,7 +126,7 @@ impl OscServer {
 /// recursively handle packets
 fn handle_packet(
     packet: OscPacket,
-    callback: &Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
+    callback: &Arc<dyn Fn(OscMessage) + Send + Sync>,
     filter_prefix: &str,
 ) {
     match packet {
@@ -143,14 +144,13 @@ fn handle_packet(
 /// handle the messages with a callback.
 fn handle_message(
     message: OscMessage,
-    callback: &Arc<Mutex<dyn Fn(OscMessage) + Send + Sync>>,
+    callback: &Arc<dyn Fn(OscMessage) + Send + Sync>,
     filter_prefix: &str,
 ) {
     let address = &message.addr;
 
     if filter_prefix == "".to_string() || address.starts_with(filter_prefix) {
-        let cb = callback.lock().unwrap();
-        cb(message);
+        callback(message);
     }
     return;
 }

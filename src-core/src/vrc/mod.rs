@@ -11,6 +11,7 @@ use crate::mapping::{
     input_node::InputNode,
 };
 use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind};
+use crate::osc::parse::RefMessage;
 use crate::osc::server::OscServer;
 use crate::state::{self, VrcSettings};
 use crate::vrc::config::{Input, InputType};
@@ -300,7 +301,7 @@ impl VrcGame {
             if now.checked_duration_since(comg.1).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(1) {
                 comg.1 = now;
                 for inf in val {
-                    let arg = OscType::Float(0.0); /// TODO: Make this actually work.
+                    let arg = OscType::Float(0.0);
                     Self::push_info(tx, inf, arg);
                 }
             }
@@ -331,29 +332,32 @@ impl VrcGame {
         self.dirty = false;
     }
 
-    fn process_msg(&self, msg: &OscMessage, cfg: &VrcSettings) {
+    fn process_msg(&mut self, msg: &OscMessage, cfg: &VrcSettings) {
         let addr = remove_version(&msg.addr);
         let Some(arg) = msg.args.first() else { return };
 
-        let Some(infos) = self.watched.get(&addr) else {
+        let Some(infos) = self.watched.get_mut(&addr) else {
             return; // not one we watch for.
         };
 
+        infos.1 = Instant::now();
+
         for info in &infos.0 {
-            Self::push_info(&self.map.event_sender, info, arg.clone());
+            Self::push_info(&self.map.event_sender, info, arg.blob().unwrap().as_array().unwrap());
         }
         
     }
 
-    fn push_info(tx: &UnboundedSender<InputEventMessage>, info: &AddrInfo, arg: OscType) {
+    fn push_info<'a>(tx: &UnboundedSender<InputEventMessage>, info: &AddrInfo, msg: RefMessage<'a>) -> anyhow::Result<()>{
         match info {
             AddrInfo::Slot(s, kind) => {
                 let msg = match kind {
-                    SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(try_f32(arg.clone())) },
-                    SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(try_f32(arg.clone())) },
+                    SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(f32::from_be_bytes(arg.try_into().unwrap())) },
+                    SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(f32::from_be_bytes(arg.try_into().unwrap())) },
                     SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(try_bool(arg.clone())) },
                 };
                 log_err!(tx.send(msg));
+                Ok(())
             },
             AddrInfo::Node(n, kind) => {
                 let msg = match kind {
@@ -362,6 +366,7 @@ impl VrcGame {
                     NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(try_bool(arg.clone())) },
                 };
                 log_err!(tx.send(msg));
+                Ok(())
             }
         }
     }

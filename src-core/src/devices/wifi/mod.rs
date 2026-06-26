@@ -179,7 +179,7 @@ impl WifiDevice {
         })
     }
 
-    /// Please be mindful this call causes lockign with internal state,
+    /// Please be mindful this call causes locking with internal state,
     /// 
     fn get_info(&self) -> WifiDeviceInfo {
         let state = self.live_state.lock();

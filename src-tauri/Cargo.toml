@@ -44,7 +44,7 @@ tauri-plugin-serialplugin = "2.21.1"
 
 # project stuff
 haptic-core = { path = "../src-core", features = ["tauri-get", "specta"] }
-tokio = {version = "1.42.1", features = ["rt-multi-thread", "full"] }
+tokio = {version = "1.42.1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net", "fs"] }
 dunce = "1.0.5"
 log = "0.4.27"
 runas = "1.2.0"

@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-
 use haptic_core::{file::AppRoot, start_server_blocking, state};
 
 fn main() {
