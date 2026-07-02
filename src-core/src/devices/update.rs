@@ -11,6 +11,7 @@ pub fn is_updateable(dtype: &HapticDevice) -> bool {
         HapticDevice::Wifi(_) => true,
         HapticDevice::BhapticBle(_) => false,
         HapticDevice::Websocket(_) => false,
+        HapticDevice::Internal(_) => false,
     }
 }
 

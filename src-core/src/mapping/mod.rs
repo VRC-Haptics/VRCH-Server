@@ -14,7 +14,7 @@ use nohash_hasher::IntMap;
 use parking_lot::RwLock;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use slotmap::SlotMap;
-use strum::EnumDiscriminants;
+use strum::{Display, EnumDiscriminants};
 use uuid::Uuid;
 use std::{collections::HashMap, default, sync::Arc, time::Duration};
 use tokio::{
@@ -118,8 +118,8 @@ impl MappingDevice {
     }
 }
 
-pub async fn start_interp_map(manager: &DeviceHandle) -> MapHandle {
-    let (mut input_map, map_handle) = InputMap::new(manager.clone()).await;
+pub async fn start_interp_map(manager: DeviceHandle) -> MapHandle {
+    let (mut input_map, map_handle) = InputMap::new(manager).await;
     tokio::spawn(async move {
         input_map.start().await;
     });
@@ -133,6 +133,7 @@ pub async fn start_interp_map(manager: &DeviceHandle) -> MapHandle {
 ///
 struct InputMap {
     generation: u64,
+    /// Increments by one each event tick. roughly 10ms per instant tick
     now: EventInstant,
     input_nodes: Nodes,
     device_manager: DeviceHandle,
@@ -177,10 +178,10 @@ struct NodeKeyDef {
 pub struct Nodes {
     /// List of event's active nodes.
     #[cfg_attr(feature = "specta", specta(type = std::collections::HashMap<EventId, Vec<NodeKey>>))]
-    transient: IntMap<EventId, Vec<NodeKey>>,
+    pub transient: IntMap<EventId, Vec<NodeKey>>,
     #[cfg_attr(feature = "specta", specta(type = Vec<Option<InputNode>>))]
-    nodes: SlotMap<NodeKey, InputNode>,
-    active_streaming: Vec<NodeKey>
+    pub nodes: SlotMap<NodeKey, InputNode>,
+    pub active_streaming: Vec<NodeKey>
 }
 
 impl Nodes {
@@ -198,38 +199,28 @@ impl Nodes {
             let mut mult = 1.0_f32;
             let mut max = 0.0_f32;
             let mut min = 1.0_f32;
+            let mut overridden = None;
             for slot in node.slots.iter_mut() {
                 let val = slot.history.latest().unwrap_or(0.0);
                 let weighted = val * slot.weight;
 
                 match slot.layer {
-                    InputLayer::Additive => {
-                        add += weighted;
-                    }
-                    InputLayer::Subtractive => {
-                        add -= weighted;
-                    }
-                    InputLayer::Multiplicative => {
-                        mult += weighted;
-                    }
-                    InputLayer::Max => {
-                        if max < weighted {
-                            max = weighted;
-                        }
-                    }
-                    InputLayer::Gate => {
-                        if min > weighted {
-                            min = weighted;
-                        }
-                    }
+                    InputLayer::Additive => add += weighted,
+                    InputLayer::Subtractive => add -= weighted,
+                    InputLayer::Multiplicative => mult *= weighted,
+                    InputLayer::Max => max = max.max(weighted),
+                    InputLayer::Gate => min = min.min(weighted),
                     InputLayer::Override => {
-                        node.value = weighted;
-                        break; // no need to go further
+                        overridden = Some(weighted);
+                        break; // override wins; stop accumulating
                     }
                 }
             }
 
-            node.value = (add * mult).max(max).min(min).clamp(0.0, 1.0);
+            node.value = match overridden {
+                Some(v) => v.clamp(0.0, 1.0),
+                None => (add * mult).max(max).min(min).clamp(0.0, 1.0),
+            };
         }
     }
 }
@@ -237,10 +228,10 @@ impl Nodes {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
 pub struct Snapshot {
-    instant: EventInstant,
-    active_events: Vec<(EventInstant, EventKey, EventId)>,
-    events: Vec<Event>,
-    input_nodes: Nodes,
+    pub instant: EventInstant,
+    pub active_events: Vec<(EventInstant, EventKey, EventId)>,
+    pub events: Vec<Event>,
+    pub input_nodes: Nodes,
 }
 
 #[derive(Default)]
@@ -282,7 +273,6 @@ impl InputMap {
     pub async fn new(manager: DeviceHandle) -> (Self, MapHandle) {
         let (tx, rx) = mpsc::unbounded_channel();
         let input_nodes = Nodes::default();
-        let dirty_flag = Arc::new(Notify::new());
         let snapshot = Arc::new(ArcSwap::new(Arc::new(Snapshot::default())));
 
         let map = Self {
@@ -479,6 +469,7 @@ impl InputMap {
                         map.input_nodes.active_streaming.push(key.clone());
                         map.dirty_since_snap = true;
                         log_err!(reply.send(key));
+                        map.map_dirty = true;
                     }
                     InputEventMessage::UpdateNode {
                         key,
@@ -495,6 +486,7 @@ impl InputMap {
                         node.location = location;
                         node.radius = radius;
                         map.dirty_since_snap = true;
+                        map.map_dirty = true;
                     }
                     InputEventMessage::UpdateSlot { key, value, weight, muted, } => {
                         let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
@@ -667,6 +659,17 @@ fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &mut Vec<Mapping
                 let out_len = device.outputs.read().len();
                 if device.nodes.len() != out_len {
                     log::error!("Output buffer not same length on device: {:?}", i.id);
+                }
+            },
+            DeviceInfo::Internal(i) => {
+                let Some(device) = devices.iter_mut().find(|d| d.id == id) else {
+                    // if device not found on our list, just continue.
+                    return;
+                };
+                device.nodes = i.nodes;
+                let out_len = device.outputs.read().len();
+                if device.nodes.len() != out_len {
+                    log::error!("Output buffer not same length on internal device");
                 }
             }
         }

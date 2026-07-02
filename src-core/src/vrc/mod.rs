@@ -11,14 +11,15 @@ use crate::mapping::{
     input_node::InputNode,
 };
 use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind};
-use crate::osc::parse::RefMessage;
-use crate::osc::server::OscServer;
+use crate::osc::parse::{MsgType, RefMessage, first_message};
 use crate::state::{self, VrcSettings};
+use crate::util::next_free_port_with_address;
 use crate::vrc::config::{Input, InputType};
 use arc_swap::{ArcSwap, Cache, Guard};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
+use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::oneshot;
 use crate::vrc::parsing::OscInfo;
@@ -34,6 +35,7 @@ use parsing::remove_version;
 
 use rosc::{OscMessage, OscType};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 use std::{net::Ipv4Addr, sync::Arc};
@@ -91,10 +93,6 @@ pub struct VrcHandle {
 }
 
 impl VrcHandle {
-    pub fn send_osc_msg_rcv(&self, msg: OscMessage) {
-        log_err!(self.tx.send(MsgToMainVrc::Osc(msg)));
-    }
-
     pub fn blocking_send(&self, msg: MsgToMainVrc) {
         log_err!(self.tx.send(msg));
     }
@@ -151,8 +149,6 @@ pub struct VrcGame {
     pub watched: FxHashMap<String, ValInstant>,
     rx: UnboundedReceiver<MsgToMainVrc>,
     map: MapHandle,
-    /// The OSC server we receive updates from
-    osc_server: OscServer,
     /// Spawns our own OSCQuery advertising
     query_server: Option<OscQueryServer>,
     dirty: bool,
@@ -163,7 +159,6 @@ pub struct VrcGame {
 #[derive(Debug)]
 pub enum MsgToMainVrc {
     Info(oneshot::Sender<()>),
-    Osc(OscMessage),
     /// A new avatar configuration was detected
     NewAvatar(Avatar),
     VrcDisconnected,
@@ -181,21 +176,11 @@ impl VrcGame {
         };
         let param_avail = Arc::new(DashMap::new());
 
-        //create the low-latency server.
-        let handle_rcv = handle.clone();
-        let on_receive = move |msg: OscMessage| {
-            handle_rcv.send_osc_msg_rcv(msg);
-        };
-        let receiving_port = 9001;
-        let mut vrc_server = OscServer::new(receiving_port, Ipv4Addr::UNSPECIFIED, on_receive);
-        let port_used = vrc_server.start().await;
-
         // Instantiate
         let vrc = VrcGame {
-            recv_port: port_used,
+            recv_port: 9001,
             ui_info: info,
             handle: handle.clone(),
-            osc_server: vrc_server,
             query_server: None,
             avatar: None,
             rx: rx,
@@ -208,13 +193,6 @@ impl VrcGame {
         // Start the thread that handles finding available vrc parameters
         // (High latency server)
         start_filling_available_parameters(vrc.get_handle(), api, param_avail).await;
-
-        // if the server wasn't able to capture the port start advertising the port it was bound to.
-        if port_used != receiving_port {
-            let mut osc_server = OscQueryServer::new(receiving_port);
-            osc_server.start().await;
-            log::warn!("Not using VRC dedicated ports, expect slower operations.");
-        }
 
         return vrc;
     }
@@ -230,10 +208,62 @@ impl VrcGame {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
+        let addr = format!("{}:{}", Ipv4Addr::UNSPECIFIED, self.recv_port);
+        let mut used_port = self.recv_port;
+        let recv_sock = match UdpSocket::bind(&addr).await {
+            Ok(s) => s,
+            Err(_) => {
+                // The desired port is not available. Look for a fallback.
+                if let Some(free_port) =
+                    next_free_port_with_address(used_port, std::net::IpAddr::V4(Ipv4Addr::from_str(&addr).unwrap()))
+                {
+                    used_port = free_port;
+                    let addr = format!("{}:{}", used_port, free_port);
+                    UdpSocket::bind(&addr).await.unwrap() //assume we will be able to bind to this one
+                } else {
+                    log::error!("Unable to connect to bhaptics port");
+                    return;
+                }
+            }
+        };
+
+        // if the server wasn't able to capture the port start advertising the port it was bound to.
+        if used_port != self.recv_port {
+            self.query_server = Some(OscQueryServer::new(used_port));
+            self.query_server.as_mut().unwrap().start().await;
+            self.recv_port = used_port;
+            log::warn!("Not using VRC dedicated ports, expect slower operations.");
+        }
+
+
+        let mut buf = [0u8; rosc::decoder::MTU];
         loop {
             tokio::select! {
                 _ = tick.tick() => {
                     self.handle_dropped();
+                },
+                res = recv_sock.recv_from(&mut buf) => {
+                    match res {
+                        Ok((size, _)) => {
+                            match first_message(&buf[..size]) {
+                                Err(e) => log::error!("Error: {e}"),
+                                Ok(msg) => {
+                                    let addr = remove_version(&msg.addr);
+
+                                    let Some(infos) = self.watched.get_mut(&addr) else {
+                                        continue; // not one we watch for.
+                                    };
+
+                                    infos.1 = Instant::now();
+
+                                    for info in &infos.0 {
+                                        log_err!(Self::push_info(&self.map.event_sender, info, &msg));
+                                    }
+                                }
+                            }
+                        },
+                        Err(e) => log::error!("{}", e),
+                    }
                 }
                 recv = self.rx.recv() => {
                     let Some(msg) = recv else {
@@ -245,12 +275,7 @@ impl VrcGame {
                         MsgToMainVrc::Info(tx) => {
                             self.update_info(); // updates if dirty
                             log_err!(tx.send(())); // marks we are done updating
-                        }
-                        MsgToMainVrc::Osc(msg) => {
-                            let cfg = settings.load();
-                            self.process_msg(&msg, cfg);
-                            self.dirty = true;
-                        }
+                        },
                         MsgToMainVrc::NewAvatar(avi) => {
                             //clear current input nodes
                             log_err!(self.map
@@ -301,8 +326,8 @@ impl VrcGame {
             if now.checked_duration_since(comg.1).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(1) {
                 comg.1 = now;
                 for inf in val {
-                    let arg = OscType::Float(0.0);
-                    Self::push_info(tx, inf, arg);
+                    let arg = &RefMessage { addr: "", t: MsgType::F32, contents: &0.0f32.to_be_bytes().clone() };
+                    log_err!(Self::push_info(tx, inf, arg));
                 }
             }
         }
@@ -332,38 +357,22 @@ impl VrcGame {
         self.dirty = false;
     }
 
-    fn process_msg(&mut self, msg: &OscMessage, cfg: &VrcSettings) {
-        let addr = remove_version(&msg.addr);
-        let Some(arg) = msg.args.first() else { return };
-
-        let Some(infos) = self.watched.get_mut(&addr) else {
-            return; // not one we watch for.
-        };
-
-        infos.1 = Instant::now();
-
-        for info in &infos.0 {
-            Self::push_info(&self.map.event_sender, info, arg.blob().unwrap().as_array().unwrap());
-        }
-        
-    }
-
-    fn push_info<'a>(tx: &UnboundedSender<InputEventMessage>, info: &AddrInfo, msg: RefMessage<'a>) -> anyhow::Result<()>{
+    fn push_info<'a>(tx: &UnboundedSender<InputEventMessage>, info: &AddrInfo, msg: &RefMessage<'a>) -> anyhow::Result<()>{
         match info {
             AddrInfo::Slot(s, kind) => {
                 let msg = match kind {
-                    SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(f32::from_be_bytes(arg.try_into().unwrap())) },
-                    SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(f32::from_be_bytes(arg.try_into().unwrap())) },
-                    SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(try_bool(arg.clone())) },
+                    SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(msg.into_f32()?) },
+                    SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(msg.into_f32()?) },
+                    SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(msg.into_bool().unwrap_or(false)) },
                 };
                 log_err!(tx.send(msg));
                 Ok(())
             },
             AddrInfo::Node(n, kind) => {
                 let msg = match kind {
-                    NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(try_vec(arg.clone())) },
-                    NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(try_f32(arg.clone())) },
-                    NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(try_bool(arg.clone())) },
+                    NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(msg.into_vec3()?) },
+                    NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(msg.into_f32()?) },
+                    NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(msg.into_bool().unwrap_or(false)) },
                 };
                 log_err!(tx.send(msg));
                 Ok(())

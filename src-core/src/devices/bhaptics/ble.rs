@@ -2,6 +2,7 @@ use btleplug::api::{BDAddr, Characteristic, PeripheralProperties};
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use parking_lot::Mutex;
+use strum::Display;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
@@ -283,7 +284,7 @@ impl DeviceChar {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Display)]
 pub enum BleError {
     /// BLE is not available on this machine
     BleNotAvailable,

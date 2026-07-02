@@ -3,6 +3,6 @@ members = [
     "src-tauri",
     "src-elevated-register",
     "src-proxy",
-    "src-core",
+    "src-core", "lua-config",
 ]
 resolver = "2"

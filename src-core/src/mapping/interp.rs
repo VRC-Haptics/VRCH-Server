@@ -32,6 +32,7 @@ impl InterpState {
             let val = self.single_node(node, in_nodes);
             // calculate device level settings (required)
             output[i] = if val > 0.0 {
+                log::trace!("offset: {}, intensity: {}", settings.offset, settings.intensity);
                 settings.offset + (settings.intensity - settings.offset) * val
             } else {
                 0.0
@@ -84,8 +85,9 @@ impl InterpState {
                     InterpolationLayer::Linear => {
                         if !distance.is_nan() && distance < in_node.radius {
                             // weight by distance pctg.
-                            let weight = in_node.radius / distance;
-                            norm_num += weight * in_node.value;
+                            let factor =  1. - distance / in_node.radius;
+                            let weight = 1.0;
+                            norm_num += weight * (in_node.value * factor);
                             norm_den += weight;
                         }
                     }

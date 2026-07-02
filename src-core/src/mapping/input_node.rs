@@ -25,7 +25,7 @@ impl SlotKey {
 const WINDOW: usize = 3;
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 pub struct Slot {
     pub muted: bool,
     pub source: InputType,
@@ -43,11 +43,11 @@ pub struct HistoryView {
     pub velocity: f32,
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, PartialEq)]
 #[serde(into = "HistoryView")]
 pub struct History {
-    samples: [(f32, Instant); WINDOW], // index 0 = newest, .0 = value, .1 = time
-    len: usize,
+    pub samples: [(f32, Instant); WINDOW], // index 0 = newest, .0 = value, .1 = time
+    pub len: usize,
 }
 
 impl Default for History {
@@ -142,7 +142,7 @@ impl History {
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 /// Represents information at a point in space that will go into computing outputs.
 /// 
 /// To have a Greedy layer drive multiple devices it must have the ALL group tag present. 
@@ -161,7 +161,7 @@ pub struct InputNode {
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[repr(u8)]
 /// Describes how this node should affect the layers. 

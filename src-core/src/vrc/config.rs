@@ -44,7 +44,7 @@ pub struct Input {
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// Whether this input source should be interpreted as weight or velocity.
 /// Should be moved to mapping if it ends up in there.
@@ -54,7 +54,7 @@ pub enum InputType {
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 /// How this input interacts within it's own sources.
 /// 

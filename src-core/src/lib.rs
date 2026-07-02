@@ -14,6 +14,10 @@ pub mod state;
 pub mod util;
 pub mod vrc;
 pub(crate) mod wrappers;
+mod migrate;
+
+#[cfg(test)]
+mod tests;
 
 // rexports
 pub use glam;
@@ -37,6 +41,17 @@ use crate::mapping::start_interp_map;
 use crate::state::get_config;
 use crate::{mapping::MapHandle, vrc::VrcHandle};
 
+#[doc(hidden)]
+pub mod __log_err {
+    use std::fmt::{Debug, Display};
+    pub struct Wrap<T>(pub T);
+    pub trait ViaDisplay { fn fmt_err(&self) -> String; }
+    pub trait ViaDebug   { fn fmt_err(&self) -> String; }
+    // Display wins (fewer autorefs); Debug is the fallback.
+    impl<T: Display> ViaDisplay for Wrap<&T>  { fn fmt_err(&self) -> String { format!("{:#}", self.0) } }
+    impl<T: Debug>   ViaDebug   for &Wrap<&T> { fn fmt_err(&self) -> String { format!("{:?}", self.0) } }
+}
+
 #[macro_export]
 /// Handles an unhandled result by printing if it failed. Optionally add context after the input to use this message instead of the default.
 ///
@@ -46,22 +61,29 @@ use crate::{mapping::MapHandle, vrc::VrcHandle};
 ///     Err("Unique Error");
 /// }
 ///
-/// log_err(returns_result());
+/// log_err!(returns_result());
 /// -> "Lazily handled error: Unique Error"
 ///
-/// log_err(returns_result(), "Error peforming action");
+/// log_err!(returns_result(), "Error peforming action");
 /// -> "Error performing action: Unique Error"
 ///
 /// ```
+#[macro_export]
 macro_rules! log_err {
     ($expr:expr) => {
         if let Err(e) = $expr {
-            log::warn!("[{}:{}] Lazily handled error: {e:?}", file!(), line!());
+            #[allow(unused_imports)]
+            use $crate::__log_err::{ViaDisplay as _, ViaDebug as _};
+            log::warn!("[{}:{}] Lazily handled error: {}", file!(), line!(),
+                       (&$crate::__log_err::Wrap(&e)).fmt_err());
         }
     };
     ($expr:expr, $($arg:tt)+) => {
         if let Err(e) = $expr {
-            log::warn!("[{}:{}] {}: {e:?}", file!(), line!(), format_args!($($arg)+));
+            #[allow(unused_imports)]
+            use $crate::__log_err::{ViaDisplay as _, ViaDebug as _};
+            log::warn!("[{}:{}] {}: {}", file!(), line!(), format_args!($($arg)+),
+                       (&$crate::__log_err::Wrap(&e)).fmt_err());
         }
     };
 }
@@ -74,7 +96,7 @@ async fn start_async_tasks(manager: DeviceHandle) -> (Option<VrcHandle>, MapHand
     let conf = get_config().server.load();
 
     // initialize input map.
-    let map_handle = start_interp_map(&manager).await;
+    let map_handle = start_interp_map(manager.clone()).await;
 
     // TODO: Move into device manager init.
     if conf.enable_ble_bhaptic {

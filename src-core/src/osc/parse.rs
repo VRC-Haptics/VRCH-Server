@@ -1,54 +1,41 @@
-[use std::ptr::null;
-
 use anyhow::{Result, anyhow};
+use glam::Vec3;
 use memchr::memchr;
 
-pub const BUNDLE_TAG: &'static str = "#bundle";
+pub const BUNDLE_TAG: &[u8] = b"#bundle";
 /// "/" + null + ",F" {no bytes allocated}
 pub const MIN_PACKET_BYTES: i32 = 1 + 1 + 2;
 /// "#bundle\0" + timetag + 1 -> 4 bytes (i32)
 /// 8 + 8 + 1 = 17
 pub const BUNDLE_FIRST_SIZE: std::ops::Range<usize> = 17..(17 + 5);
-pub const EMPTY: &'static [u8] = &[0; 1];
+pub const EMPTY: &'static [u8] = &[];
+
+
+/// Pad a null-terminated string.
+/// Rust -> C style OscStrings
+#[inline]
+const fn padded_len(content_len: usize) -> usize {
+    content_len + (4 - content_len % 4)
+}
 
 /// Returns the first singular message of a buffer containing an OSC packet.
-pub fn first_message(bytes: &[u8], size: u16) -> Result<RefMessage<'_>> {
-    // Size must index into bytes.
-    debug_assert!(bytes.len() <= size as usize);
-
-    // check for bundle tag
-    if let Some(first) = bytes.get(0..BUNDLE_TAG.len()) {
-        if first == BUNDLE_TAG.as_bytes() {
-            let content_size = bytes.get(BUNDLE_FIRST_SIZE).unwrap_or(&[0]);
-            let (int_bytes, rest) = content_size.split_at(size_of::<u32>());
-            debug_assert!(rest.len() != 0);
-
-            // must point to one after the timestamp.
-            let contents = (21)..bytes.len()-1;
-            let bundle = bytes.get(contents).ok_or(anyhow!("Contents indexed wrong"))?;
-            let size = i32::from_be_bytes(int_bytes.try_into()?);
-            first_message(bundle, size as u16);
-        }
+pub fn first_message(bytes: &[u8]) -> Result<RefMessage<'_>> {
+    if bytes.get(0..BUNDLE_TAG.len()) == Some(BUNDLE_TAG) {
+        let size = bytes.get(16..20).ok_or_else(|| anyhow!("truncated bundle header"))?;
+        let size = u32::from_be_bytes(size.try_into()?) as usize;
+        let element = bytes.get(20..20 + size).ok_or_else(|| anyhow!("bundle element out of range"))?;
+        return first_message(element);
     }
 
-    let mut addr  = "";
-    let mut tag_idx = 0;
-    for (idx, bytes) in bytes.chunks_exact(4).enumerate() {
-        // on null byte
-        if *bytes.last().unwrap() == 0 {
-            addr = str::from_utf8(bytes.get(0..idx).unwrap())?;
-            // skip this null and 
-            tag_idx = (idx + 1) * 4;
-            break;
-        }
-    }
+    // finds address locations
+    let addr_null = memchr(b'\0', bytes).ok_or_else(|| anyhow!("address not terminated"))?;
+    let addr = str::from_utf8(&bytes[..addr_null])?;
+    let tag_start = padded_len(addr_null);
 
-    let (osc_type, null_byte) = get_type(bytes, tag_idx)?;
-
-    let len = osc_type.size();
+    let (osc_type, args_start) = get_type(bytes, tag_start)?;
+    let len = osc_type.size() as usize;
     let contents = if len > 0 {
-        let start = null_byte + 1;
-        bytes.get(start..(start + len  as usize)).ok_or(anyhow!("Unable to get sized output"))?
+        bytes.get(args_start..(args_start + len  as usize)).ok_or_else(|| anyhow!("arguments out of range"))?
     } else {
         &EMPTY
     };
@@ -57,47 +44,64 @@ pub fn first_message(bytes: &[u8], size: u16) -> Result<RefMessage<'_>> {
 }
 
 /// returns type and the null byte index of the tag string
-pub fn get_type(bytes: &[u8], start: usize) -> Result<(MsgType, usize)> {
-    let char = *bytes.get(start).unwrap() as char;
-    match char {
-        'f' => Ok((MsgType::F32, start+1)),
-        'i' => Ok((MsgType::I32, start+1)),
-        's' => Ok((MsgType::String, start+1)),
-        'T' => Ok((MsgType::BoolTrue, start+1)),
-        'F' => Ok((MsgType::BoolFalse, start+1)),
-        'N' => Ok((MsgType::Nill, start+1)),
-        'I' => Ok((MsgType::Infinitum, start+1)),
-        '[' => array_type(bytes, start+1),
-        _ => Err(anyhow!("Unsupported Osc Message type: `{char}`"))
+pub fn get_type(bytes: &[u8], tag_start: usize) -> Result<(MsgType, usize)> {
+    if bytes.get(tag_start) != Some(&b',') {
+        return Err(anyhow!("type-tag string must begin with ','"));
     }
+    let tail = bytes.get(tag_start..).ok_or_else(|| anyhow!("tag start out of range"))?;
+    let rel_null = memchr(b'\0', tail).ok_or_else(|| anyhow!("type tag not terminated"))?;
+    let tag_null = tag_start + rel_null;
+    let args_start = tag_start + padded_len(tag_null - tag_start);
+ 
+
+    let tags = &bytes[tag_start + 1..tag_null];
+    let t = match tags.first() {
+        None => return Err(anyhow!("empty type tag")),
+        Some(b'[') => array_type(tags)?,
+        Some(&c) if tags.len() == 1 => scalar(c)?,
+        Some(_) => return Err(anyhow!("unsupported multi-argument tag: {tags:?}")),
+    };
+    Ok((t, args_start))
 }
 
-pub fn array_type(bytes: &[u8], start: usize) -> Result<(MsgType, usize)> {
-    debug_assert!(bytes.len() > start);
-    // unwrap should be protected by assert?
-    let iter =  bytes.get(start..bytes.len()).ok_or(anyhow!("Unable to get idx"))?.iter();
-    let mut current = MsgType::Nill;
-    let mut idx = 0;
-    for (rel_idx, b) in iter.enumerate() {
-        let char = *b as char;
-        current = match (current, char) {
-            (MsgType::Nill, 'f') => MsgType::F32,
-            (MsgType::F32, 'f') => MsgType::ArrayF32X2,
-            (MsgType::ArrayF32X2, 'f') => MsgType::ArrayF32X3,
-            (MsgType::ArrayF32X3, 'f') => MsgType::ArrayF32X4,
-            (MsgType::ArrayF32X4, 'f') => MsgType::ArrayF32X5,
-            (MsgType::ArrayF32X5, 'f') => MsgType::ArrayF32X6,
-            (MsgType::Nill, ']') => return Err(anyhow!("Expected a type, found closing")),
-            (current, ']') => return Ok((current, memchr(b'\0', bytes.get((start + rel_idx)..bytes.len()).ok_or(anyhow!("Unable to get idx"))?).ok_or(anyhow!("Unable to get idx"))?)),
-            (current, char) => return Err(anyhow!("Unhandled pairing of array types: {current:?}: {char}")),
+fn scalar(c: u8) -> Result<MsgType> {
+    Ok(match c {
+        b'f' => MsgType::F32,
+        b'i' => MsgType::I32,
+        b's' => MsgType::String,
+        b'T' => MsgType::BoolTrue,
+        b'F' => MsgType::BoolFalse,
+        b'N' => MsgType::Nill,
+        b'I' => MsgType::Infinitum,
+        other => return Err(anyhow!("unsupported OSC type: '{}'", other as char)),
+    })
+}
+
+/// comma stripped tag slices
+fn array_type(tags: &[u8]) -> Result<MsgType> {
+    debug_assert_eq!(tags.first(), Some(&b'['));
+    let mut count = 0usize;
+    for &b in &tags[1..] {
+        match b {
+            b'f' => count += 1,
+            b']' => return count_to_type(count),
+            other => return Err(anyhow!("unsupported array element '{}'", other as char)),
         }
     }
-    
-    if idx == 0 {
-        return Err(anyhow!("No type tags"));
-    }
+    Err(anyhow!("array not closed"))
+}
 
-    return Ok((current, idx));
+fn count_to_type(count: usize) -> Result<MsgType> {
+    Ok(match count {
+        1 => MsgType::F32,
+        2 => MsgType::ArrayF32X2,
+        3 => MsgType::ArrayF32X3,
+        4 => MsgType::ArrayF32X4,
+        5 => MsgType::ArrayF32X5,
+        6 => MsgType::ArrayF32X6,
+        0 => return Err(anyhow!("empty array")),
+        n => return Err(anyhow!("unsupported array length {n}")),
+    })
 }
 
 pub struct RefMessage<'a> {
@@ -105,6 +109,20 @@ pub struct RefMessage<'a> {
     pub addr: &'a str,
     pub t: MsgType,
     pub contents: &'a [u8],
+}
+
+impl RefMessage<'_> {
+    pub fn into_vec3(&self) -> Result<Vec3> {
+        self.t.try_vec3(self.contents, true)
+    }
+
+    pub fn into_f32(&self) -> Result<f32> {
+        self.t.try_f32(self.contents, true)
+    }
+
+    pub fn into_bool(&self) -> Option<bool> {
+        self.t.parse_bool(self.contents, true)
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -123,8 +141,26 @@ pub enum MsgType {
     Nill,
 }
 
+
+#[inline]
+fn word(buff: &[u8], off: usize) -> Option<[u8; 4]> {
+    buff.get(off..off + 4)?.try_into().ok()
+}
+
 impl MsgType {
-    pub const fn try_f32(&self, buff: &[u8], scale_ints: bool) -> Result<f32> {
+    pub fn try_vec3(&self, buff: &[u8], _scale_ints: bool) -> Result<Vec3> {
+        match self {
+            Self::ArrayF32X3 | Self::ArrayF32X4 | Self::ArrayF32X5 | Self::ArrayF32X6 => {
+                let x = word(buff, 0).ok_or_else(|| anyhow!("buffer too small for x"))?;
+                let y = word(buff, 4).ok_or_else(|| anyhow!("buffer too small for y"))?;
+                let z = word(buff, 8).ok_or_else(|| anyhow!("buffer too small for z"))?;
+                Ok(Vec3::new(Self::to_f32(x), Self::to_f32(y), Self::to_f32(z)))
+            }
+            _ => Err(anyhow!("{self:?} isn't coercible into a vector")),
+        }
+    }
+
+    pub fn try_f32(&self, buff: &[u8], scale_ints: bool) -> Result<f32> {
         // non allocated constants
         match self {
             Self::BoolFalse => return Ok(0.0),
@@ -135,105 +171,66 @@ impl MsgType {
             _ => {},
         }
 
-        if buff.len() < 4 {
-            return Err(anyhow!("Sized types must have at least 4 byte buffers. Len: `{}`", buff.len()));
-        }
+        let chunk = word(buff, 0)
+            .ok_or_else(|| anyhow!("sized types need >= 4 bytes, got {}", buff.len()))?;
 
-        let first_chunk = buff.get(0..5)?;
 
         // native f32 types
         match self {
-            Self::F32 |
-            Self::ArrayF32X2 |
-            Self::ArrayF32X3 |
-            Self::ArrayF32X4 |
-            Self::ArrayF32X5 |
-            Self::ArrayF32X6 => {
-                return Ok(Self::to_f32(first_chunk.into()));
-            }
-            _ => {},
-        }
-
-        // converted types
-        match self {
+            Self::F32 | Self::ArrayF32X2 | Self::ArrayF32X3
+            | Self::ArrayF32X4 | Self::ArrayF32X5 | Self::ArrayF32X6 => Ok(Self::to_f32(chunk)),
             Self::I32 => {
-                let val = Self::to_i32(first_chunk.into());
-                if use_range {
-                    return Ok(f32::clamp(val / 255.0, 0., 1.));
+                let val = Self::to_i32(chunk);
+                if scale_ints {
+                    Ok((val as f32 / 255.0).clamp(0.0, 1.0))
                 } else {
-                    return Ok(f32::clamp(val as f32, 0., 1.));
+                    Ok(val as f32) // unclamped; raw value
                 }
-            },
-            _ => {},
+            }
+            _ => Err(anyhow!("Unhandled message type: {self:?}")),
         }
-
-        Err(anyhow!("Unhandled message type: {self}"))
     }
 
-    pub const fn to_f32(buff: [u8; 4]) -> f32 {
-        f32::from_be_bytes(buff)
-    }
+    pub const fn to_f32(buff: [u8; 4]) -> f32 { f32::from_be_bytes(buff) }
+    pub const fn to_i32(buff: [u8; 4]) -> i32 { i32::from_be_bytes(buff) }
 
-    pub const fn to_i32(buff: [u8; 4]) -> i32 {
-        i32::from_be_bytes(buff)
-    }
-
-    pub const fn parse_bool(&self, buff: [u8], scale_ints: bool) -> Option<bool> {
+    pub fn parse_bool(&self, buff: &[u8], scale_ints: bool) -> Option<bool> {
         match self {
             Self::BoolTrue => Some(true),
             Self::BoolFalse => Some(false),
-            Self::F32 |
-            Self::ArrayF32X2 |
-            Self::ArrayF32X3 |
-            Self::ArrayF32X4 |
+            Self::F32 | 
+            Self::ArrayF32X2 | 
+            Self::ArrayF32X3| 
+            Self::ArrayF32X4 | 
             Self::ArrayF32X5 | 
             Self::ArrayF32X6 => {
-                if buff.len() >= 4 {
-                    return Some(Self::to_f32(buff.get(0..5).unwrap().into()) > 0.5 );
-                } else {
-                    return None;
-                }
-            },
-            Self::I32 => {
-                if buff.len() >= 4 {
-                    if scale_ints {
-                        return Some(Self::to_i32(buff.get(0..5).unwrap().into()) > 128 );
-                    }
-                    return Some(Self::to_i32(buff.get(0..5).unwrap().into()) >= 1 );
-                } else {
-                    return None;
-                }
+                Some(Self::to_f32(word(buff, 0)?) > 0.5)
             }
-            Self::Infinitum => None,
-            Self::Nill => None,
+            Self::I32 => {
+                let val = Self::to_i32(word(buff, 0)?);
+                Some(if scale_ints { val > 128 } else { val >= 1 })
+            }
+            Self::Infinitum | Self::Nill => None,
             Self::String => {
-                let str = str::from_utf8(*buff)?.to_lowercase();
-                if str.contains("true") {
-                    Some(true)
-                } else if (str.contains("false")) {
-                    Some(false)
-                } else {
-                    None
-                }
-            },
+                // alloc-free: exact, ASCII-case-insensitive match (nulls trimmed)
+                let s = str::from_utf8(buff).ok()?.trim_end_matches('\0').trim();
+                if s.eq_ignore_ascii_case("true") { Some(true) }
+                else if s.eq_ignore_ascii_case("false") { Some(false) }
+                else { None }
+            }
         }
     }
 
     pub const fn size(&self) -> u16 {
         match self {
-            MsgType::BoolFalse |
-            MsgType::BoolTrue  |
-            MsgType::Infinitum |
-            MsgType::Nill      
-                => 0,
-            MsgType::F32 |
-            MsgType::I32 => 4,
+            MsgType::BoolFalse | MsgType::BoolTrue | MsgType::Infinitum
+            | MsgType::Nill | MsgType::String => 0,
+            MsgType::F32 | MsgType::I32 => 4,
             MsgType::ArrayF32X2 => 8,
             MsgType::ArrayF32X3 => 12,
             MsgType::ArrayF32X4 => 16,
             MsgType::ArrayF32X5 => 20,
             MsgType::ArrayF32X6 => 24,
-            MsgType::String => 0,
         }
     }
 }

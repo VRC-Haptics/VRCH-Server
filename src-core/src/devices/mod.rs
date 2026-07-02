@@ -5,6 +5,7 @@ pub mod bhaptics;
 pub mod update;
 pub mod wifi;
 pub mod websocket;
+pub mod internal;
 
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
@@ -18,7 +19,7 @@ use tokio_util::sync::CancellationToken;
 use wifi::{WifiDevice, WifiDeviceInfo};
 
 use crate::{
-    devices::{bhaptics::{BhapticBle, BhapticInfo}, websocket::{WebsocketDevice, WebsocketDeviceInfo}, wifi::start_wifi_devices},
+    devices::{bhaptics::{BhapticBle, BhapticInfo}, internal::{InternalDevice, InternalDeviceInfo}, websocket::{WebsocketDevice, WebsocketDeviceInfo}, wifi::start_wifi_devices},
     mapping::haptic_node::HapticNode, state::get_config,
 };
 
@@ -35,6 +36,8 @@ pub enum HapticDevice {
     Wifi(WifiDevice),
     BhapticBle(BhapticBle),
     Websocket(WebsocketDevice),
+    /// Intended for internal server usage, for testing mainly, possibly for UI experiments 
+    Internal(InternalDevice),
 }
 
 /// Info container for each device type
@@ -48,6 +51,7 @@ pub enum DeviceInfo {
     Wifi(WifiDeviceInfo),
     BhapticBle(BhapticInfo),
     Websocket(WebsocketDeviceInfo),
+    Internal(InternalDeviceInfo),
 }
 
 impl DeviceInfo {
@@ -56,6 +60,7 @@ impl DeviceInfo {
             DeviceInfo::Wifi(inf) => &inf.nodes,
             DeviceInfo::BhapticBle(inf) => &inf.nodes,
             DeviceInfo::Websocket(inf) => &inf.nodes,
+            DeviceInfo::Internal(inf) => &inf.nodes,
         }
     }
 
@@ -65,6 +70,7 @@ impl DeviceInfo {
             DeviceInfo::Wifi(ref mut inf) => inf.nodes = new,
             DeviceInfo::BhapticBle(ref mut inf) => inf.nodes = new,
             DeviceInfo::Websocket(ref mut inf) => inf.nodes = new,
+            DeviceInfo::Internal(ref mut inf) => inf.nodes = new,
         }
     }
 
@@ -73,6 +79,7 @@ impl DeviceInfo {
             DeviceInfo::Wifi(wif) => wif.esp_model.clone(),
             DeviceInfo::BhapticBle(_) => ESP32Model::Unknown,
             DeviceInfo::Websocket(_) => ESP32Model::Unknown,
+            DeviceInfo::Internal(_) => ESP32Model::Unknown,
         }
     }
 }

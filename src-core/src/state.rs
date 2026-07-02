@@ -8,7 +8,9 @@ use std::{
     time::Duration,
 };
 
-use crate::{devices::DeviceId, log_err, mapping::interp::InterpState};
+use crate::{devices::DeviceId, log_err, mapping::interp::InterpState, migrate::migrate};
+
+pub const CONFIG_VERSION: u32 = 1;
 
 // not intended to be accessed publicly. Use functions below
 static CONFIG: LazyLock<Config> = LazyLock::new(|| load_config().unwrap_or_default());
@@ -20,13 +22,18 @@ static DIRTY: AtomicBool = AtomicBool::new(false);
 
 /// Only intended to be called once
 fn load_config() -> Option<Config> {
+    if !CONFIG_DIR.get().is_some() {
+        log::warn!("config directory not set, using default settings");
+    }
     let mut dir = CONFIG_DIR.get()?.clone();
     dir.push("memory");
     dir.set_extension("json");
     log_err!(CONFIG_FILE.set(dir.clone()));
+    log::trace!("Loading memory file: {:?}", CONFIG_FILE.get());
 
     let data = fs::read_to_string(dir).ok()?;
-    serde_json::from_str(&data).ok()
+    let value: serde_json::Value = serde_json::from_str(&data).ok()?;
+    migrate(value)
 }
 
 pub fn set_config_dir(path: PathBuf) {
@@ -112,6 +119,7 @@ pub fn update_device(state: Arc<PerDevice>) -> usize {
 ///
 /// This is never intended to be moved at runtime and references to the children are of static lifetime.
 pub struct Config {
+    pub version: u32,
     pub server: ArcSwap<ServerSettings>,
     pub mapping_menu: ArcSwap<StandardMenu>,
     pub devices: Devices,
@@ -230,6 +238,7 @@ impl<'de> serde::Deserialize<'de> for Devices {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            version: CONFIG_VERSION,
             server: ArcSwap::new(Arc::new(ServerSettings {
                 enable_websocket_devices: true,
                 enable_vrc: true,
@@ -266,7 +275,7 @@ impl PerDevice {
         Self {
             id: id,
             intensity: 1.0,
-            offset: 0.01,
+            offset: 0.0,
             interp_algo: InterpState::default(),
         }
     }
