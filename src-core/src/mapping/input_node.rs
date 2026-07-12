@@ -43,11 +43,22 @@ pub struct HistoryView {
     pub velocity: f32,
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 #[serde(into = "HistoryView")]
 pub struct History {
     pub samples: [(f32, Instant); WINDOW], // index 0 = newest, .0 = value, .1 = time
     pub len: usize,
+}
+
+impl PartialEq for History {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.len == other.len
+            && self.samples[..self.len]
+                .iter()
+                .zip(&other.samples[..other.len])
+                .all(|(a, b)| a.0 == b.0)
+    }
 }
 
 impl Default for History {

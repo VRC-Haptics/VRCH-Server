@@ -20,6 +20,7 @@ path = "src/main.rs"
 
 [features]
 dhat-heap = ["dep:dhat"]
+profiling = ["dep:tauri-plugin-profiling"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -41,6 +42,7 @@ tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
 tauri-plugin-serialplugin = "2.21.1"
+tauri-plugin-profiling = { git = "https://github.com/fltsci/tauri-plugin-profiling", optional = true }
 
 # project stuff
 haptic-core = { path = "../src-core", features = ["tauri-get", "specta"] }

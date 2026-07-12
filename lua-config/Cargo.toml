@@ -3,8 +3,11 @@ name = "lua-config"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"] 
+
 [dependencies]
-mlua = {version = "0.11.6", features = ["luau-vector4", "vendored"]}
+mlua = {version = "0.11.6", features = ["luau-vector4", "serialize", "vendored"]}
+serde = { version = "1", features = ["derive"] }
 
-
-haptic-core = {}
+haptic-core = { path = "../src-core"}

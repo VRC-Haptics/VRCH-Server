@@ -99,7 +99,7 @@ export type DeviceId = string;
  *  An information that should be in all variants should be made so via the below impl.
  *  Don't manually dip into each variant please.
  */
-export type DeviceInfo = { variant: "Wifi"; value: WifiDeviceInfo } | { variant: "BhapticBle"; value: BhapticInfo } | { variant: "Websocket"; value: WebsocketDeviceInfo };
+export type DeviceInfo = { variant: "Wifi"; value: WifiDeviceInfo } | { variant: "BhapticBle"; value: BhapticInfo } | { variant: "Websocket"; value: WebsocketDeviceInfo } | { variant: "Internal"; value: InternalDeviceInfo };
 
 // The firmware type returned from the device.
 export type ESP32Model = 
@@ -224,6 +224,10 @@ export type InputShape = { type: "sphere"; radius: number } | { type: "capsule";
  *  Should be moved to mapping if it ends up in there.
  */
 export type InputType = "weight" | "velocity";
+
+export type InternalDeviceInfo = {
+	nodes: HapticNode[],
+};
 
 // Describes how this node should affect the layers. 
 export type InterpolationLayer = 

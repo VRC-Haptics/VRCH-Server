@@ -23,6 +23,8 @@ use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_log::{Target, TargetKind};
 use specta_typescript::Typescript;
+#[cfg(feature = "profiling")]
+use tauri_plugin_profiling::ProfilingExt;
 
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
@@ -70,7 +72,7 @@ async fn main() {
     );
 
 
-    let builder = tauri_specta::Builder::<tauri::Wry>::new()
+    let cmd_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_device_list,
             commands::get_vrc_info,
@@ -94,13 +96,20 @@ async fn main() {
         ]);
 
     #[cfg(debug_assertions)] // Only export on non-release builds
-    builder
+    cmd_builder
         .export(Typescript::default(), "../src/bindings.ts")
         .expect("Failed to export typescript bindings");
 
     // init logging and stuff first
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let app_builder = tauri::Builder::default();
+    #[cfg(feature = "profiling")]
+    let app_builder = {
+        let app_builder = app_builder.plugin(tauri_plugin_profiling::init());
+        println!("Profiling Started");
+        app_builder
+    };
+    
+    let app = app_builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             println!("Instance already open, shutting down.");
             let _ = app
                 .get_webview_window("main")
@@ -132,9 +141,12 @@ async fn main() {
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))
                 .build(),
         )
-        .invoke_handler(builder.invoke_handler())
+        .invoke_handler(cmd_builder.invoke_handler())
         .setup(move |app: &mut tauri::App| {
-            builder.mount_events(app);
+            #[cfg(feature = "profiling")]
+            app.start_cpu_profile()?;
+
+            cmd_builder.mount_events(app);
 
             let handle = app.handle().clone();
 
@@ -185,8 +197,16 @@ async fn main() {
         });
     }
 
-    app.run(move |_app_handle, event| {
+    app.run(move |handle, event| {
         if let tauri::RunEvent::Exit = event {
+            #[cfg(feature = "profiling")]
+            {
+                match handle.stop_cpu_profile() {
+                    Ok(result) => println!("Stopping profiling: {:?}", result.flamegraph_path),
+                    Err(e) => log::error!("Failed to stop CPU profile: {e}"),
+                }
+            }
+
             // Drop the profiler here so dhat actually writes dhat-heap.json,
             // since the event loop won't unwind back into main on Windows.
             #[cfg(feature = "dhat-heap")]
@@ -194,6 +214,8 @@ async fn main() {
                 drop(p);
                 println!("dhat: wrote dhat-heap.json");
             }
+
+            handle.exit(0);
         }
     });
 }
