@@ -10,7 +10,6 @@ pub mod internal;
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
 use parking_lot::{Mutex, RwLock};
-use warp::filters::method::get;
 use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::mpsc;

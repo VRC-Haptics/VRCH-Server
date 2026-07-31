@@ -3,6 +3,7 @@ pub mod config;
 pub mod discovery;
 pub mod osc_query;
 pub mod parsing;
+pub mod ps;
 
 // crate dependencies
 use crate::api::ApiManager;
@@ -12,9 +13,10 @@ use crate::mapping::{
 };
 use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind};
 use crate::osc::parse::{MsgType, RefMessage, first_message};
-use crate::state::{self, VrcSettings};
+use crate::state::{self, VrcSettings, get_config};
 use crate::util::next_free_port_with_address;
 use crate::vrc::config::{Input, InputType};
+use crate::vrc::ps::{create_ogb_nodes, create_vfh_nodes};
 use arc_swap::{ArcSwap, Cache, Guard};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
@@ -237,6 +239,7 @@ impl VrcGame {
 
 
         let mut buf = [0u8; rosc::decoder::MTU];
+        let mut cache = Cache::new(&get_config().server);
         loop {
             tokio::select! {
                 _ = tick.tick() => {
@@ -283,7 +286,7 @@ impl VrcGame {
 
                             let cfg = settings.load();
                             let nodes = to_inputs(&avi, cfg);
-                            self.avatar = Some(avi);
+                            self.avatar = Some(avi);                          
 
                             if !nodes.is_empty() {
                                 for (pairs, node) in nodes {
@@ -437,11 +440,23 @@ fn try_bool(val: OscType) -> bool {
 
     }
 }
- 
+
 /// Converts a vrc avatar descriptor into a list of input nodes for our input map.
 fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)>, Box<InputNode>)> {
     let mut nodes = vec![];
 
+    // add ogb setup
+    if let Some((ogb, vfh)) = &avi.ps {
+        for param in ogb {
+            nodes.append(&mut create_ogb_nodes(settings, param.full_path.0.clone()));
+        }
+
+        for param in ogb {
+            nodes.append(&mut create_vfh_nodes(settings, param.full_path.0.clone()));
+        }
+    }
+
+    // add normal nodes
     for conf in &avi.configs {
         for node in &conf.nodes {
             let location = node.location;
@@ -494,6 +509,9 @@ pub struct Avatar {
     prefab_names: Vec<String>,
     /// All information mapping OSC Parameters to their needed formats
     configs: Vec<GameMap>,
+    // ogb, vfh
+    ps: Option<(Vec<OscInfo>, Vec<OscInfo>)>,
+
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]

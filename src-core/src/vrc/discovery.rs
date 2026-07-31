@@ -70,7 +70,7 @@ pub async fn start_filling_available_parameters(
         let mut receiver = {
             let (tx, rx) = mpsc::channel::<(u16, String)>(2);
             let storage = PORT_SENDER.get_or_init(|| Mutex::new(None));
-            let mut guard = storage.lock().await;
+            let mut guard: tokio::sync::MutexGuard<'_, Option<mpsc::Sender<(u16, String)>>> = storage.lock().await;
             *guard = Some(tx);
             rx
         };
@@ -169,10 +169,20 @@ async fn create_avatar(
         .collect();
     log::info!("Updated avatar with new configuration");
 
+    let ogb: Vec<OscInfo> = params.iter().filter(|v | v.key().0.contains("avatar/parameters/OGB")).map(|v| v.value().clone()).collect();
+    let vfh: Vec<OscInfo> = params.iter().filter(|v| v.key().0.contains("avatar/parameters/VFH/Zone")).map(|v| v.value().clone()).collect();
+
+    let ps = if ogb.len() > 0 || vfh.len() > 0 {
+        Some((ogb, vfh))
+    } else {
+        None
+    };
+
     Avatar {
         id: new_id,
         prefab_names: names,
         configs: configs,
+        ps
     }
 }
 

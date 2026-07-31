@@ -1,14 +1,13 @@
 use arc_swap::ArcSwap;
 use boxcar::Vec as AppendVec;
+use glam::Vec3;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
-    path::PathBuf,
-    sync::{atomic::AtomicBool, Arc, LazyLock, OnceLock},
-    time::Duration,
+    collections::HashMap, fs, path::PathBuf, sync::{Arc, LazyLock, OnceLock, atomic::AtomicBool}, time::Duration
 };
 
-use crate::{devices::DeviceId, log_err, mapping::interp::InterpState, migrate::migrate};
+use crate::{devices::DeviceId, log_err, mapping::{input_node::InterpolationLayer, interp::InterpState}, migrate::migrate};
 
 pub const CONFIG_VERSION: u32 = 1;
 
@@ -281,6 +280,9 @@ impl PerDevice {
     }
 }
 
+pub type AviId = String;
+pub type OgbID = String;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Persistant state related to vrc specifically.
 pub struct VrcSettings {
@@ -299,6 +301,21 @@ pub struct VrcSettings {
     ///
     /// Smooths motor acceleration.
     pub smoothing_time: Duration,
+    #[serde(default)]
+    pub enable_ps: bool,
+    #[serde(default)]
+    pub avatar_overrides: FxHashMap<AviId, AviOverride>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AviOverride {
+    pub ps: FxHashMap<OgbID, PsSettings>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PsSettings {
+    // location, radius, layer
+    pub outputs: Vec<(Vec3, f32, InterpolationLayer)>,
 }
 
 impl Default for VrcSettings {
@@ -309,6 +326,8 @@ impl Default for VrcSettings {
             size: 1.0,
             sample_cache: 10,
             smoothing_time: Duration::from_secs_f32(0.12),
+            enable_ps: false,
+            avatar_overrides: FxHashMap::default(),
         }
     }
 }
