@@ -51,6 +51,13 @@ export type Avatar = {
 	prefab_names: string[],
 	// All information mapping OSC Parameters to their needed formats
 	configs: GameMap[],
+	ps: [OscInfo[], OscInfo[]] | null,
+	/**
+	 *  The camera schema ID from `/avatar/parameters/haptic/cam_id/<uuid>`.
+	 * 
+	 *  An avatar carries one ID, because the game gives one camera output.
+	 */
+	cam_id: string | null,
 };
 
 export type BhapticInfo = {
@@ -60,6 +67,63 @@ export type BhapticInfo = {
 };
 
 export type BhapticsModel = "TacsuitX16";
+
+// A snapshot of the camera path for the UI.
+export type CameraInfo = {
+	// The camera ID of the avatar.
+	id: string | null,
+	// The schema version in use.
+	version: number,
+	// The count of fields that drive a watched parameter.
+	mapped_fields: number,
+	// The count of fields in the schema.
+	total_fields: number,
+	state: CameraState,
+	frames: number,
+	values_sent: number,
+	dropped_frames: number,
+	errors: number,
+	// The decode time of the last frame.
+	decode_micros: number,
+	mean_confidence: number,
+	// True when the frame ID does not match the schema ID.
+	id_mismatch: boolean,
+	// True when the Spout sender exists.
+	connected: boolean,
+	// True when the detector found the grid.
+	detected: boolean,
+	grid_cols: number,
+	grid_rows: number,
+	/**
+	 *  Calls to `drd_poll` per second. This shows the pace of the thread, not
+	 *  the pace of the camera.
+	 */
+	poll_hz: number,
+	// Frames per second that the poll loop took from the library.
+	capture_hz: number,
+	// Frames per second that carried new bits.
+	change_hz: number,
+	// Map updates per second.
+	value_hz: number,
+	// Frames per second that the library counted for the handle.
+	library_hz: number,
+	/**
+	 *  The running total of frames that the library counted but the poll loop
+	 *  never took.
+	 */
+	missed_frames: number,
+};
+
+// The state that the UI shows for the camera path.
+export type CameraState = 
+// No avatar bound a camera.
+"Off" | 
+// The decoder is open. No frame arrived yet.
+"Waiting" | 
+// Frames arrive and drive the input map.
+"Running" | 
+// The library or the sender failed. The thread retries.
+"Failed";
 
 // Metadata from the json config
 export type ConfIdent = {
@@ -361,6 +425,8 @@ export type VrcInfo = {
 	velocity_mult: number,
 	watched: ([string, AddrInfo])[],
 	available: OscInfo[],
+	// The state of the camera decode path.
+	camera: CameraInfo,
 };
 
 export type WebsocketDeviceInfo = {

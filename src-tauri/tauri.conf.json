@@ -37,6 +37,7 @@
       "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
       "sidecars/elevated-register.exe",
       "sidecars/listen-for-vrc.dll",
+      "sidecars/datarefdecode.dll",
       "security/localhost.crt",
       "security/localhost.key",
       "security/README.md",

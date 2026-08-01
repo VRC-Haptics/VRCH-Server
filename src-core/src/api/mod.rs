@@ -1,3 +1,5 @@
+pub mod schema;
+
 use crate::vrc::config::GameMap;
 use std::fs;
 use std::sync::Arc;
@@ -6,12 +8,23 @@ use tokio::sync::Mutex;
 use walkdir::WalkDir;
 use crate::network::fetch_text;
 
+pub use schema::{
+    DataRefField, DataRefKind, DataRefSchema, LocalAvailableSchema, SchemaError,
+};
+
+/// The folder under the config cache that holds camera schema files.
+pub const SCHEMA_FOLDER: &str = "cameras";
+
 #[derive(Debug)]
 pub struct ApiManager {
     pub config_folder: PathBuf,
+    /// The folder that holds the data reference schema files.
+    pub schema_folder: PathBuf,
     pub base_url: String,
     pub remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>,
     pub local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
+    /// The schema files on disk, keyed by ID and version.
+    pub local_schemas: Arc<Mutex<HashSet<LocalAvailableSchema>>>,
     refresh_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -37,14 +50,24 @@ pub struct LocalAvailableMap {
 impl ApiManager {
     /// Creates a new ApiManager.
     /// Caches WILL NOT be filled until refresh_caches is called.
+    ///
+    /// The camera schemas live in the `cameras` folder under the cache.
     pub fn new(cache: PathBuf) -> ApiManager {
+        let schemas = cache.join(SCHEMA_FOLDER);
+        Self::new_with_schemas(cache, schemas)
+    }
+
+    /// Creates a new ApiManager with a named schema folder.
+    pub fn new_with_schemas(cache: PathBuf, schema_folder: PathBuf) -> ApiManager {
         let base_url = "http://vrc-haptics.github.io/haptic-config-hosting/".to_string();
 
         ApiManager {
             config_folder: cache,
+            schema_folder,
             base_url,
             remote_maps: Arc::new(Mutex::new(None)),
             local_maps: Arc::new(Mutex::new(HashSet::new())),
+            local_schemas: Arc::new(Mutex::new(HashSet::new())),
             refresh_handle: None,
         }
     }
@@ -59,15 +82,25 @@ impl ApiManager {
         }
 
         let config_folder = self.config_folder.clone();
+        let schema_folder = self.schema_folder.clone();
         let base_url = self.base_url.clone();
         let local_maps = Arc::clone(&self.local_maps);
         let remote_maps = Arc::clone(&self.remote_maps);
+        let local_schemas = Arc::clone(&self.local_schemas);
 
         let handle = tokio::spawn(async move {
             log::debug!("Starting async cache refresh");
 
             // Refresh local index
-            Self::refresh_local_index_thread(config_folder, local_maps.clone()).await;
+            Self::refresh_local_index_thread(
+                config_folder,
+                schema_folder.clone(),
+                local_maps.clone(),
+            )
+            .await;
+
+            // Refresh the camera schema index
+            Self::refresh_schema_index_thread(schema_folder, local_schemas.clone()).await;
 
             // Refresh remote index
             Self::refresh_remote_index_thread(base_url, remote_maps.clone()).await;
@@ -75,6 +108,9 @@ impl ApiManager {
             // Log refreshed values
             let local = local_maps.lock().await;
             log::trace!("Local Cache: {:?} Maps", local.len());
+
+            let schemas = local_schemas.lock().await;
+            log::trace!("Schema Cache: {:?} Schemas", schemas.len());
 
             let remote = remote_maps.lock().await;
             if let Some(ref maps) = *remote {
@@ -108,11 +144,15 @@ impl ApiManager {
     /// Refreshes all cache types (expensive and network blocking)
     pub async fn refresh_caches_blocking(&mut self) {
         self.refresh_local_index().await;
+        self.refresh_schema_index().await;
         self.refresh_remote_index().await;
 
         // log refreshed values.
         let local = self.local_maps.lock().await;
         log::trace!("Local Cache: {:?} Maps", local.len());
+
+        let schemas = self.local_schemas.lock().await;
+        log::trace!("Schema Cache: {:?} Schemas", schemas.len());
 
         let remote = self.remote_maps.lock().await;
         if let Some(ref maps) = *remote {
@@ -125,46 +165,24 @@ impl ApiManager {
     /// Thread-safe version of refresh_local_index for use in async refresh
     async fn refresh_local_index_thread(
         config_folder: PathBuf,
+        schema_folder: PathBuf,
         local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
     ) {
-        let mut new_local_maps = HashSet::new();
-
-        for entry in WalkDir::new(&config_folder)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
-            if entry.file_type().is_file() {
-                match fs::read_to_string(entry.path()) {
-                    Ok(content) => match serde_json::from_str::<GameMap>(&content) {
-                        Ok(game_map) => {
-                            let map = LocalAvailableMap {
-                                author: game_map.identification.author_name,
-                                name: game_map.identification.map_name,
-                                version: game_map.identification.map_version,
-                                path: entry.clone().into_path(),
-                            };
-
-                            if !new_local_maps.insert(map) {
-                                log::warn!(
-                                    "Duplicate config files, Will be ignored: {:?}",
-                                    entry.file_name()
-                                );
-                            }
-                        }
-                        // Surface the real reason instead of discarding it.
-                        Err(e) => log::warn!(
-                            "Unable to parse {:?} as GameMap: {}",
-                            entry.file_name(),
-                            e
-                        ),
-                    },
-                    Err(e) => log::warn!("Unable to read file {:?}: {}", entry.path(), e),
-                }
-            }
-        }
+        let new_local_maps = Self::scan_map_folder(&config_folder, &schema_folder);
 
         let mut maps = local_maps.lock().await;
         *maps = new_local_maps;
+    }
+
+    /// Thread-safe version of refresh_schema_index for use in async refresh
+    async fn refresh_schema_index_thread(
+        schema_folder: PathBuf,
+        local_schemas: Arc<Mutex<HashSet<LocalAvailableSchema>>>,
+    ) {
+        let found = Self::scan_schema_folder(&schema_folder);
+
+        let mut schemas = local_schemas.lock().await;
+        *schemas = found;
     }
 
     /// Thread-safe version of refresh_remote_index for use in async refresh
@@ -300,49 +318,178 @@ impl ApiManager {
         )))
     }
 
-    /// Re-indexes the local config files.
-    /// Each config file is "probably" valid, it atleast has each of the needed fields.
-    pub async fn refresh_local_index(&mut self) {
-        // Find already locally cached maps.
-        let mut new_local_maps = HashSet::new();
+    /// Loads the camera schema with the given ID.
+    ///
+    /// The index holds one entry per file. Two files may share an ID. The
+    /// loader takes the highest version. A file that fails to parse falls back
+    /// to the next lower version.
+    ///
+    /// The remote source does not exist yet. The search stays local.
+    pub async fn load_schema(&self, id: &str) -> Result<DataRefSchema, ApiRetrievalError> {
+        Self::load_schema_from(&self.local_schemas, id).await
+    }
 
-        for entry in WalkDir::new(&self.config_folder)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
-            if entry.file_type().is_file() {
-                match fs::read_to_string(entry.path()) {
-                    Ok(content) => match serde_json::from_str::<GameMap>(&content) {
-                        Ok(game_map) => {
-                            let map = LocalAvailableMap {
-                                author: game_map.identification.author_name,
-                                name: game_map.identification.map_name,
-                                version: game_map.identification.map_version,
-                                path: entry.clone().into_path(),
-                            };
+    /// Loads a camera schema straight out of the index.
+    ///
+    /// The caller holds the index, not the whole manager. The VRC loop uses
+    /// this form so that a schema read never blocks the map loader.
+    pub async fn load_schema_from(
+        index: &Arc<Mutex<HashSet<LocalAvailableSchema>>>,
+        id: &str,
+    ) -> Result<DataRefSchema, ApiRetrievalError> {
+        let mut candidates: Vec<LocalAvailableSchema> = {
+            let schemas = index.lock().await;
+            schemas
+                .iter()
+                .filter(|entry| entry.id == id)
+                .cloned()
+                .collect()
+        };
 
-                            if !new_local_maps.insert(map) {
-                                log::trace!("{:?}", &new_local_maps);
-                                log::warn!(
-                                    "Duplicate config files, Will be ignored: {:?}",
-                                    entry.file_name()
-                                );
-                            }
-                        }
-                        // Log WHY it failed instead of discarding the error.
-                        Err(e) => log::warn!(
-                            "Unable to parse {:?} as GameMap: {}",
-                            entry.path(),
-                            e
-                        ),
-                    },
-                    Err(e) => log::warn!("Unable to read file {:?}: {}", entry.path(), e),
+        if candidates.is_empty() {
+            return Err(ApiRetrievalError::MapNotFound(format!(
+                "No camera schema found for id: {}",
+                id
+            )));
+        }
+
+        // Highest version first.
+        candidates.sort_unstable_by(|a, b| b.version.cmp(&a.version));
+
+        let mut last_error = String::new();
+        for entry in &candidates {
+            match schema::read_schema(&entry.path) {
+                Ok(parsed) => match parsed.validate() {
+                    Ok(()) => return Ok(parsed),
+                    Err(err) => {
+                        last_error = format!("{:?}: {}", entry.path, err);
+                        log::warn!("Rejected camera schema {}", last_error);
+                    }
+                },
+                Err(err) => {
+                    last_error = format!("{:?}: {}", entry.path, err);
+                    log::warn!("Unable to read camera schema {}", last_error);
                 }
             }
         }
 
+        Err(ApiRetrievalError::BadResponseFromServer(format!(
+            "No usable camera schema for id {}. Last error: {}",
+            id, last_error
+        )))
+    }
+
+    /// Re-indexes the local config files.
+    /// Each config file is "probably" valid, it atleast has each of the needed fields.
+    pub async fn refresh_local_index(&mut self) {
+        // Find already locally cached maps.
+        let new_local_maps = Self::scan_map_folder(&self.config_folder, &self.schema_folder);
+
         let mut maps = self.local_maps.lock().await;
         *maps = new_local_maps;
+    }
+
+    /// Re-indexes the local camera schema files.
+    ///
+    /// The scan reads every file under the schema folder. A file that does not
+    /// hold a schema drops out of the index with a warning.
+    pub async fn refresh_schema_index(&self) {
+        let found = Self::scan_schema_folder(&self.schema_folder);
+
+        let mut schemas = self.local_schemas.lock().await;
+        *schemas = found;
+    }
+
+    /// Walks the config folder and reads every map file.
+    ///
+    /// The schema folder often sits under the config folder. The walk skips it,
+    /// because a camera schema is not a map.
+    fn scan_map_folder(folder: &PathBuf, skip: &PathBuf) -> HashSet<LocalAvailableMap> {
+        let mut new_local_maps = HashSet::new();
+
+        for entry in WalkDir::new(folder).into_iter().filter_map(Result::ok) {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            if entry.path().starts_with(skip) {
+                continue;
+            }
+
+            match fs::read_to_string(entry.path()) {
+                Ok(content) => match serde_json::from_str::<GameMap>(&content) {
+                    Ok(game_map) => {
+                        let map = LocalAvailableMap {
+                            author: game_map.identification.author_name,
+                            name: game_map.identification.map_name,
+                            version: game_map.identification.map_version,
+                            path: entry.clone().into_path(),
+                        };
+
+                        if !new_local_maps.insert(map) {
+                            log::warn!(
+                                "Duplicate config files, Will be ignored: {:?}",
+                                entry.file_name()
+                            );
+                        }
+                    }
+                    // Log WHY it failed instead of discarding the error.
+                    Err(e) => log::warn!("Unable to parse {:?} as GameMap: {}", entry.path(), e),
+                },
+                Err(e) => log::warn!("Unable to read file {:?}: {}", entry.path(), e),
+            }
+        }
+
+        new_local_maps
+    }
+
+    /// Walks the schema folder and reads every schema file.
+    ///
+    /// The reader takes plain JSON and markdown with a fenced JSON block.
+    fn scan_schema_folder(folder: &PathBuf) -> HashSet<LocalAvailableSchema> {
+        let mut found = HashSet::new();
+
+        // The user drops schema files in here, so the folder must exist.
+        if !folder.is_dir() {
+            if let Err(err) = fs::create_dir_all(folder) {
+                log::warn!("Unable to create the schema folder {:?}: {}", folder, err);
+                return found;
+            }
+        }
+
+        for entry in WalkDir::new(folder).into_iter().filter_map(Result::ok) {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+
+            match schema::read_schema(entry.path()) {
+                Ok(parsed) => {
+                    if let Err(err) = parsed.validate() {
+                        log::warn!("Unusable camera schema {:?}: {}", entry.path(), err);
+                        continue;
+                    }
+
+                    let record = LocalAvailableSchema {
+                        id: parsed.id,
+                        version: parsed.version,
+                        path: entry.clone().into_path(),
+                    };
+
+                    if !found.insert(record) {
+                        log::warn!(
+                            "Duplicate camera schema, Will be ignored: {:?}",
+                            entry.file_name()
+                        );
+                    }
+                }
+                Err(err) => log::warn!(
+                    "Unable to parse {:?} as a camera schema: {}",
+                    entry.path(),
+                    err
+                ),
+            }
+        }
+
+        found
     }
 
     /// Calls to refresh files available on the remote index.

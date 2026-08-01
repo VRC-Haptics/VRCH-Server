@@ -355,14 +355,14 @@ impl InputMap {
 
             #[cfg(debug_assertions)]
             if last_report.elapsed() >= Duration::from_secs(1) {
-                log::info!(
-                    "[map] msg/s={} (avg {:.1}us max {:.1}us) | events/s={} (avg {:.1}us max {:.1}us) | dirty/s={} (avg {:.1}us) | dev/s={} | backlog_max={}",
-                    stats.msg.count, stats.msg.avg_us(), stats.msg.max_ns as f64 / 1000.0,
-                    stats.events.count, stats.events.avg_us(), stats.events.max_ns as f64 / 1000.0,
-                    stats.dirty.count, stats.dirty.avg_us(),
-                    stats.device.count,
-                    stats.max_backlog,
-                );
+                // log::info!(
+                //     "[map] msg/s={} (avg {:.1}us max {:.1}us) | events/s={} (avg {:.1}us max {:.1}us) | dirty/s={} (avg {:.1}us) | dev/s={} | backlog_max={}",
+                //     stats.msg.count, stats.msg.avg_us(), stats.msg.max_ns as f64 / 1000.0,
+                //     stats.events.count, stats.events.avg_us(), stats.events.max_ns as f64 / 1000.0,
+                //     stats.dirty.count, stats.dirty.avg_us(),
+                //     stats.device.count,
+                //     stats.max_backlog,
+                // );
                 stats = LoopStats::default();
                 last_report = Instant::now();
             }

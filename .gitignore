@@ -34,3 +34,4 @@ target/*
 !src-tauri/sidecars/listen-for-vrc.dll
 !src-tauri/sidecars/elevated-register.exe
 !src-tauri/sidecars/bHapticsPlayer/BhapticsPlayer.exe
+!src-tauri/sidecars/datarefdecode.dll

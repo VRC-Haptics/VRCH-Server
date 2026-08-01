@@ -32,7 +32,7 @@ impl InterpState {
             let val = self.single_node(node, in_nodes);
             // calculate device level settings (required)
             output[i] = if val > 0.0 {
-                log::trace!("offset: {}, intensity: {}", settings.offset, settings.intensity);
+                // log::trace!("offset: {}, intensity: {}", settings.offset, settings.intensity);
                 settings.offset + (settings.intensity - settings.offset) * val
             } else {
                 0.0

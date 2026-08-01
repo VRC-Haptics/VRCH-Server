@@ -1,12 +1,13 @@
 pub mod cache_node;
 pub mod config;
+pub mod datref;
 pub mod discovery;
 pub mod osc_query;
 pub mod parsing;
 pub mod ps;
 
 // crate dependencies
-use crate::api::ApiManager;
+use crate::api::{ApiManager, DataRefSchema, LocalAvailableSchema};
 use crate::mapping::input_node::{History, Slot, SlotKey};
 use crate::mapping::{
     input_node::InputNode,
@@ -16,7 +17,8 @@ use crate::osc::parse::{MsgType, RefMessage, first_message};
 use crate::state::{self, VrcSettings, get_config};
 use crate::util::next_free_port_with_address;
 use crate::vrc::config::{Input, InputType};
-use crate::vrc::ps::{create_ogb_nodes, create_vfh_nodes};
+use crate::vrc::datref::{CameraDecoder, CameraInfo, CameraSession, FieldRoute};
+use crate::vrc::ps::{ create_vfh_nodes};
 use arc_swap::{ArcSwap, Cache, Guard};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
@@ -37,6 +39,7 @@ use parsing::remove_version;
 
 use rosc::{OscMessage, OscType};
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
@@ -60,6 +63,8 @@ pub struct VrcInfo {
     pub velocity_mult: f32,
     pub watched: Vec<(String, AddrInfo)>,
     pub available: Vec<OscInfo>,
+    /// The state of the camera decode path.
+    pub camera: CameraInfo,
 }
 
 impl Default for VrcInfo {
@@ -73,6 +78,7 @@ impl Default for VrcInfo {
             velocity_mult: 0.5,
             watched: vec![],
             available: Vec::new(),
+            camera: CameraInfo::default(),
         }
     }
 }
@@ -86,6 +92,31 @@ pub const INTENSITY_PATH: &str = "/avatar/parameters/haptic/global/intensity";
 pub const ENABLE_PATH: &str = "/avatar/parameters/haptic/global/enable";
 pub const AVATAR_ID_PATH: &str = "/avatar/change";
 pub const VRC_TAG: &str = "VRC";
+
+/// "/avatar/parameters/haptic/cam_id/<uuid>"
+///
+/// The rest of the path is the ID of the camera schema. An avatar carries one
+/// camera ID, because the game gives one camera output.
+pub const CAM_ID_PREFIX: &str = "/avatar/parameters/haptic/cam_id/";
+
+/// The confidence that a decoded field must reach.
+///
+/// The library gates a whole frame on this value. The frame callback gates each
+/// field again with the same number.
+pub const CAMERA_MIN_CONFIDENCE: f32 = 0.6;
+
+/// Returns the camera ID of a `cam_id` path.
+///
+/// A path with no ID, or with more path parts after the ID, returns `None`.
+#[inline]
+pub fn camera_id_from_path(path: &str) -> Option<&str> {
+    let id = path.strip_prefix(CAM_ID_PREFIX)?;
+    if id.is_empty() || id.contains('/') {
+        None
+    } else {
+        Some(id)
+    }
+}
 
 /// Implements cheap clone, is threadsafe.
 pub struct VrcHandle {
@@ -129,12 +160,27 @@ pub enum AddrInfo
     Node(NodeKey, NodeFieldKind)
 }
 
+/// One watched OSC address and the map targets that it drives.
 #[derive(Debug)]
-pub struct ValInstant(SmallVec<[AddrInfo; 2]>, Instant);
+pub struct WatchedAddr {
+    /// The targets of this address.
+    pub infos: SmallVec<[AddrInfo; 2]>,
+    /// The time of the last value.
+    pub last: Instant,
+    /// True when the camera decode path drives this address.
+    ///
+    /// A camera address gets no value over OSC, so the drop check reads the
+    /// camera counters instead of the timestamp.
+    pub camera: bool,
+}
 
-impl Default for ValInstant {
+impl Default for WatchedAddr {
     fn default() -> Self {
-        Self (SmallVec::default(), Instant::now())
+        Self {
+            infos: SmallVec::default(),
+            last: Instant::now(),
+            camera: false,
+        }
     }
 }
 
@@ -148,12 +194,22 @@ pub struct VrcGame {
     ///
     /// NOTE: The values actual values contained in this struct are out of date by up to 2 seconds.
     pub available_parameters: Arc<DashMap<OscPath, OscInfo>>,
-    pub watched: FxHashMap<String, ValInstant>,
+    pub watched: FxHashMap<String, WatchedAddr>,
     rx: UnboundedReceiver<MsgToMainVrc>,
     map: MapHandle,
     /// Spawns our own OSCQuery advertising
     query_server: Option<OscQueryServer>,
     dirty: bool,
+    /// The camera schema index. The loader reads it without the api lock.
+    schema_index: Arc<Mutex<HashSet<LocalAvailableSchema>>>,
+    /// The decode thread. A drop stops it.
+    camera: CameraDecoder,
+    /// The session that the decode thread runs.
+    camera_session: Option<Arc<CameraSession>>,
+    /// The camera ID that the avatar reports.
+    camera_id: Option<String>,
+    /// The camera activity count of the last tick.
+    camera_activity: u64,
 }
 
 /// I hate naming things
@@ -163,6 +219,13 @@ pub enum MsgToMainVrc {
     Info(oneshot::Sender<()>),
     /// A new avatar configuration was detected
     NewAvatar(Avatar),
+    /// The avatar reported a camera ID over OSC.
+    CameraId(String),
+    /// A camera schema load finished. `None` means no usable file.
+    CameraSchema {
+        id: String,
+        schema: Option<Box<DataRefSchema>>,
+    },
     VrcDisconnected,
 }
 
@@ -178,6 +241,10 @@ impl VrcGame {
         };
         let param_avail = Arc::new(DashMap::new());
 
+        // Take the schema index once. The decode path then needs no lock on the
+        // api manager, which the config loader holds with try_lock.
+        let schema_index = Arc::clone(&api.lock().await.local_schemas);
+
         // Instantiate
         let vrc = VrcGame {
             recv_port: 9001,
@@ -186,10 +253,15 @@ impl VrcGame {
             query_server: None,
             avatar: None,
             rx: rx,
+            camera: CameraDecoder::start(map_handle.event_sender.clone()),
             map: map_handle,
             available_parameters: Arc::clone(&param_avail),
             watched: FxHashMap::default(),
             dirty: false,
+            schema_index,
+            camera_session: None,
+            camera_id: None,
+            camera_activity: 0,
         };
 
         // Start the thread that handles finding available vrc parameters
@@ -249,18 +321,27 @@ impl VrcGame {
                     match res {
                         Ok((size, _)) => {
                             match first_message(&buf[..size]) {
-                                Err(e) => log::error!("Error: {e}"),
+                                Err(e) => {},
                                 Ok(msg) => {
                                     let addr = remove_version(&msg.addr);
 
-                                    let Some(infos) = self.watched.get_mut(&addr) else {
-                                        continue; // not one we watch for.
-                                    };
+                                    if let Some(infos) = self.watched.get_mut(&addr) {
+                                        infos.last = Instant::now();
 
-                                    infos.1 = Instant::now();
+                                        for info in &infos.infos {
+                                            log_err!(Self::push_info(&self.map.event_sender, info, &msg));
+                                        }
+                                        continue;
+                                    }
 
-                                    for info in &infos.0 {
-                                        log_err!(Self::push_info(&self.map.event_sender, info, &msg));
+                                    // Not a watched address. It may still name
+                                    // the camera of this avatar.
+                                    if let Some(id) = camera_id_from_path(&addr) {
+                                        if self.camera_id.as_deref() != Some(id) {
+                                            let id = id.to_string();
+                                            self.camera_id = Some(id.clone());
+                                            self.request_camera_schema(id);
+                                        }
                                     }
                                 }
                             }
@@ -284,9 +365,15 @@ impl VrcGame {
                             log_err!(self.map
                                 .send_event(InputEventMessage::Flush));
 
+                            // The flush drops every node, so every key in the
+                            // watch table is dead.
+                            self.watched.clear();
+                            self.clear_camera();
+
                             let cfg = settings.load();
                             let nodes = to_inputs(&avi, cfg);
-                            self.avatar = Some(avi);                          
+                            let cam_id = avi.cam_id.clone();
+                            self.avatar = Some(avi);
 
                             if !nodes.is_empty() {
                                 for (pairs, node) in nodes {
@@ -302,17 +389,45 @@ impl VrcGame {
                                         let key = SlotKey::new(resp, idx);
                                         self.watched
                                             .entry(addr.clone())
-                                            .or_default().0
+                                            .or_default().infos
                                             .push(AddrInfo::Slot(key, SlotFieldKind::Value));
                                     }
                                 }
                             }
+
+                            // The routes need the finished watch table, so the
+                            // camera binds last.
+                            if let Some(id) = cam_id {
+                                self.camera_id = Some(id.clone());
+                                self.request_camera_schema(id);
+                            }
+
                             self.dirty = true;
+                        }
+                        MsgToMainVrc::CameraId(id) => {
+                            if self.camera_id.as_deref() != Some(id.as_str()) {
+                                self.camera_id = Some(id.clone());
+                                self.request_camera_schema(id);
+                            }
+                        }
+                        MsgToMainVrc::CameraSchema { id, schema } => {
+                            // A late reply for an old avatar is stale.
+                            if self.camera_id.as_deref() != Some(id.as_str()) {
+                                log::debug!("Dropped a stale camera schema: {}", id);
+                            } else {
+                                match schema {
+                                    Some(schema) => self.bind_camera(&schema),
+                                    None => self.clear_camera(),
+                                }
+                                self.dirty = true;
+                            }
                         }
                         MsgToMainVrc::VrcDisconnected => {
                             log::warn!("Vrc Disconnected");
                             self.avatar = None;
                             self.available_parameters.clear();
+                            self.clear_camera();
+                            self.camera_id = None;
                             self.dirty = true;
                         }
                     }
@@ -321,14 +436,92 @@ impl VrcGame {
         }
     }
 
+    /// Reads the camera schema with the given ID on a side task.
+    ///
+    /// The read touches the file system, so it must not run on the socket loop.
+    /// The result comes back as `MsgToMainVrc::CameraSchema`.
+    fn request_camera_schema(&self, id: String) {
+        log::info!("Avatar reports camera id: {}", id);
+        let index = Arc::clone(&self.schema_index);
+        let handle = self.get_handle();
+
+        tokio::spawn(async move {
+            let schema = match ApiManager::load_schema_from(&index, &id).await {
+                Ok(schema) => Some(Box::new(schema)),
+                Err(err) => {
+                    log::warn!("No camera schema for id {}: {:?}", id, err);
+                    None
+                }
+            };
+            handle.send(MsgToMainVrc::CameraSchema { id, schema });
+        });
+    }
+
+    /// Builds the routing table and starts the decode thread on it.
+    ///
+    /// A field name is an OSC path without the VRC Fury prefix. A name that no
+    /// node watches drops out of the table.
+    fn bind_camera(&mut self, schema: &DataRefSchema) {
+        let watched = &mut self.watched;
+        for entry in watched.values_mut() {
+            entry.camera = false;
+        }
+
+        let built = CameraSession::build(
+            schema,
+            CAMERA_MIN_CONFIDENCE,
+            true,
+            None,
+            |name| match watched.get_mut(&remove_version(name)) {
+                Some(entry) => {
+                    entry.camera = true;
+                    entry.infos.clone()
+                }
+                None => FieldRoute::new(),
+            },
+        );
+
+        match built {
+            Ok(session) => {
+                self.camera.bind(Arc::clone(&session));
+                self.camera_session = Some(session);
+            }
+            Err(err) => {
+                log::warn!("Unable to bind camera {}: {}", schema.id, err);
+                self.clear_camera();
+            }
+        }
+    }
+
+    /// Stops the decode thread and clears the camera flags.
+    fn clear_camera(&mut self) {
+        if self.camera_session.take().is_some() {
+            self.camera.clear();
+        }
+        for entry in self.watched.values_mut() {
+            entry.camera = false;
+        }
+    }
+
     fn handle_dropped(&mut self) {
         let now = Instant::now();
         let tx = &self.map.event_sender.clone();
+
+        // The camera holds a value until the next change, so a camera address
+        // has no steady OSC traffic. Read the decoder counters instead.
+        let activity = self.camera.stats().activity();
+        let camera_alive = activity != self.camera_activity;
+        self.camera_activity = activity;
+
         for comg in self.watched.values_mut() {
-            let val = &comg.0;
-            if now.checked_duration_since(comg.1).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(1) {
-                comg.1 = now;
-                for inf in val {
+            if comg.camera && camera_alive {
+                comg.last = now;
+                continue;
+            }
+
+            if now.checked_duration_since(comg.last).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(1) {
+                comg.last = now;
+                for inf in &comg.infos {
                     let arg = &RefMessage { addr: "", t: MsgType::F32, contents: &0.0f32.to_be_bytes().clone() };
                     log_err!(Self::push_info(tx, inf, arg));
                 }
@@ -352,8 +545,9 @@ impl VrcGame {
             velocity_mult: 0.0, // these will be filled out by touching the state in the handle function
             velocity_ratio: 0.0,
             watched: self.watched.iter()
-                .flat_map(|(s, infos)| infos.0.iter().map(move |i| (s.clone(), i.clone())))
+                .flat_map(|(s, entry)| entry.infos.iter().map(move |i| (s.clone(), i.clone())))
                 .collect(),
+            camera: self.camera.stats().snapshot(self.camera_session.as_deref()),
         };
 
         current.swap(Arc::new(changed));
@@ -382,6 +576,41 @@ impl VrcGame {
             }
         }
     }
+}
+
+/// Sends one already decoded value to a map target.
+///
+/// The camera path calls this for every changed field. The call takes no lock
+/// and allocates nothing beyond the channel node. It returns false when the map
+/// loop is gone.
+#[inline]
+pub(crate) fn push_scalar(
+    tx: &UnboundedSender<InputEventMessage>,
+    info: &AddrInfo,
+    value: f32,
+) -> bool {
+    let msg = match info {
+        AddrInfo::Slot(key, kind) => {
+            let field = match kind {
+                SlotFieldKind::Weight => SlotField::Weight(value),
+                SlotFieldKind::Value => SlotField::Value(value),
+                SlotFieldKind::Muted => SlotField::Muted(value > 0.5),
+            };
+            InputEventMessage::UpdateSlotField { key: key.clone(), field }
+        }
+        AddrInfo::Node(key, kind) => {
+            let field = match kind {
+                // A single number fills x, the same way a single float from OSC
+                // does.
+                NodeFieldKind::Location => NodeField::Location(Vec3::new(value, 0.0, 0.0)),
+                NodeFieldKind::Radius => NodeField::Radius(value),
+                NodeFieldKind::Muted => NodeField::Muted(value > 0.5),
+            };
+            InputEventMessage::UpdateNodeField { key: key.clone(), field }
+        }
+    };
+
+    tx.send(msg).is_ok()
 }
 
 const F32DEFAULT: f32 = 0.0;
@@ -447,9 +676,9 @@ fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)
 
     // add ogb setup
     if let Some((ogb, vfh)) = &avi.ps {
-        for param in ogb {
-            nodes.append(&mut create_ogb_nodes(settings, param.full_path.0.clone()));
-        }
+        // for param in ogb {
+        //     nodes.append(&mut create_ogb_nodes(settings, param.full_path.0.clone()));
+        // }
 
         for param in ogb {
             nodes.append(&mut create_vfh_nodes(settings, param.full_path.0.clone()));
@@ -511,7 +740,10 @@ pub struct Avatar {
     configs: Vec<GameMap>,
     // ogb, vfh
     ps: Option<(Vec<OscInfo>, Vec<OscInfo>)>,
-
+    /// The camera schema ID from `/avatar/parameters/haptic/cam_id/<uuid>`.
+    ///
+    /// An avatar carries one ID, because the game gives one camera output.
+    cam_id: Option<String>,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]

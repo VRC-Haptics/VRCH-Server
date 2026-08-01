@@ -61,44 +61,44 @@ impl FromStr for OGBContacts {
 /// Returns a list of nodes. 
 /// 
 /// each node has a list of (addr, slots), these will be handled so that each parameter drives this value when a message arrives.
-pub fn create_ogb_nodes(cfg: &VrcSettings, over: &AviOverride, params: Vec<String>) -> Result<Vec<(Vec<(String, u8)>, Box<InputNode>)>, > {
-    let new = param.replace("/avatar/parameters/OGB/", "");
-    let trimmed: Vec<_> = new.split(|v| v == '/').collect();
-    let ogb = trimmed.first().with_context(|| "OGB Parameter: {param}; Doesn't have first")?;
-    let id = trimmed.get(1).with_context(|| "OGB Parameter: {param}; doesn't have id")?;
-    let spec = trimmed.get(2).with_context(|| "OGB Parameter: {param}; doesn't have type")?;
+// pub fn create_ogb_nodes(cfg: &VrcSettings, over: &AviOverride, params: Vec<String>) -> Result<Vec<(Vec<(String, u8)>, Box<InputNode>)>, > {
+//     let new = param.replace("/avatar/parameters/OGB/", "");
+//     let trimmed: Vec<_> = new.split(|v| v == '/').collect();
+//     let ogb = trimmed.first().with_context(|| "OGB Parameter: {param}; Doesn't have first")?;
+//     let id = trimmed.get(1).with_context(|| "OGB Parameter: {param}; doesn't have id")?;
+//     let spec = trimmed.get(2).with_context(|| "OGB Parameter: {param}; doesn't have type")?;
 
-    let _type = if *ogb == "Orf" {
-        OGBType::Orf
-    } else if *ogb == "Pen" {
-        OGBType::Pen
-    } else {
-        return Err(anyhow!("Unable to build type for: {ogb}"));
-    };
+//     let _type = if *ogb == "Orf" {
+//         OGBType::Orf
+//     } else if *ogb == "Pen" {
+//         OGBType::Pen
+//     } else {
+//         return Err(anyhow!("Unable to build type for: {ogb}"));
+//     };
 
-    let contact = spec.parse::<OGBContacts>()?;
+//     let contact = spec.parse::<OGBContacts>()?;
 
-    Ok(match over.ps.get(*id) {
-        Some(new) => {
-            let mut nodes = vec![];
-            for entry in new.outputs {
-                let mut slots = SmallVec::default();
+//     Ok(match over.ps.get(*id) {
+//         Some(new) => {
+//             let mut nodes = vec![];
+//             for entry in new.outputs {
+//                 let mut slots = SmallVec::default();
 
-                let sl = Slot {
-                    muted: false,
-                    source: super::config::InputType::Weight,
-                    layer: I
-                }
+//                 let sl = Slot {
+//                     muted: false,
+//                     source: super::config::InputType::Weight,
+//                     layer: I
+//                 }
 
-                let node = InputNode::new(entry.0, NodeGroup::All, entry.2, slots, entry.1)
-            }
-            nodes
-        }
-        None => {
+//                 let node = InputNode::new(entry.0, NodeGroup::All, entry.2, slots, entry.1)
+//             }
+//             nodes
+//         }
+//         None => {
 
-        }
-    })
-}
+//         }
+//     })
+// }
 
 /// Takes in a string following the form:
 /// 

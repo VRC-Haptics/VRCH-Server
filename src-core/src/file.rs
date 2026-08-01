@@ -45,6 +45,7 @@ pub enum Directory {
     BhapticsCache,
     Logs,
     Maps,
+    CamMaps,
     Security,
     Sidecars,
 }
@@ -56,6 +57,7 @@ pub fn resolve_dir(folder: Directory) -> PathBuf {
         Directory::BhapticsCache => root.join("data"),
         Directory::Logs => root.join("logs"),
         Directory::Maps => root.join("map_configs"),
+        Directory::CamMaps => root.join("cam_configs"),
         Directory::Security => root.join("security"),
         Directory::Sidecars => root.join("sidecars"),
     }

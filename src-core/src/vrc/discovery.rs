@@ -1,5 +1,5 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
-use super::{Avatar, GameMap, MsgToMainVrc, OscPath, VrcHandle, PREFAB_PREFIX};
+use super::{Avatar, GameMap, MsgToMainVrc, OscPath, VrcHandle, CAM_ID_PREFIX, PREFAB_PREFIX};
 use crate::api::ApiManager;
 use crate::vrc::AVATAR_ID_PATH;
 
@@ -182,7 +182,8 @@ async fn create_avatar(
         id: new_id,
         prefab_names: names,
         configs: configs,
-        ps
+        ps,
+        cam_id: get_camera_id(params),
     }
 }
 
@@ -313,4 +314,40 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
     } else {
         Some(results)
     }
+}
+
+/// Searches the DashMap for the camera ID. Paths must follow the pattern:
+/// `/avatar/parameters/haptic/cam_id/<uuid>`
+///
+/// An avatar is allowed one camera ID, because the game gives one camera
+/// output. A second ID is a build error on the avatar, so the search warns and
+/// takes the lowest name.
+pub fn get_camera_id(map: &DashMap<OscPath, OscInfo>) -> Option<String> {
+    let mut found: Option<String> = None;
+
+    for entry in map.iter() {
+        let Some(id) = entry.key().0.strip_prefix(CAM_ID_PREFIX) else {
+            continue;
+        };
+        if id.is_empty() || id.contains('/') {
+            continue; // a partial path, not an ID
+        }
+
+        match &found {
+            Some(first) if first.as_str() != id => {
+                log::warn!("Avatar has more than one camera id: {} and {}", first, id);
+                if id < first.as_str() {
+                    found = Some(id.to_string());
+                }
+            }
+            Some(_) => {}
+            None => found = Some(id.to_string()),
+        }
+    }
+
+    if let Some(id) = &found {
+        log::info!("Avatar has camera: {}", id);
+    }
+
+    found
 }
