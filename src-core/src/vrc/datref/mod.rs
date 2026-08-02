@@ -39,15 +39,15 @@ pub use session::{CameraSession, FieldRoute, FieldSpec, SessionError};
 use ffi::{Drd, DrdConfig, DrdFrame, DRD_CONFIG_ON_CHANGE, DRD_FRAME_ID};
 
 /// The wait between polls while frames arrive.
-const PACE_HOT: Duration = Duration::from_micros(250);
+const PACE_HOT: Duration = Duration::from_millis(4);
 /// The wait after a short run of empty polls.
-const PACE_WARM: Duration = Duration::from_millis(4);
+const PACE_WARM: Duration = Duration::from_millis(5);
 /// The wait when no sender exists.
 const PACE_COLD: Duration = Duration::from_millis(100);
 /// The count of empty polls before the warm wait.
-const IDLE_WARM: u32 = 32;
+const IDLE_WARM: u32 = 16;
 /// The count of empty polls before the cold wait.
-const IDLE_COLD: u32 = 512;
+const IDLE_COLD: u32 = 32;
 /// The wait before a second open after a failure.
 const REOPEN_DELAY: Duration = Duration::from_secs(2);
 /// The wait between two reads of the handle state.

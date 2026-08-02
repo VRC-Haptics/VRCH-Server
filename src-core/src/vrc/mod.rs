@@ -14,12 +14,12 @@ use crate::mapping::{
 };
 use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind};
 use crate::osc::parse::{MsgType, RefMessage, first_message};
-use crate::state::{self, VrcSettings, get_config};
+use crate::state::{VrcSettings, get_config};
 use crate::util::next_free_port_with_address;
-use crate::vrc::config::{Input, InputType};
+use crate::vrc::config::InputType;
 use crate::vrc::datref::{CameraDecoder, CameraInfo, CameraSession, FieldRoute};
-use crate::vrc::ps::{ create_vfh_nodes};
-use arc_swap::{ArcSwap, Cache, Guard};
+use crate::vrc::ps::create_vfh_nodes;
+use arc_swap::{ArcSwap, Cache};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
@@ -33,21 +33,16 @@ use crate::{log_err};
 use config::GameMap;
 use dashmap::DashMap;
 use discovery::start_filling_available_parameters;
-use hazarc::{ArcBorrow, AtomicArc};
 use osc_query::OscQueryServer;
 use parsing::remove_version;
 
-use rosc::{OscMessage, OscType};
-use std::collections::HashMap;
+use rosc::OscType;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 use std::{net::Ipv4Addr, sync::Arc};
-use tokio::sync::{
-    mpsc::{channel, Receiver, Sender},
-    Mutex,
-};
+use tokio::sync::Mutex;
 
 /// struct exposed to the UI.
 ///
@@ -216,6 +211,7 @@ pub struct VrcGame {
 //const _: [u8; std::mem::size_of::<MsgToMainVrc>()] = [];
 #[derive(Debug)]
 pub enum MsgToMainVrc {
+    RebuildAvatar,
     Info(oneshot::Sender<()>),
     /// A new avatar configuration was detected
     NewAvatar(Avatar),
@@ -278,7 +274,7 @@ impl VrcGame {
     /// Main event loop that handles VRC communications.
     pub async fn run(&mut self) {
         log::trace!("Running VRC");
-        let mut settings = Cache::new(&state::get_config().vrc_settings);
+        let mut settings = Cache::new(&get_config().vrc_settings);
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -311,7 +307,6 @@ impl VrcGame {
 
 
         let mut buf = [0u8; rosc::decoder::MTU];
-        let mut cache = Cache::new(&get_config().server);
         loop {
             tokio::select! {
                 _ = tick.tick() => {
@@ -356,6 +351,11 @@ impl VrcGame {
                     };
 
                     match msg {
+                        MsgToMainVrc::RebuildAvatar => {
+                            if let Some(avi) = &self.avatar {
+                                self.handle.send(MsgToMainVrc::NewAvatar(avi.clone()));
+                            }
+                        }
                         MsgToMainVrc::Info(tx) => {
                             self.update_info(); // updates if dirty
                             log_err!(tx.send(())); // marks we are done updating
@@ -432,6 +432,16 @@ impl VrcGame {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    fn handle_info_update(&mut self, cfg: &Arc<VrcSettings>, mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
+        if (cfg.velocity_ratio - ratio).abs() < 0.0001 {
+            
+            if let Some(avi) = &self.avatar {
+                // rebuilding the avatar takes the new cfg value into account.
+                self.handle.send(MsgToMainVrc::NewAvatar(avi.clone()));
             }
         }
     }
@@ -696,8 +706,8 @@ fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)
             let vel = settings.velocity_ratio;
             let slots: Vec<(String, Slot)> = node.inputs.iter().map(|i| {
                 let weight = match i.source {
-                    InputType::Weight => vel,
-                    InputType::Velocity => 1.0 - vel,
+                    InputType::Weight => (vel) * i.weight, // TODO: This is swapped?
+                    InputType::Velocity => (1.0 - vel) * i.weight,
                 };
 
                 return (

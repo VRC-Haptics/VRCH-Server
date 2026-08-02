@@ -6,20 +6,18 @@ pub mod input_node;
 pub mod interp;
 
 use crate::{
-    log_err,
-    mapping::{event::{Frames, Steps}, input_node::{InterpolationLayer, SlotKey}}, vrc::config::{Input, InputLayer, InputType},
+    log_err, mapping::{event::{Frames, Steps}, input_node::SlotKey}, state::{VrcSettings, get_config}, vrc::config::{InputLayer, InputType}
 };
-use arc_swap::{ArcSwap, Guard};
+use arc_swap::{ArcSwap, Cache, Guard};
 use nohash_hasher::IntMap;
 use parking_lot::RwLock;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use slotmap::SlotMap;
-use strum::{Display, EnumDiscriminants};
-use uuid::Uuid;
-use std::{collections::HashMap, default, sync::Arc, time::Duration};
+use strum::EnumDiscriminants;
+use std::{sync::Arc, time::Duration};
 use tokio::{
     sync::{
-        Notify, mpsc::{self, error::SendError, unbounded_channel}, oneshot
+        mpsc::{self, error::SendError}, oneshot
     },
     time::{Instant, interval},
 };
@@ -187,7 +185,8 @@ pub struct Nodes {
 impl Nodes {
     /// Updates nodes' final output value.
     /// Gets called each update, be careful.
-    pub fn update_nodes(&mut self) {
+    pub fn update_nodes(&mut self, cfg: &Arc<VrcSettings>) {
+        let now = std::time::Instant::now();
         // TODO: Add velocity calculations/handling
         for key in self.active_streaming.iter().chain(self.transient.values().flatten()) {
             let Some(node) = self.nodes.get_mut(*key) else {
@@ -201,7 +200,10 @@ impl Nodes {
             let mut min = 1.0_f32;
             let mut overridden = None;
             for slot in node.slots.iter_mut() {
-                let val = slot.history.latest().unwrap_or(0.0);
+                let val = match slot.source {
+                    InputType::Weight => slot.history.latest().unwrap_or(0.0),
+                    InputType::Velocity => slot.history.speed_windowed_at(now) * cfg.velocity_mult,
+                };
                 let weighted = val * slot.weight;
 
                 match slot.layer {
@@ -312,6 +314,7 @@ impl InputMap {
 
         let mut stats = LoopStats::default();
         let mut last_report = Instant::now();
+        let mut cache = Cache::new(&get_config().vrc_settings);
         loop {
             // sample backlog before we block on select
             let backlog = self.event_recv.len();
@@ -332,8 +335,9 @@ impl InputMap {
                     }
 
                     if self.map_dirty {
+                        let cfg = cache.load();
                         let t = Instant::now();
-                        self.update_devices();
+                        self.update_devices(cfg);
                         self.map_dirty = false;
                         stats.dirty.record(t.elapsed().as_nanos());
                     }
@@ -609,9 +613,9 @@ impl InputMap {
     }
 
     /// pushes updates from map to devices, using our intermediary devices.
-    fn update_devices(&mut self) {
+    fn update_devices(&mut self, cfg: &Arc<VrcSettings>) {
         // Calculate internal node values from slots.
-        self.input_nodes.update_nodes();
+        self.input_nodes.update_nodes(cfg);
 
         let _: () = self.devices.par_iter().map(|d | {
             // could be done in parallel here. but few devices means not efficient (probably)

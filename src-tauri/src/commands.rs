@@ -7,7 +7,7 @@ use crate::mapping::{InputEventMessage};
 use crate::log_err;
 
 use crate::vrc::{config::GameMap};
-use haptic_core::mapping::{EventKey, NodeField, NodeKey, Snapshot};
+use haptic_core::{mapping::{EventKey, NodeField, NodeKey, Snapshot}, vrc::MsgToMainVrc};
 //standard imports
 use runas::Command;
 use std::sync::{Arc, LazyLock};
@@ -166,9 +166,13 @@ pub async fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> Result<Arc<VrcInf
 #[tauri::command]
 #[specta::specta]
 /// sets all vrc relevant info. It is all behind an arcswap so it is the same cost to set all or one of them.
-pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
+pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration, vrc: tauri::State<'_, VrcHandle>) {
     let shared = &state::get_config().vrc_settings;
     let mut new = VrcSettings::clone(&shared.load());
+    
+    let should_refresh = (ratio - new.velocity_ratio).abs() > 0.001;
+
+    
     new.velocity_mult = mult;
     new.velocity_ratio = ratio;
     new.sample_cache = samples;
@@ -176,6 +180,14 @@ pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
 
     shared.swap(Arc::new(new));
     state::mark_dirty();
+
+    // velocity ratio get's rebuilt with avatar rebuild
+    if should_refresh {
+        vrc.send(MsgToMainVrc::RebuildAvatar);
+    }
+    // velocity mult is loaded from arcswap every map itteration
+    // smaple_cache isn't taken into account yet, since it is compiled in small vec
+    // smoothing time isn't implemented yet.
 }
 
 #[tauri::command]
