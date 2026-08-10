@@ -95,7 +95,7 @@ export type DeviceId = string;
 
 /**
  *  Info container for each device type
- *  
+ * 
  *  An information that should be in all variants should be made so via the below impl.
  *  Don't manually dip into each variant please.
  */
@@ -109,7 +109,7 @@ export type ESP32Model =
 "ESP32S2" | 
 // ESP32-S2 with 16MB flash
 "ESP32S2FH16" | 
-// ESP32-S2 with 32MB flash  
+// ESP32-S2 with 32MB flash
 "ESP32S2FH32" | "ESP32S3" | "ESP32C3" | "ESP32C2" | "ESP32C6" | "ESP8266" | "Unknown";
 
 // Represents a haptic event that takes place over time.

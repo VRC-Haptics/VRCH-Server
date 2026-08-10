@@ -1,31 +1,28 @@
-use std::fmt;
-use std::net::Ipv4Addr;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use smallvec::SmallVec;
-use tokio::net::UdpSocket;
+use std::{fmt, net::SocketAddr};
+use std::sync::Arc;
+use anyhow::Context;
+use tokio::{io, net::{ToSocketAddrs, UdpSocket}};
 
-use rosc::{OscMessage, OscPacket};
-use tokio::sync::mpsc;
+use rosc::OscPacket;
+use tokio_util::sync::CancellationToken;
 
-use crate::util::next_free_port_with_address;
-
+/// An osc Server dedictated to sendig and receiving across a single UDP connection.
 #[derive(serde::Serialize, Clone)]
 pub struct OscServer {
-    pub port: u16,
-    pub address: Ipv4Addr,
+    pub local: SocketAddr,
+    pub remote: SocketAddr,
     pub filter_prefix: String,
+    pub send: bool,
     #[serde(skip)]
-    close_handle: Option<mpsc::Sender<()>>,
+    pub socket: Arc<UdpSocket>,
     #[serde(skip)]
-    on_receive: Arc<dyn Fn(OscMessage) + Send + Sync>,
+    close_handle: CancellationToken,
 }
 
 impl fmt::Debug for OscServer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("OscServer")
-            .field("port", &self.port)
-            .field("address", &self.address)
+            .field("remote", &self.local)
             .field("close_handle", &self.close_handle)
             .field("on_receive", &"Function Pointer")
             .finish()
@@ -35,122 +32,71 @@ impl fmt::Debug for OscServer {
 impl OscServer {
     /// create new Osc Server, it will need to be started with the start() command
     /// THE ADDRESS IS USUALLY JUST "0.0.0.0". THIS IS THE ADDRESS WE OWN.
-    pub fn new<F>(port: u16, address: Ipv4Addr, on_receive: F) -> Self
+    pub async fn new<F, A>(local: SocketAddr, remote: Option<A>, on_receive: F) -> anyhow::Result<Self>
     where
-        F: Fn(OscMessage) + Send + Sync + 'static,
+        F: Fn(OscPacket) + Send + Sync + 'static,
+        A: ToSocketAddrs
     {
-        OscServer {
-            port,
-            address,
-            close_handle: None,
-            filter_prefix: "".to_string(),
-            on_receive: Arc::new(on_receive),
+        // udp sockets can be shared by arcs safely
+        let socket = UdpSocket::bind(local).await.context("Failed to bind Socket")?;
+        let mut send = false;
+        if let Some(addr) = remote {
+            socket.connect(addr).await.context("Binding to address: {addr:?}")?;
+            send = true;
         }
-    }
+        let socket = Arc::new(socket);
+        let send_socket = Arc::clone(&socket);
 
-    /// Starts a server listening in a new thread.
-    pub async fn start(&mut self) -> u16 {
-        let mut used_port = self.port;
-        let addr = format!("{}:{}", self.address, self.port);
-        let socket = match UdpSocket::bind(&addr).await {
-            Ok(s) => s,
-            Err(_) => {
-                // The desired port is not available. Look for a fallback.
-                if let Some(free_port) =
-                    next_free_port_with_address(self.port, std::net::IpAddr::V4(self.address))
-                {
-                    used_port = free_port;
-                    let addr = format!("{}:{}", self.address, free_port);
-                    UdpSocket::bind(&addr).await.unwrap() //assume we will be able to bind to this one
-                } else {
-                    log::error!("Unable to connect to bhaptics port");
-                    return 0;
-                }
-            }
-        };
+        let token = CancellationToken::new();
+        let tok_clone = token.clone();
+        let callback = on_receive;
+        tokio::spawn(
+            token.run_until_cancelled_owned(async move {
+                log::trace!(
+                    "Spawned UDP OSC Server on: {}",
+                    socket.local_addr().unwrap()
+                );
 
-        let on_receive = Arc::clone(&self.on_receive);
-        let filter_prefix = self.filter_prefix.clone();
-
-        let (tx, mut rx) = mpsc::channel(1);
-        self.close_handle = Some(tx);
-
-        tokio::spawn(async move {
-            log::trace!(
-                "Spawned UDP OSC Server on: {}",
-                socket.local_addr().unwrap()
-            );
-
-            let mut buf = [0u8; rosc::decoder::MTU];
-            loop {
-                tokio::select! {
-                    _ = rx.recv() => {
-                        log::info!("Stopping server thread.");
-                        break;
-                    }
-                    result = socket.recv_from(&mut buf) => {
-                        match result {
-                            Ok((size, _src)) => {
-                                match rosc::decoder::decode_udp(&buf[..size]) {
-                                    Ok((_, packet)) => {
-                                        handle_packet(packet, &on_receive, &filter_prefix);
+                let mut buf = [0u8; rosc::decoder::MTU];
+                loop {
+                    match socket.recv_from(&mut buf).await {
+                        Ok((size, _src))=> {
+                            match rosc::decoder::decode_udp(&buf[..size]) {
+                                Ok((_, packet)) => callback(packet),
+                                Err(e) => {
+                                    if let rosc::OscError::BadPacket(_) = e {
+                                        continue;
                                     }
-                                    Err(e) => {
-                                        if let rosc::OscError::BadPacket(_) = e {
-                                            continue;
-                                        }
-                                        log::error!("Failed to decode OSC packet: {:?}", e);
-                                    }
+                                    log::error!("Failed to decode OSC packet: {:?}", e);
                                 }
-
-                            }
-                            Err(e) => {
-                                log::error!("Error receiving packet: {:?}", e);
                             }
                         }
+                        Err(e) => {
+                            log::error!("Error receiving packet: {:?}", e);
+                        }
                     }
+
                 }
-            }
-        });
-        return used_port;
+            })
+        );
+
+        Ok(OscServer {
+            local: send_socket.local_addr().context("Fetching Local Addr")?,
+            remote: send_socket.peer_addr().context("Could not fetch peer addr")?,
+            close_handle: tok_clone,
+            send,
+            filter_prefix: "".to_string(),
+            socket: Arc::clone(&send_socket),
+        })
+    }
+
+    /// send data to the connected
+    pub async fn send(&self, data: &[u8]) -> io::Result<usize> {
+        self.socket.send(data).await
     }
 
     //kills the server thread.
     pub fn stop(&mut self) {
-        if let Some(handle) = self.close_handle.take() {
-            let _ = handle.send(());
-        }
+        self.close_handle.cancel()
     }
-}
-
-/// recursively handle packets
-fn handle_packet(
-    packet: OscPacket,
-    callback: &Arc<dyn Fn(OscMessage) + Send + Sync>,
-    filter_prefix: &str,
-) {
-    match packet {
-        OscPacket::Bundle(bundle) => {
-            for packet in bundle.content {
-                handle_packet(packet, callback, filter_prefix);
-            }
-        }
-        OscPacket::Message(message) => {
-            handle_message(message, callback, filter_prefix);
-        }
-    }
-}
-
-/// handle the messages with a callback.
-fn handle_message(
-    message: OscMessage,
-    callback: &Arc<dyn Fn(OscMessage) + Send + Sync>,
-    filter_prefix: &str,
-) {
-    let address = &message.addr;
-
-    if filter_prefix == "".to_string() || address.starts_with(filter_prefix) {
-        callback(message);
-    }
-    return;
 }

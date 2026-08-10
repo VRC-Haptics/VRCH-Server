@@ -1,36 +1,43 @@
 use super::{Device, DeviceId, DeviceInfo, DeviceMessage};
-use anyhow::Context;
+use arc_swap::{cache::Cache, ArcSwapAny};
 use parking_lot::{Mutex, RwLock};
 use rosc::{encoder, OscMessage, OscPacket, OscType};
 use std::{
-    net::{SocketAddr},
+    net::{SocketAddr, SocketAddrV4},
     sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::{devices::{
-    DeviceHandle, ESP32Model, wifi::{config::WifiConfig, connection_manager::WifiConnManager}
-}, log_err, state::{self, PerDevice}};
 use crate::mapping::haptic_node::HapticNode;
-use udp::{start_discovery};
+use crate::util::next_free_port;
+use crate::{
+    devices::{
+        wifi::{config::WifiConfig, connection_manager::WifiConnManager},
+        DeviceHandle, ESP32Model,
+    },
+    log_err,
+    state::{self, PerDevice},
+};
+use udp::{broadcast::start_listen_broadcast, send_udp};
 
 mod config;
 mod connection_manager;
-mod udp;
 pub(crate) mod ota;
+mod udp;
 
 pub async fn start_wifi_devices(manager: &mut DeviceHandle) {
     log::trace!("Starting wifi devices");
-    log_err!(start_discovery(manager.clone()).await);
+    udp::start_udp().await;
+    start_listen_broadcast(manager).await;
 }
 
-/// Implements Device trait, Abstracts over VRCH official haptics devices.
 #[derive(Debug)]
 pub struct WifiDevice {
     name: String,
     mac: String,
+    remote_addr: SocketAddr,
     cancel: CancellationToken,
     manager: mpsc::Sender<DeviceMessage>,
     live_state: Arc<Mutex<WifiDeviceState>>,
@@ -81,164 +88,27 @@ pub struct WifiDeviceInfo {
     pub intensity: f32,
 }
 
-/// because devices aren't ticked by the main instance they need to spawn
-/// processes into the tokio pool.
-struct WifiTicker {
-    id: DeviceId,
-    name: String,
-    state: Arc<Mutex<WifiDeviceState>>,
-    manager: mpsc::Sender<DeviceMessage>,
-    connection: WifiConnManager,
-    cancel: CancellationToken,
-}
-
-impl WifiTicker {
-    /// Does not yield until the device is disconnected or cancelled.
-    async fn run(self) {
-        let period = Duration::from_millis(20);
-        let cancel = self.cancel.clone();
-        cancel
-            .run_until_cancelled(async move {
-                let mut interval = tokio::time::interval(period);
-                loop {
-                    interval.tick().await;
-                    let start = Instant::now();
-                    self.tick().await;
-                    let elapsed = start.elapsed();
-                    if elapsed > period {
-                        log::warn!("Device tick overran: {:?} (limit {:?})", elapsed, period);
-                    }
-                }
-            })
-            .await;
-    }
-
-    async fn tick(&self) {
-        // actions are split so that
-        let action = {
-            let mut state = self.state.lock();
-
-            match state.been_pinged {
-                Some(i) => {
-                    let since_pinged = Instant::now().duration_since(i);
-                    let diff = state.last_heartbeat.elapsed();
-                    let ttl = Duration::from_secs(**state::get_config().devices.wifi_device_timeout.load() as u64);
-                    if diff > ttl && since_pinged > ttl || self.cancel.is_cancelled() {
-                        // don't handle killing here.
-                        // This shoudl take less than the 10ms reset, could be race condition.
-                        log_err!(self.manager.try_send(DeviceMessage::Remove(self.id.clone())));
-                        TickAction::Kill
-                    } else {
-                        // fall through to other checks below
-                        TickAction::None
-                    }
-                }
-                None => {
-                    state.been_pinged = Some(Instant::now());
-                    let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
-                        addr: "/ping".to_string(),
-                        args: vec![OscType::Int(self.connection.server.local.port().into())],
-                    }))
-                    .expect("Failed to build packet");
-                    TickAction::Ping(msg_buf)
-                }
-            }
-        };
-
-        // Handle actions that need no further lock
-        match action {
-            TickAction::Kill => {
-                self.cancel.cancel()
-            },
-            TickAction::Ping(buf) => {
-                log::trace!("Sent ping: {}", self.name);
-                log_err!(self.connection.send(&buf).await);
-                return;
-            },
-            TickAction::None |
-            TickAction::Drive(_) |
-            TickAction::PushMap(_) |
-            TickAction::QueryPlatform(_) |
-            TickAction::Query(_) => {}
-        }
-
-        // Second lock scope for remaining checks
-        let action = {
-            let mut state = self.state.lock();
-
-            if state.push_map && state.config.is_some() {
-                state.push_map = false;
-                let conf = state.config.as_ref().unwrap();
-                log::trace!("Pushing config to device: {}", self.name);
-                TickAction::PushMap(build_set_map(&conf.node_map))
-            } else if state.config.is_none() && state.been_query.is_none() {
-                state.been_query = Some(Instant::now());
-                let msg = encoder::encode(&OscPacket::Message(OscMessage {
-                    addr: "/command".to_string(),
-                    args: vec![OscType::String("get all".to_string())],
-                })).unwrap();
-                log::trace!("Query Device: {}", self.name);
-                TickAction::Query(msg)
-            } else if !state.been_platform_query {
-                state.been_platform_query = true;
-                let msg = encoder::encode(&OscPacket::Message(OscMessage {
-                    addr: "/command".to_string(),
-                    args: vec![OscType::String("GET PLATFORM".to_string())],
-                })).unwrap();
-                log::trace!("Query platform: {}", self.name);
-                TickAction::QueryPlatform(msg)
-            } else if let Some(conf) = &state.config {
-                let mut hex = String::new();
-                for mtr_idx in 0..conf.node_map.len() {
-                    let output = state.output.read();
-                    let num = output.get(mtr_idx).unwrap_or(&0.0);
-                    let scaled = (num.clamp(0.0, 1.0) * 0xffff as f32).round() as u16;
-                    hex.push_str(&format!("{:04x}", scaled));
-                }
-                let bytes = rosc::encoder::encode(&rosc::OscPacket::Message(rosc::OscMessage {
-                    addr: "/h".to_string(),
-                    args: vec![OscType::String(hex)],
-                })).unwrap();
-                TickAction::Drive(bytes)
-            }else {
-                TickAction::None
-            }
-        }; // lock dropped
-
-        match action {
-            TickAction::PushMap(buf) => {log_err!(self.connection.send(&buf).await)},
-            TickAction::Query(buf) => {log_err!(self.connection.send(&buf).await)},
-            TickAction::Drive(buf) => {log_err!(self.connection.send(&buf).await)},
-            TickAction::Ping(_) => {}, // no action can push here?
-            TickAction::QueryPlatform(buf) => {log_err!(self.connection.send(&buf).await)},
-            TickAction::Kill |
-            TickAction::None => {},
-        }
-    }
-}
-
 impl WifiDevice {
-    /// Initializes device setup.
-    ///
-    /// Does not send any data to teh device or monitor the connection in any way.
-    /// start_tick() is required to initiate and continue communication.
+    /// NOTE: Needs to initialize everything
     pub async fn new(
         mac: String,
         ip: String,
         port: u16,
         name: String,
-        dev_tx: mpsc::Sender<DeviceMessage>,
-    ) -> anyhow::Result<WifiDevice> {
+        tx: mpsc::Sender<DeviceMessage>,
+    ) -> Option<WifiDevice> {
         let is_alive = CancellationToken::new();
-        let ip = ip.parse().context("Parsing Device IP")?;
+        let ip = ip.parse().expect("Unable to parse ip");
 
+        let recv_port = next_free_port(1500).unwrap();
         let (con_tx, mut rx) = mpsc::channel(5);
-        let con = WifiConnManager::new(SocketAddr::new(ip, port), con_tx).await.context("Creating Device manager")?;
+        let con = WifiConnManager::new(&recv_port, "/hrtbt".to_string(), con_tx).await;
         let state = Arc::new(Mutex::new(WifiDeviceState::default()));
 
+        // processing messages from the connection manager
         let cancel_clone = is_alive.clone();
         let state_clone = Arc::clone(&state.clone());
-        let tx_clone = dev_tx.clone();
+        let tx_clone = tx.clone();
         let id_clone = DeviceId(mac.clone());
         tokio::task::spawn(async move {
             loop {
@@ -294,35 +164,33 @@ impl WifiDevice {
             }
         });
 
-        let dev = WifiDevice {
+        let addr = SocketAddr::V4(SocketAddrV4::new(ip, port));
+        start_tick(
+            is_alive.clone(),
+            addr.clone(),
+            Arc::clone(&state),
+            recv_port,
+        )
+        .await;
+
+        Some(WifiDevice {
             live_state: state,
+            remote_addr: addr,
             name: name,
             mac: mac,
-            manager: dev_tx,
+            manager: tx,
             cancel: is_alive,
             connection: con,
-        };
-
-        tokio::spawn(
-            WifiTicker {
-                id: dev.get_id(),
-                name: dev.name.clone(),
-                state: Arc::clone(&dev.live_state),
-                manager: dev.manager.clone(),
-                connection: dev.connection.clone(),
-                cancel: dev.cancel.clone()
-            }.run()
-        );
-
-        Ok(dev)
+        })
     }
 
     /// Please be mindful this call causes locking with internal state,
+    ///
     fn get_info(&self) -> WifiDeviceInfo {
         let state = self.live_state.lock();
         WifiDeviceInfo {
             nodes: state.nodes.clone(),
-            remote_addr: self.connection.server.remote.clone(),
+            remote_addr: self.remote_addr.clone(),
             name: self.name.clone(),
             mac: self.mac.clone(),
             rssi: 0,
@@ -332,7 +200,35 @@ impl WifiDevice {
         }
     }
 
-    pub fn reset_ping(&self) {}//TODO!("THIS SHOULD WORK")
+    pub fn reset_ping(&self) {}
+}
+
+async fn start_tick(
+    cancel: CancellationToken,
+    addr: SocketAddr,
+    state: Arc<Mutex<WifiDeviceState>>,
+    recieve_port: u16,
+) {
+    tokio::task::spawn(async move {
+        let period = Duration::from_millis(20);
+        let mut interval = tokio::time::interval(period);
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    let start = Instant::now();
+                    tick(&addr, &state, recieve_port, cancel.clone()).await;
+                    let elapsed = start.elapsed();
+                    if elapsed > period {
+                        log::warn!("Device tick overran: {:?} (limit {:?})", elapsed, period);
+                    }
+                }
+
+                _ = cancel.cancelled() => {
+                    break;
+                }
+            };
+        }
+    });
 }
 
 enum TickAction {
@@ -345,6 +241,125 @@ enum TickAction {
     None,
 }
 
+async fn tick(
+    addr: &SocketAddr,
+    state: &Arc<Mutex<WifiDeviceState>>,
+    recieve_port: u16,
+    cancel: CancellationToken,
+) {
+    let action = {
+        let mut state = state.lock();
+
+        match state.been_pinged {
+            Some(i) => {
+                let since_pinged = Instant::now().duration_since(i);
+                let diff = state.last_heartbeat.elapsed();
+                let ttl = Duration::from_secs(
+                    **state::get_config().devices.wifi_device_timeout.load() as u64,
+                );
+                if diff > ttl && since_pinged > ttl || cancel.is_cancelled() {
+                    cancel.cancel();
+                    TickAction::Kill
+                } else {
+                    // fall through to other checks below
+                    TickAction::None
+                }
+            }
+            None => {
+                state.been_pinged = Some(Instant::now());
+                let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+                    addr: "/ping".to_string(),
+                    args: vec![OscType::Int(recieve_port.into())],
+                }))
+                .expect("Failed to build packet");
+                TickAction::Ping(msg_buf)
+            }
+        }
+    };
+
+    // Handle actions that need no further lock
+    match action {
+        TickAction::Kill => cancel.cancel(),
+        TickAction::Ping(buf) => {
+            log::trace!("Sent ping: {}", addr);
+            let _ = send_udp(&buf, addr).await;
+            return;
+        }
+        TickAction::None
+        | TickAction::Drive(_)
+        | TickAction::PushMap(_)
+        | TickAction::QueryPlatform(_)
+        | TickAction::Query(_) => {}
+    }
+
+    // Second lock scope for remaining checks
+    let action = {
+        let mut state = state.lock();
+
+        if state.push_map && state.config.is_some() {
+            state.push_map = false;
+            let conf = state.config.as_ref().unwrap();
+            log::trace!("Pushing config to device: {addr:?}");
+            TickAction::PushMap(build_set_map(&conf.node_map))
+        } else if state.config.is_none() && state.been_query.is_none() {
+            state.been_query = Some(Instant::now());
+            let msg = encoder::encode(&OscPacket::Message(OscMessage {
+                addr: "/command".to_string(),
+                args: vec![OscType::String("get all".to_string())],
+            }))
+            .unwrap();
+            log::trace!("Query Device: {addr:?}");
+            TickAction::Query(msg)
+        } else if !state.been_platform_query {
+            state.been_platform_query = true;
+            let msg = encoder::encode(&OscPacket::Message(OscMessage {
+                addr: "/command".to_string(),
+                args: vec![OscType::String("GET PLATFORM".to_string())],
+            }))
+            .unwrap();
+            log::trace!("Query platform: {addr:?}");
+            TickAction::QueryPlatform(msg)
+        } else if let Some(conf) = &state.config {
+            let mut hex = String::new();
+            for mtr_idx in 0..conf.node_map.len() {
+                let output = state.output.read();
+                let num = output.get(mtr_idx).unwrap_or(&0.0);
+                let scaled = (num.clamp(0.0, 1.0) * 0xffff as f32).round() as u16;
+                hex.push_str(&format!("{:04x}", scaled));
+            }
+            let bytes = rosc::encoder::encode(&rosc::OscPacket::Message(rosc::OscMessage {
+                addr: "/h".to_string(),
+                args: vec![OscType::String(hex)],
+            }))
+            .unwrap();
+            TickAction::Drive(bytes)
+        } else {
+            TickAction::None
+        }
+    }; // lock dropped
+
+    match action {
+        TickAction::PushMap(buf) => {
+            log_err!(send_udp(&buf, addr).await)
+        }
+        TickAction::Query(buf) => {
+            log_err!(send_udp(&buf, addr).await)
+        }
+        TickAction::Drive(buf) => {
+            log_err!(send_udp(&buf, addr).await)
+        }
+        TickAction::Ping(buf) => {
+            log::trace!("Port: {:?}", addr.port());
+            let mut new = addr.clone();
+            new.set_port(1027);
+            log_err!(send_udp(&buf, &new).await)
+        }
+        TickAction::QueryPlatform(buf) => {
+            log_err!(send_udp(&buf, addr).await)
+        }
+        TickAction::Kill | TickAction::None => {}
+    }
+}
 
 /// builds binary response to
 fn build_set_map(map: &Vec<HapticNode>) -> Vec<u8> {
@@ -386,7 +401,7 @@ impl Device for WifiDevice {
         let state = self.live_state.lock();
         let info = WifiDeviceInfo {
             nodes: state.nodes.clone(),
-            remote_addr: self.connection.server.remote.clone(),
+            remote_addr: self.remote_addr.clone(),
             name: self.name.clone(),
             mac: self.mac.clone(),
             rssi: 0,
@@ -408,16 +423,21 @@ impl Device for WifiDevice {
                 cfg.swap(Arc::new(local));
 
                 let mut state = self.live_state.lock();
-                if let Some( ref mut conf) = &mut state.config {
+                if let Some(ref mut conf) = &mut state.config {
                     conf.node_map = inf.nodes.clone();
-
                 }
                 state.output.write().resize(inf.nodes.len(), 0.0);
                 state.nodes = inf.nodes;
                 state.push_map = true; // signal to persist to device
-                log_err!(self.manager.try_send(DeviceMessage::InfoDirty(self.get_id()))); // tell map our info has changed
+                log_err!(self
+                    .manager
+                    .try_send(DeviceMessage::InfoDirty(self.get_id()))); // tell map our info has changed
             }
-            _ => log::warn!("Updated with wrong info type on wifi device: {:?}=>{:?}", self.name, self.mac),
+            _ => log::warn!(
+                "Updated with wrong info type on wifi device: {:?}=>{:?}",
+                self.name,
+                self.mac
+            ),
         }
     }
 
@@ -431,9 +451,7 @@ impl Device for WifiDevice {
     }
 
     /// Does nothing since device continously updated.
-    fn buffer_updated(&self) {
-
-    }
+    fn buffer_updated(&self) {}
 
     async fn set_manager_channel(&mut self, tx: mpsc::Sender<DeviceMessage>) {
         self.manager = tx;

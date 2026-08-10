@@ -36,12 +36,12 @@ pub enum HapticDevice {
     Wifi(WifiDevice),
     BhapticBle(BhapticBle),
     Websocket(WebsocketDevice),
-    /// Intended for internal server usage, for testing mainly, possibly for UI experiments 
+    /// Intended for internal server usage, for testing mainly, possibly for UI experiments
     Internal(InternalDevice),
 }
 
 /// Info container for each device type
-/// 
+///
 /// An information that should be in all variants should be made so via the below impl.
 /// Don't manually dip into each variant please.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -174,7 +174,7 @@ impl DeviceHandle {
     ///
     /// ```
     /// let info = manager.with_device("mac address", |d| d.info());
-    ///  
+    ///
     /// ```
     pub fn with_device<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
     where
@@ -337,7 +337,7 @@ pub enum ESP32Model {
     ESP32S2,
     /// ESP32-S2 with 16MB flash
     ESP32S2FH16,
-    /// ESP32-S2 with 32MB flash  
+    /// ESP32-S2 with 32MB flash
     ESP32S2FH32,
     ESP32S3,
     ESP32C3,

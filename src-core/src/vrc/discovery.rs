@@ -1,6 +1,7 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, MsgToMainVrc, OscPath, VrcHandle, PREFAB_PREFIX};
 use crate::api::ApiManager;
+use crate::file::{Directory, native_lib, sidecar};
 use crate::vrc::AVATAR_ID_PATH;
 
 use dashmap::DashMap;
@@ -40,7 +41,7 @@ pub async fn start_filling_available_parameters(
     params: Arc<DashMap<OscPath, OscInfo>>,
 ) {
     tokio::spawn(async move {
-        let library_path = Path::new("./sidecars/listen-for-vrc.dll");
+        let library_path = native_lib("listen-for-vrc").expect("Should be allowed");
         let library = match unsafe { Library::new(library_path) } {
             Ok(lib) => lib,
             Err(err) => {
@@ -286,7 +287,7 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
                 // parse the remainder as an i32
                 let version = num_str
                     .parse::<u32>()
-                    .unwrap_or_else(|_|{ 
+                    .unwrap_or_else(|_|{
                         log::error!("Could not parse verison number: {:?}", key_str);
                         0
                     });

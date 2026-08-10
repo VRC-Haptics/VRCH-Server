@@ -29,6 +29,7 @@ use vrc::VrcGame;
 
 //standard imports
 use once_cell::sync::OnceCell;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -36,7 +37,7 @@ use tokio::sync::Mutex;
 use crate::bhaptics::game::BhapticHandle;
 use crate::devices::websocket::start_websocket_devices;
 use crate::devices::{bhaptics::start_ble, DeviceHandle};
-use crate::file::{resolve_dir, AppRoot, ROOT_DIR};
+use crate::file::{AppRoot, RESOURCE_DIR, ROOT_DIR, resolve_dir};
 use crate::mapping::start_interp_map;
 use crate::state::get_config;
 use crate::{mapping::MapHandle, vrc::VrcHandle};
@@ -133,8 +134,11 @@ async fn start_async_tasks(manager: DeviceHandle) -> (Option<VrcHandle>, MapHand
 }
 
 /// Handles spawning the various components of the haptic server.
-pub async fn start_server(root: AppRoot) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
+pub async fn start_server(root: AppRoot, resources: PathBuf) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
     log_err!(ROOT_DIR.set(root));
+    log_err!(RESOURCE_DIR.set(resources));
+
+    log_err!(file::seed_from_resources(), "Failed to seed bundled resources");
 
     // map fetching api points to cache in the cache folder
     let api_manager = ApiManager::new(resolve_dir(file::Directory::Maps));
@@ -169,13 +173,13 @@ pub async fn start_server(root: AppRoot) -> (Option<VrcHandle>, MapHandle, Optio
 /// Starts the various components of the server and returns their handles.
 ///
 /// Same as start_server but does not rely on an existing runtime.
-pub fn start_server_blocking(root: AppRoot) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
+pub fn start_server_blocking(root: AppRoot, resources: PathBuf) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
     let _running_handle = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("unable to start sub tokio runtime");
         rt.block_on(async move {
-            let blob = start_server(root).await;
+            let blob = start_server(root, resources).await;
             let _ = tx.send(blob);
 
             // Keep the runtime alive after sending handles

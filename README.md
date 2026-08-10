@@ -28,6 +28,16 @@ To connect to a Quest standalone VRC instance the computer running this manager 
 - `pnpm i` -> Installs dependencies (both rust and node)
 - `pnpm run tauri build` -> Builds installer under: `./src-tauri/target/release/bundle/<some_subfolder>`
 
+**LINUX**
+
+CachyOS(Arch): 
+
+```bash
+pnpm run tauri build --bundles deb
+cd packaging
+makepkg -sif
+```
+
 #### Test:
  - `cargo binstall cargo-nextest --secure` 
  - (In src-core directory)`cargo nextest run` -> Because state is a static global the isolation from nextest is needed for tests that mess with configuration settings.
