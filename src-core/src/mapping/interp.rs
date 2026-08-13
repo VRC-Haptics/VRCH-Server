@@ -53,7 +53,7 @@ impl InterpState {
     }
 
     /// returns the straight interpolation for the node.
-    /// 
+    ///
     /// This gets called DeviceNodes * InputNode times PER UPDATE.
     /// Performance is a big deal.
     fn single_node(&self, node: &HapticNode, in_nodes: &Nodes) -> f32 {
@@ -80,7 +80,7 @@ impl InterpState {
                             norm_num += weight * in_node.value;
                             norm_den += weight;
                         }
-                        
+
                     }
                     InterpolationLayer::Linear => {
                         if !distance.is_nan() && distance < in_node.radius {

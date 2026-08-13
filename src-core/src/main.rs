@@ -14,7 +14,7 @@ fn main() {
     // Likely something like AppRoot::new(<path>); confirm against file.rs.
     let root = AppRoot::default("headless-vrch").expect("Unable to use approot name");
 
-    let (_vrc, _map, _bhaptics, _devices) = start_server_blocking(root);
+    let (_vrc, _map, _bhaptics, _devices) = start_server_blocking(root, "resources".into());
     log::info!("haptic server running — press Ctrl-C to exit");
 
     // force config to be saved so we can edit it.

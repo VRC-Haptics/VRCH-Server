@@ -1,0 +1,60 @@
+pkgname=vrch-gui
+pkgver=0.0.10
+pkgrel=1
+pkgdesc="VRCH haptics GUI, local development build"
+arch=('x86_64')
+url="https://example.invalid"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'cairo' 'gdk-pixbuf2'
+         'glib2' 'pango' 'hicolor-icon-theme' 'systemd-libs')
+options=('!strip' '!debug')
+source=()
+
+pkgver() {
+  local _root _ver
+  _root=$(readlink -f "$startdir/..")
+
+  _ver=$(grep -Po '"version"\s*:\s*"\K[^"]+' \
+    "$_root/src-tauri/tauri.conf.json" | head -1)
+
+  if [ -z "$_ver" ]; then
+    echo "0.0.0"
+  else
+    echo "$_ver"
+  fi
+}
+
+package() {
+  local _root
+  _root=$(readlink -f "$startdir/..")
+
+  local _deb=""
+
+  # A Cargo workspace writes to the repository root target dir.
+  # A standalone crate writes to src-tauri/target.
+  for _dir in "$_root/target/release/bundle/deb" \
+              "$_root/src-tauri/target/release/bundle/deb"; do
+    if [ -d "$_dir" ]; then
+      _deb=$(ls -t "$_dir"/*.deb 2>/dev/null | head -1)
+      [ -n "$_deb" ] && break
+    fi
+  done
+
+  if [ -z "$_deb" ]; then
+    echo "No deb found under $_root"
+    echo "Run: pnpm tauri build --bundles deb"
+    return 1
+  fi
+
+  echo "Packaging $_deb"
+
+  bsdtar -xOf "$_deb" 'data.tar.*' \
+    | bsdtar -xp --no-same-owner -C "$pkgdir"
+
+  rm -rf "$pkgdir/usr/share/doc"
+
+  # security/localhost.key is a private key. Restrict it.
+  if [ -f "$pkgdir/usr/lib/$pkgname/security/localhost.key" ]; then
+    chmod 600 "$pkgdir/usr/lib/$pkgname/security/localhost.key"
+  fi
+}

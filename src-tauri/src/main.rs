@@ -29,7 +29,7 @@ use tauri_plugin_profiling::ProfilingExt;
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
     state::save_config();
-    
+
     log::trace!("Shutdown bhaptics server");
     let app = window.app_handle();
     if let Some(handle) = app.try_state::<BhapticHandle>() {
@@ -108,7 +108,7 @@ async fn main() {
         println!("Profiling Started");
         app_builder
     };
-    
+
     let app = app_builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             println!("Instance already open, shutting down.");
             let _ = app
@@ -150,6 +150,11 @@ async fn main() {
 
             let handle = app.handle().clone();
 
+            let resources = app
+                .path()
+                .resource_dir()
+                .expect("unable to resolve the resource directory");
+
             let default_panic = take_hook();
             set_hook(Box::new(move |info| {
                 log::logger().flush(); // flush previous logs
@@ -163,7 +168,7 @@ async fn main() {
                     log::error!("Unable to initialize app root");
                     panic!(); // TODO: This should be done better.
                 });
-                let (vrc, map, bh, device) = haptic_core::start_server(root).await;
+                let (vrc, map, bh, device) = haptic_core::start_server(root, resources).await;
                 if let Some(vrc) = vrc {
                     handle.manage(vrc);
                 }

@@ -30,6 +30,7 @@ use input_node::InputNode;
 use crate::{
     devices::{Device, DeviceHandle, DeviceId, DeviceInfo, DeviceOutEvents},
     state::{self, PerDevice},
+    mapping::{groups::NodeGroup, input_node::{History, Slot}},
 };
 
 pub type EventInstant = u64;
@@ -345,12 +346,12 @@ impl InputMap {
                     } else {
                         cleanups += 1
                     }
-                    
+
                     if self.event_instance.len() > 0 {
                         let t = Instant::now();
                         handle_events(self).await;
                         stats.events.record(t.elapsed().as_nanos());
-                        
+
                     }
                     last_tick = instant;
                 }
@@ -377,29 +378,56 @@ impl InputMap {
         }
 
         async fn handle_events(map: &mut InputMap) {
+            /// Frees the transient key list and the InputNodes it owns.
+            fn drop_instance(nodes: &mut Nodes, id: &EventId) {
+                let Some(keys) = nodes.transient.remove(id) else {
+                    return;
+                };
+                for key in keys {
+                    nodes.nodes.remove(key);
+                }
+            }
+
             let instant = map.now;
             let nodes = &mut map.input_nodes;
+            let events = &map.events;
+            let mut changed = false;
 
-            for (start, key, instance_key) in &map.event_instance {
-                let Some(event) = map.events.get(key.0) else {
-                    log::error!("Unable to find event definition");
-                    continue;
+            map.event_instance.retain(|(start, key, id)| {
+                let Some(event) = events.get(key.0) else {
+                    log::error!("Unable to find event definition for instance {}", id);
+                    drop_instance(nodes, id);
+                    changed = true;
+                    return false;
                 };
-                
-                if start + instant == event.duration {
-                    nodes.transient.remove(instance_key);
+
+                // Not started yet. This also stops the u64 underflow on the first tick.
+                if instant < *start {
+                    return true;
                 }
-                
-                let Some(node_keys) = nodes.transient.get(instance_key) else {
-                    log::error!("Nodes not present");
-                    continue;
+
+                let elapsed = instant - *start;
+                if elapsed >= event.duration {
+                    drop_instance(nodes, id);
+                    changed = true;
+                    return false;
+                }
+
+                let Some(node_keys) = nodes.transient.get(id) else {
+                    log::error!("Nodes not present for event instance {}", id);
+                    changed = true;
+                    return false; // drop the instance instead of logging it every tick.
                 };
 
-                event.tick(&mut nodes.nodes, node_keys, instant - start);
-            }
+                event.tick(&mut nodes.nodes, node_keys, elapsed);
+                true
+            });
 
             map.now += 1;
             map.map_dirty = true;
+            if changed {
+                map.dirty_since_snap = true;
+            }
         }
 
         fn handle_device(map: &mut InputMap, msg: Option<DeviceOutEvents>) {
@@ -437,6 +465,58 @@ impl InputMap {
         }
 
         fn handle_msg(map: &mut InputMap, msg: Option<InputEventMessage>) {
+            fn register_event(map: &mut InputMap, event: Event) -> EventKey {
+                let idx = map.events.len();
+                map.events.push(event);
+                EventKey(idx)
+            }
+
+            fn start_event(map: &mut InputMap, key: EventKey) {
+                let Some(event) = map.events.get(key.0) else {
+                    log::error!("Unable to find event");
+                    return;
+                };
+
+                if event.frames.nodes.is_empty() {
+                    log::error!("Event '{}' has no frames", event.name);
+                    return;
+                }
+
+                let id = map.event_marker;
+                map.event_marker += 1;
+
+                let now = std::time::Instant::now();
+                let mut keys: Vec<NodeKey> = Vec::with_capacity(event.frames.nodes.len());
+
+                for steps in event.frames.nodes.iter() {
+                    // Const fields never come back from Steps::get, so seed the node here.
+                    let mut slot = Slot {
+                        muted: false,
+                        source: InputType::Weight, // SET THIS: the InputType variant for scripted/event input.
+                        layer: InputLayer::Additive,
+                        weight: *steps.weight.first(),
+                        history: History::new(),
+                    };
+                    slot.history.push_at(*steps.value.first(), now);
+
+                    let mut node = InputNode::new(
+                        *steps.position.first(),
+                        NodeGroup::All,
+                        InterpolationLayer::Default,
+                        smallvec::smallvec![slot],
+                        *steps.radius.first(),
+                    );
+                    node.muted = *steps.muted.first();
+
+                    keys.push(map.input_nodes.nodes.insert(node));
+                }
+
+                map.input_nodes.transient.insert(id, keys);
+                map.event_instance.push((map.now, key, id));
+                map.map_dirty = true;
+                map.dirty_since_snap = true;
+            }
+
             match msg {
                 Some(msg) => match msg {
                     InputEventMessage::MapDirty => {
@@ -547,38 +627,28 @@ impl InputMap {
                         }
                     }
                     InputEventMessage::StartEvent(e) => {
-                        let Some(_) = map.events.get(e.0) else {
-                            log::error!("Unable to find event");
-                            return;
-                        };
-                        let start = map.now + 1;
-                        let key = e;
-                        let id = map.event_marker;
-                        map.event_marker += 1;
-                        map.event_instance.push((start, key, id));
-                        map.dirty_since_snap = true;
+                        start_event(map, e);
                     }
                     InputEventMessage::RegisterEvent { event, reply } => {
-                        let idx = map.events.len();
-                        map.events.push(*event);
-
-                        log_err!(reply.send(EventKey(idx)));
+                        let key = register_event(map, *event);
+                        log_err!(reply.send(key));
                     }
                     InputEventMessage::QuickEvent { duration, power, location } => {
-                        let key = match &map.quick_event {
+                        let duration = duration.max(1);
+                        let key = match map.quick_event.clone() {
                             Some(key) => {
-                                let Some(event) =map.events.get_mut(key.0) else {
+                                let Some(event) = map.events.get_mut(key.0) else {
                                     log::error!("Unable to retrieve event key");
                                     return;
                                 };
                                 event.duration = duration;
                                 let Some(slot) = event.frames.nodes.get_mut(0) else {
+                                    log::error!("QuickTrigger event has no frames");
                                     return;
                                 };
                                 slot.position = location.into();
                                 slot.value = power.into();
-
-                                key.clone()
+                                key
                             }
                             None => {
                                 let step = Steps {
@@ -592,21 +662,16 @@ impl InputMap {
                                 let event = Event {
                                     name: "QuickTrigger".to_string(),
                                     frames: Frames::new(vec![step]),
-                                    duration: duration,
+                                    duration,
                                 };
 
-                                let (tx, rx) = oneshot::channel();
-                                handle_msg(map,Some(InputEventMessage::RegisterEvent{ event: Box::new(event), reply: tx }));
-                                let Ok(key) = rx.blocking_recv() else {
-                                    return;
-                                };
-
+                                let key = register_event(map, event);
                                 map.quick_event = Some(key.clone());
                                 key
                             }
                         };
 
-                        handle_msg(map, Some(InputEventMessage::StartEvent(key.clone())));
+                        start_event(map, key);
                     }
                 },
                 None => {

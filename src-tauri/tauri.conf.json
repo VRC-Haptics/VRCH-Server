@@ -22,27 +22,5 @@
     "security": {
       "csp": null
     }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ],
-    "resources": [
-      "sidecars/bHapticsPlayer/BhapticsPlayer.exe",
-      "sidecars/elevated-register.exe",
-      "sidecars/listen-for-vrc.dll",
-      "sidecars/datarefdecode.dll",
-      "security/localhost.crt",
-      "security/localhost.key",
-      "security/README.md",
-      "security/selfsigned_cert.sh",
-      "map_configs/**/*.json"
-    ]
   }
 }

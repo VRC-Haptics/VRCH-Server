@@ -103,19 +103,23 @@ pub fn swap_conf_nodes(
         .unwrap_or_else(|| Err(format!("No device with id: {:?}", device_id)))
 }
 
-const PLAY_POINT: LazyLock<Option<EventKey>> = LazyLock::new(|| None);
-
 /// Plays the specified point for the duration in seconds at the power percentage of intensity.
 #[tauri::command]
 #[specta::specta]
 pub async fn play_point(
     feedback_location: Vec3, // xyz location to insert point
-    power: f32,                         // the power percentage to play 1 = no change
-    duration: f32,                      // When should this point be removed.
+    power: f32,              // the power percentage to play 1 = no change
+    duration: f32,           // how long the point stays, in seconds
     map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
-    log_err!(map.send_event(InputEventMessage::QuickEvent { duration: (duration * 100.) as u64, power: power, location: feedback_location }));
-    return Ok(());
+    // The map ticks at 100 Hz, so one second is 100 ticks.
+    let ticks = (duration.max(0.0) * 100.0) as u64;
+    log_err!(map.send_event(InputEventMessage::QuickEvent {
+        duration: ticks,
+        power,
+        location: feedback_location,
+    }));
+    Ok(())
 }
 
 #[tauri::command]
