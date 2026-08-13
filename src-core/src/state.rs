@@ -21,18 +21,53 @@ static DIRTY: AtomicBool = AtomicBool::new(false);
 
 /// Only intended to be called once
 fn load_config() -> Option<Config> {
-    if !CONFIG_DIR.get().is_some() {
+    let Some(dir_root) = CONFIG_DIR.get() else {
         log::warn!("config directory not set, using default settings");
-    }
-    let mut dir = CONFIG_DIR.get()?.clone();
+        return None;
+    };
+
+    let mut dir = dir_root.clone();
     dir.push("memory");
     dir.set_extension("json");
     log_err!(CONFIG_FILE.set(dir.clone()));
-    log::trace!("Loading memory file: {:?}", CONFIG_FILE.get());
+    log::info!("Loading memory file: {}", dir.display());
 
-    let data = fs::read_to_string(dir).ok()?;
-    let value: serde_json::Value = serde_json::from_str(&data).ok()?;
-    migrate(value)
+    let data = match fs::read_to_string(&dir) {
+        Ok(d) => d,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            log::info!("No memory file yet, starting from defaults");
+            return None;
+        }
+        Err(e) => {
+            log::error!("Failed to read memory file {}: {e}", dir.display());
+            return None;
+        }
+    };
+
+    let value: serde_json::Value = match serde_json::from_str(&data) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Memory file is not valid JSON ({e}); backing up and using defaults");
+            let _ = fs::rename(&dir, dir.with_extension("json.corrupt"));
+            return None;
+        }
+    };
+
+    let on_disk = value.get("version").and_then(|v| v.as_u64());
+    match migrate(value) {
+        Some(cfg) => {
+            log::info!("Loaded memory file (on-disk version {on_disk:?})");
+            Some(cfg)
+        }
+        None => {
+            log::error!(
+                "migrate() rejected memory file (on-disk version {on_disk:?}, expected {CONFIG_VERSION}); \
+                 backing up to memory.json.rejected and using defaults"
+            );
+            let _ = fs::copy(&dir, dir.with_extension("json.rejected"));
+            None
+        }
+    }
 }
 
 pub fn set_config_dir(path: PathBuf) {
@@ -59,13 +94,39 @@ pub fn mark_dirty() {
 
 /// Heavy function, persists a snapshot of our config to the disk.
 pub fn save_config() {
-    let path = CONFIG_FILE
-        .get()
-        .expect("Should have initialized config before calling save loop");
+    let cfg = get_config();
+
+    let Some(path) = CONFIG_FILE.get() else {
+        log::error!("save_config called before config was initialized; skipping save");
+        return;
+    };
+
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        if let Err(e) = fs::create_dir_all(parent) {
+            log::error!("Could not create config dir {}: {e}", parent.display());
+            return;
+        }
     }
-    let _ = fs::write(path, serde_json::to_string_pretty(get_config()).unwrap());
+
+    let json = match serde_json::to_string_pretty(cfg) {
+        Ok(j) => j,
+        Err(e) => {
+            log::error!("Failed to serialize config: {e}");
+            return;
+        }
+    };
+
+    // write to temp then rename, so a crash mid-write can't truncate the real file
+    let tmp = path.with_extension("json.tmp");
+    if let Err(e) = fs::write(&tmp, &json) {
+        log::error!("Failed to write {}: {e}", tmp.display());
+        return;
+    }
+    if let Err(e) = fs::rename(&tmp, path) {
+        log::error!("Failed to replace {}: {e}", path.display());
+        return;
+    }
+    log::trace!("Saved config ({} bytes)", json.len());
 }
 
 /// returns bare static reference to global app configuration (state)

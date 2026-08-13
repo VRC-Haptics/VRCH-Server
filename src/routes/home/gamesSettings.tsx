@@ -105,7 +105,7 @@ export default function VrcInfoCard() {
           <label className="form-control">
             <span>Velocity scaling</span>
             <div className="flex items-center gap-2">
-              <input type="range" min="0" max="2" step="0.01"
+              <input type="range" min="0.01" max="0.75" step="0.01"
                 value={velocityMult} onChange={handleVelMultChange}
                 className="range range-sm flex-1" />
               <span className="w-12 text-right tabular-nums">{velocityMult.toFixed(2)}x</span>

@@ -320,14 +320,14 @@ impl VrcGame {
                                 Ok(msg) => {
                                     let addr = remove_version(&msg.addr);
 
-                                    if let Some(infos) = self.watched.get_mut(&addr) {
-                                        infos.last = Instant::now();
+                                    // if let Some(infos) = self.watched.get_mut(&addr) {
+                                    //     infos.last = Instant::now();
 
-                                        for info in &infos.infos {
-                                            log_err!(Self::push_info(&self.map.event_sender, info, &msg));
-                                        }
-                                        continue;
-                                    }
+                                    //     for info in &infos.infos {
+                                    //         log_err!(Self::push_info(&self.map.event_sender, info, &msg));
+                                    //     }
+                                    //     continue;
+                                    // }
 
                                     // Not a watched address. It may still name
                                     // the camera of this avatar.
@@ -706,8 +706,8 @@ fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)
             let vel = settings.velocity_ratio;
             let slots: Vec<(String, Slot)> = node.inputs.iter().map(|i| {
                 let weight = match i.source {
-                    InputType::Weight => (vel) * i.weight, // TODO: This is swapped?
-                    InputType::Velocity => (1.0 - vel) * i.weight,
+                    InputType::Weight => (1.0 - vel) * i.weight,
+                    InputType::Velocity => (vel) * i.weight,
                 };
 
                 return (

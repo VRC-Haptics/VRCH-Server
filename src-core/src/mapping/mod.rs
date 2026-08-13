@@ -202,7 +202,7 @@ impl Nodes {
             for slot in node.slots.iter_mut() {
                 let val = match slot.source {
                     InputType::Weight => slot.history.latest().unwrap_or(0.0),
-                    InputType::Velocity => slot.history.speed_windowed_at(now) * cfg.velocity_mult,
+                    InputType::Velocity => slot.history.velocity_at(now).abs() * cfg.velocity_mult,
                 };
                 let weighted = val * slot.weight;
 
@@ -311,6 +311,7 @@ impl InputMap {
         let period = Duration::from_millis(10);
         let mut event_interval = interval(period.clone());
         let mut last_tick = tokio::time::Instant::now();
+        let mut cleanups = 0;
 
         let mut stats = LoopStats::default();
         let mut last_report = Instant::now();
@@ -334,12 +335,15 @@ impl InputMap {
                         log::warn!("Late event Tick: {:?}", diff);
                     }
 
-                    if self.map_dirty {
+                    if self.map_dirty || cleanups == 10 {
                         let cfg = cache.load();
                         let t = Instant::now();
                         self.update_devices(cfg);
                         self.map_dirty = false;
                         stats.dirty.record(t.elapsed().as_nanos());
+                        cleanups = 0
+                    } else {
+                        cleanups += 1
                     }
                     
                     if self.event_instance.len() > 0 {

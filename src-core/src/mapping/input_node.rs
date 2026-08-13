@@ -1,7 +1,9 @@
 use std::time::{Duration, Instant};
+use arraydeque::{ArrayDeque, Wrapping};
 use glam::Vec3;
 use smallvec::SmallVec;
 
+use crate::log_err;
 use crate::mapping::NodeKey;
 use crate::mapping::groups::NodeGroup;
 use crate::vrc::config::{InputLayer, InputType};
@@ -42,54 +44,17 @@ pub struct HistoryView {
     pub len: usize,
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[serde(into = "HistoryView")]
 pub struct History {
-    pub stage: Stage,
-    pub samples: [(f32, Instant); WINDOW],
-    pub len: usize,
-}
-
-#[derive(Debug, Clone, Copy, serde::Serialize, PartialEq, Eq)]
-enum Stage {
-    Empty,
-    S0,
-    S1,
-    S2,
-    S3,
-    S4,
-}
-
-impl Stage {
-    pub const fn next(self) -> Self {
-        match self {
-            Self::Empty => Self::S0,
-            Self::S0 => Self::S1,
-            Self::S1 => Self::S2,
-            Self::S2 => Self::S3,
-            Self::S3 => Self::S4,
-            Self::S4 => Self::S0,
-        }
-    }
-
-    pub const fn index(&self) -> u8 {
-        match self {
-            Self::Empty => 0,
-            Self::S0 => 0,
-            Self::S1 => 1,
-            Self::S2 => 2,
-            Self::S3 => 3,
-            Self::S4 => 4,
-        }
-    }
+    pub samples: ArrayDeque<(f32, Instant), WINDOW, Wrapping>,
 }
 
 impl PartialEq for History {
     fn eq(&self, other: &Self) -> bool {
-        self.len == other.len
-            && self.samples[..self.len]
-                .iter()
-                .zip(&other.samples[..other.len])
+        self.samples.len() == other.samples.len()
+            && self.samples.iter()
+                .zip(other.samples.iter())
                 .all(|(a, b)| a.0 == b.0)
     }
 }
@@ -106,80 +71,85 @@ impl From<History> for HistoryView {
     }
 }
 
-/// 10hz is the OSC update rate
-const VELOCITY_TIMEOUT: Duration = Duration::from_millis(11);
+/// Largest gap between two samples still treated as continuous motion.
+/// Anything wider is a dropped packet / new gesture and is not bridged.
+const MAX_SAMPLE_GAP: Duration = Duration::from_millis(250);
+/// How long after the newest sample velocity is still reported, fading to 0.
+const VELOCITY_HOLD: Duration = Duration::from_millis(150);
+const MIN_DT: f32 = 1e-4;
 
 impl History {
-    /// Average velocity from `self.samples[old_idx]` to `now`, treating the
-    /// signal as held constant since the newest sample.
-    fn velocity_between(&self, now: Instant, old_idx: usize) -> f32 {
-        if self.len < 2 {
+    /// Average finite-difference velocity (units/second) over the recent window.
+    /// Take absolute value to get speed.
+    pub fn velocity_at(&self, now: Instant) -> f32 {
+        // front == newest (push_front)
+        let Some((_, newest_time)) = self.samples.front() else {
+            return 0.0;
+        };
+
+        // No fresh input: fade out rather than holding a stale reading.
+        let staleness = now.saturating_duration_since(*newest_time);
+        if staleness >= VELOCITY_HOLD {
             return 0.0;
         }
-        let old_idx = old_idx.clamp(1, self.len - 1);
-        let new = self.samples[0];
-        let old = self.samples[old_idx];
+        let decay = 1.0 - (staleness.as_secs_f32() / VELOCITY_HOLD.as_secs_f32());
 
-        let stale = now.saturating_duration_since(new.1);
-        if stale >= VELOCITY_TIMEOUT {
-            return 0.0;
+        let mut num = 0.0f32;
+        let mut denom = 0.0f32;
+        // iteration is newest-first, so `previous` is the *newer* half of each pair
+        let mut previous: Option<(f32, Instant)> = None;
+        for (value, time) in self.samples.iter().copied() {
+            if let Some((newer_val, newer_time)) = previous {
+                let gap = newer_time.saturating_duration_since(time);
+                if gap > MAX_SAMPLE_GAP {
+                    break;
+                }
+                let dt = gap.as_secs_f32();
+                if dt >= MIN_DT {
+                    num += (newer_val - value) / dt;
+                    denom += 1.0;
+                }
+            }
+            previous = Some((value, time));
         }
 
-        // Denominator spans old sample -> now, not old -> new. This is what
-        // makes a stalled input decay instead of latching.
-        let elapsed = now.saturating_duration_since(old.1).as_secs_f32();
-        if elapsed <= 0.0 {
-            return 0.0;
+        if denom > 0.0 {
+            (num / denom) * decay
+        } else {
+            0.0
         }
-
-        // Linear taper so the value reaches 0 continuously at the timeout
-        // rather than stepping off a cliff.
-        let fade = 1.0 - stale.as_secs_f32() / VELOCITY_TIMEOUT.as_secs_f32();
-        ((new.0 - old.0) / elapsed) * fade
     }
 
-    /// gives absolute speed, at this instant. Applies smoothing and slow data updates.
-    pub fn speed_windowed_at(&self, now: Instant) -> f32 {
-        self.velocity_between(now, self.len.saturating_sub(1)).abs()
-    }
 
     pub fn view(&self) -> HistoryView {
         let mut values = [0.0f32; WINDOW];
-        for i in 0..self.len {
-            values[i] = self.samples[i].0;
+        for (i, (v, _)) in self.samples.iter().enumerate() {
+            values[i] = *v;
         }
         HistoryView {
             values,
-            len: self.len,
+            len: self.samples.len(),
         }
     }
 
     pub fn new() -> Self {
-        let now = Instant::now();
         Self {
-            stage: Stage::Empty,
-            samples: [(0.0, now); WINDOW], // never reads defaults because of stages
-            len: 0,
+            samples: ArrayDeque::new()
         }
     }
 
     pub fn push_at(&mut self, value: f32, time: Instant) {
-        self.stage = self.stage.next();
-        self.samples[self.stage.index() as usize] = (value, time);
-        self.len = (self.len + 1).min(WINDOW);
+        let _ = self.samples.push_front((value, time));
     }
 
     pub fn latest(&self) -> Option<f32> {
-        if self.stage == Stage::Empty {
-            None
-        } else {
-            Some(self.samples[self.stage.index() as usize].0)
-        }
+        self.samples.front().map(|v| v.0)
     }
 
     /// Valid samples, newest-first. Each entry is (value, time).
-    pub fn history(&self) -> &[(f32, Instant)] {
-        &self.samples[..self.len]
+    pub fn history(&self) -> impl DoubleEndedIterator<Item = &(f32, Instant)> + ExactSizeIterator + '_ {
+        // newest were inserted via push_front, so front-to-back == newest-first
+        self.samples.iter()
     }
 }
 
