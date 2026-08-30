@@ -1,6 +1,6 @@
 pub mod cache_node;
 pub mod config;
-pub mod datref;
+pub mod cam;
 pub mod discovery;
 pub mod osc_query;
 pub mod parsing;
@@ -17,7 +17,7 @@ use crate::osc::parse::{MsgType, RefMessage, first_message};
 use crate::state::{VrcSettings, get_config};
 use crate::util::next_free_port_with_address;
 use crate::vrc::config::InputType;
-use crate::vrc::datref::{CameraDecoder, CameraInfo, CameraSession, FieldRoute};
+use crate::vrc::cam::{CameraDecoder, CameraInfo, CameraSession, FieldRoute};
 use crate::vrc::ps::create_vfh_nodes;
 use arc_swap::{ArcSwap, Cache};
 use glam::Vec3;

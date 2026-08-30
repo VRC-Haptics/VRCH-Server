@@ -91,6 +91,7 @@ impl Directory {
             Directory::BhapticsCache => "data",
             Directory::Logs => "logs",
             Directory::Maps => "map_configs",
+            Directory::CamMaps => "cam_configs",
             Directory::Security => "security",
         }
     }

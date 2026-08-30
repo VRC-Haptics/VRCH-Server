@@ -6,7 +6,7 @@ pub mod input_node;
 pub mod interp;
 
 use crate::{
-    log_err, mapping::{event::{Frames, Steps}, input_node::SlotKey}, state::{VrcSettings, get_config}, vrc::config::{InputLayer, InputType}
+    log_err, mapping::{event::{Frames, Steps}, input_node::{InterpolationLayer, SlotKey}}, state::{VrcSettings, get_config}, vrc::config::{InputLayer, InputType}
 };
 use arc_swap::{ArcSwap, Cache, Guard};
 use nohash_hasher::IntMap;
