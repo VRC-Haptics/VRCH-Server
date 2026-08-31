@@ -9,7 +9,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::de::DeserializeOwned;
 use v0::{NodeV0};
-use haptic_core::{glam::{Vec3, Vec4}, mapping::{Nodes, groups::NodeGroup, input_node::*}};
+use haptic_core::{glam::{Vec3, Vec4}, mapping::{groups::NodeGroup, input_node::*}};
 use mlua::prelude::*;
 
 use crate::{params::{ParamDef, ParamValue, discover_params, install_params}, v0::LocationV0};
@@ -44,8 +44,8 @@ pub fn build_nodes(rt: &Lua, params: Option<HashMap<String, ParamValue>>) -> Lua
         rt.load(&src).exec()?;
     };
 
-    let this = run_function::<NodeList>("build_nodes", &rt)?;
-    return Ok(this.0);
+    let this = run_function::<NodeList>("build_nodes", rt)?;
+    Ok(this.0)
 }
 
 pub fn build_locations(rt: Lua) -> LuaResult<(Vec<Location>, Vec<TagDef>)> {
@@ -88,7 +88,7 @@ impl Versioned for LocationList {
             "v0" => {
                 let locs: Vec<LocationV0> = rt.from_value(locs)?;
                 let tags: Vec<TagDef> = rt.from_value(tags)?;
-                Ok(Self(locs.into_iter().map(Location::from).collect(), tags.into_iter().map(TagDef::from).collect()))
+                Ok(Self(locs.into_iter().map(Location::from).collect(), tags.into_iter().collect()))
             }
             other => Err(LuaError::runtime(format!("unsupported node version: {other:?}"))),
         }
@@ -135,7 +135,7 @@ impl From<LocationV0> for Location {
 }
 
 impl Location {
-    pub fn from_nodes(nodes: Vec<Node>) -> Vec<Location> {
+    pub fn from_nodes(_nodes: Vec<Node>) -> Vec<Location> {
         // shape based on _Weight post-fix
         unimplemented!()
     }

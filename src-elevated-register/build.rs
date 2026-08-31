@@ -1,4 +1,3 @@
-use winres;
 
 fn main() {
     // only run if target os is windows

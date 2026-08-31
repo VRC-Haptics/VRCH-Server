@@ -7,10 +7,10 @@ use crate::mapping::{InputEventMessage};
 use crate::log_err;
 
 use crate::vrc::{config::GameMap};
-use haptic_core::{mapping::{EventKey, NodeField, NodeKey, Snapshot}, vrc::MsgToMainVrc};
+use haptic_core::{mapping::{NodeField, NodeKey, Snapshot}, vrc::MsgToMainVrc};
 //standard imports
 use runas::Command;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use tokio::time::Duration;
 
 #[tauri::command]
@@ -22,7 +22,7 @@ pub fn get_device_esp_model(
     let Some(this) = devices.with_device(&id.into(), |d| d.info().get_esp32()) else {
         return Err("unable to find device with id".to_string());
     };
-    return Ok(this);
+    Ok(this)
 }
 
 
@@ -52,7 +52,7 @@ pub fn set_nodes_radius(
     map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
     for key in keys {
-        log_err!(map.send_event(InputEventMessage::UpdateNodeField { key: key, field: NodeField::Radius(radius)}));
+        log_err!(map.send_event(InputEventMessage::UpdateNodeField { key, field: NodeField::Radius(radius)}));
     };
 
     Ok(())
@@ -236,7 +236,7 @@ pub async fn upload_device_map(
 
     state::mark_dirty();
     if res.is_none() {
-        return Err(format!("No Device with id: {}", id))
+        Err(format!("No Device with id: {}", id))
     } else {
         Ok(())
     }

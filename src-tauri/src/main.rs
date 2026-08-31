@@ -18,9 +18,7 @@ use haptic_core::*;
 //standard imports
 use commands::*;
 use std::panic::{set_hook, take_hook};
-use std::sync::{Arc, LazyLock};
-use tauri::{AppHandle, Manager, Window, WindowEvent};
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri::{Manager, Window, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 use specta_typescript::Typescript;
 #[cfg(feature = "profiling")]

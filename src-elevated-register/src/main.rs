@@ -2,7 +2,6 @@ use std::env;
 use std::io;
 use winreg::enums::*;
 use winreg::RegKey;
-use dunce;
 
 const BHAPTICS_KEY_PATH: &str = r"\bhaptics-app\shell\open\command";
 const PROXY_PATH: &str = r".\sidecars\bHapticsPlayer\BhapticsPlayer.exe";
@@ -19,14 +18,14 @@ fn main() {
     let full_path = dunce::canonicalize(PROXY_PATH)
         .map_err(|e| io::Error::new(e.kind(), format!("Error canonicalizing PROXY_PATH: {}", e))).unwrap();
     let full_path_str = full_path.to_str().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::Other, "Unable to convert full path to string")
+        io::Error::other("Unable to convert full path to string")
     }).unwrap();
     println!("Canonical proxy path: {:?}", full_path_str);
 
     let command = args[1].as_str();
     let result = match command {
-        "set" => set_registry(&full_path_str),
-        "reset" => reset_registry(&full_path_str),
+        "set" => set_registry(full_path_str),
+        "reset" => reset_registry(full_path_str),
         _ => {
             eprintln!("Unknown command: {}", command);
             std::process::exit(1);
