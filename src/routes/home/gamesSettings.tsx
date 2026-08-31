@@ -14,7 +14,7 @@ export default function VrcInfoCard() {
   const { vrcInfo } = useVrcContext();
 
   const [velocityRatio, setVelocityRatio] = useState(0.5);
-  const [velocityMult, setVelocityMult] = useState(1.0);
+  const [velocityMult, setVelocityMult] = useState(0.5);
 
   useEffect(() => {
     if (!vrcInfo) return;

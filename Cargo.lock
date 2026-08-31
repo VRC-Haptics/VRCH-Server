@@ -636,9 +636,23 @@ dependencies = [
 
 [[package]]
 name = "bytemuck"
-version = "1.25.0"
+version = "1.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
+checksum = "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797"
+dependencies = [
+ "bytemuck_derive",
+]
+
+[[package]]
+name = "bytemuck_derive"
+version = "1.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9abbd1bc6865053c427f7198e6af43bfdedc55ab791faed4fbd361d789575ff"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.115",
+]
 
 [[package]]
 name = "byteorder"
@@ -2146,6 +2160,7 @@ dependencies = [
  "bitflags 2.11.1",
  "boxcar",
  "btleplug",
+ "bytemuck",
  "dashmap 6.1.0",
  "directories",
  "enum_dispatch",
@@ -2174,6 +2189,7 @@ dependencies = [
  "slotmap",
  "smallvec",
  "specta",
+ "spout2-rs",
  "strum",
  "tauri-plugin-http",
  "thiserror 2.0.19",
@@ -2182,6 +2198,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "tokio-websockets",
+ "triple_buffer",
  "urlencoding",
  "uuid",
  "walkdir",
@@ -5548,6 +5565,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "spout2-rs"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e3d5a4fafc4e72ae9a57e78d8a4b84e7580a7671b9729c26894fe2434c73bb4"
+dependencies = [
+ "spout2-sys",
+]
+
+[[package]]
+name = "spout2-sys"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "670dd837cb0132982b6113a6c553e99453b0f8ba3014bd697bd7236e1a9d88aa"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6720,6 +6755,15 @@ dependencies = [
  "serde",
  "thiserror 2.0.19",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "triple_buffer"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e875ab7068a75b74f419da453927e05527c36f0001b3c7aad3ce443640683487"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]

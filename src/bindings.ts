@@ -426,7 +426,7 @@ export type VrcInfo = {
 	watched: ([string, AddrInfo])[],
 	available: OscInfo[],
 	// The state of the camera decode path.
-	camera: CameraInfo,
+	camera: CameraInfo | null,
 };
 
 export type WebsocketDeviceInfo = {
