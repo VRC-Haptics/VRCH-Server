@@ -626,6 +626,7 @@ impl InputMap {
                             log::error!("unable to find Slot #{} on key", key.slot_idx);
                         }
                     }
+                    InputEventMessage::BatchUpdate(batch) => handle_batch(map, &batch),
                     InputEventMessage::StartEvent(e) => {
                         start_event(map, e);
                     }
@@ -696,6 +697,80 @@ impl InputMap {
     }
 }
 
+fn handle_batch(map: &mut InputMap, msgs: &[BatchUpdateMsg]) {
+    for msg in msgs {
+        match msg {
+            BatchUpdateMsg::Node {
+                key,
+                muted,
+                location,
+                radius,
+            } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(*key) else {
+                    log::error!("Unable to find node with key");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                node.mute(*muted);
+                node.location = *location;
+                node.radius = *radius;
+                map.dirty_since_snap = true;
+                map.map_dirty = true;
+            }
+            BatchUpdateMsg::Slot { key, value, weight, muted, } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
+                    log::error!("Unable to find node with key (slot)");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                // check on node insert that it has at least one slot.
+                if let Some(slot) = node.slots.get_mut(key.slot_idx as usize)  {
+                    map.dirty_since_snap = true;
+                    slot.history.push_at(*value, std::time::Instant::now());
+                    slot.weight = *weight;
+                    slot.muted = *muted;
+                    map.map_dirty = true;
+                } else {
+                    log::error!("unable to find Slot #{} on key", key.slot_idx);
+                }
+            }
+            BatchUpdateMsg::NodeField { key, field } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(*key) else {
+                    log::error!("Unable to find node with key");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                match field {
+                    NodeField::Location(l) => node.location = *l,
+                    NodeField::Muted(m) => node.mute(*m),
+                    NodeField::Radius(r) => node.radius = *r,
+                }
+                map.map_dirty = true;
+                map.dirty_since_snap = true;
+            }
+            BatchUpdateMsg::SlotField { key, field } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
+                    log::error!("Unable to find node with key");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                // check on node insert that it has at least one slot.
+                if let Some(slot) = node.slots.get_mut(key.slot_idx as usize)  {
+                    match field {
+                        SlotField::Muted(m) => slot.muted = *m,
+                        SlotField::Value(v) => slot.history.push_at(*v, std::time::Instant::now()),
+                        SlotField::Weight(w) => slot.weight = *w,
+                    }
+                    map.map_dirty = true;
+                    map.dirty_since_snap = true;
+                } else {
+                    log::error!("unable to find Slot #{} on key", key.slot_idx);
+                }
+            }
+        }
+    }
+}
+
 /// pull dirty info from individual devices
 fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &mut Vec<MappingDevice>) {
     if let Some(info) = dev.with_device(&id, |d| d.info()) {
@@ -749,7 +824,7 @@ fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &mut Vec<Mapping
     }
 }
 
-//const _: [u8; std::mem::size_of::<InputEventMessage>()] = [];
+//const _: [u8; std::mem::size_of::<BatchUpdateMsg>()] = [];
 
 pub enum InputEventMessage {
     /// Treats the map as if it has been changed on next map tick.
@@ -786,12 +861,36 @@ pub enum InputEventMessage {
         key: NodeKey,
         field: NodeField,
     },
+    BatchUpdate(Box<Vec<BatchUpdateMsg>>),
     /// Register events for use in this map epoch
     RegisterEvent{ event: Box<Event>, reply: oneshot::Sender<EventKey> },
     /// Call a registered event.
     StartEvent(EventKey),
     QuickEvent{ duration: u64, power: f32, location: Vec3 },
     CancelEvents,
+}
+
+pub enum BatchUpdateMsg {
+    Node {
+        key: NodeKey,
+        muted: bool,
+        location: Vec3,
+        radius: f32,
+    },
+    Slot {
+        key: SlotKey,
+        value: f32,
+        weight: f32,
+        muted: bool,
+    },
+    SlotField {
+        key: SlotKey,
+        field: SlotField,
+    },
+    NodeField {
+        key: NodeKey,
+        field: NodeField,
+    },
 }
 
 #[derive(EnumDiscriminants)]

@@ -11,8 +11,9 @@ impl Versions {
     pub fn from_num(num: u32) -> Option<Self> {
         match num {
             0 => Some(Self::V0),
-            // doesn't need an upgrade
-            _ => None
+            1 => Some(Self::V1),
+            // we haven't seen this version before.
+            _ => None,
         }
     }
 }
@@ -21,13 +22,14 @@ pub fn migrate(value: Value) -> Option<Config> {
     let num = value
         .get("version")
         .and_then(serde_json::Value::as_u64)
-        .map(|v| v as u32).unwrap_or(0);
+        .map(|v| v as u32)
+        .unwrap_or(0);
+    log::trace!("Version: {num}");
     let version = Versions::from_num(num)?;
 
     match version {
         Versions::V0 => v0_to_v1(value),
         Versions::V1 => serde_json::from_value::<Config>(value).ok(),
-        
     }
 }
 

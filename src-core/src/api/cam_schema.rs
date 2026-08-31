@@ -22,39 +22,28 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use thiserror::Error;
+
 /// The value type of one field. The codes match the native ABI.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum DataRefKind {
+pub enum CamType {
     Float,
     Int,
     Uint,
     Bool,
 }
 
-impl DataRefKind {
-    /// The `kind` code that `DrdField` and `DrdValue` use.
-    #[inline]
-    pub const fn abi_code(self) -> u32 {
-        match self {
-            Self::Float => 0,
-            Self::Int => 1,
-            Self::Uint => 2,
-            Self::Bool => 3,
-        }
-    }
-}
-
 /// One field of the packed code.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DataRefField {
+pub struct CamField {
     /// The OSC parameter that this field drives.
     pub osc: String,
     #[serde(rename = "type")]
-    pub kind: DataRefKind,
+    pub kind: CamType,
     /// The width of the field, 1 to 32 bits.
     pub bits: u32,
 }
@@ -63,8 +52,8 @@ pub struct DataRefField {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DataRefSchema {
-    /// The camera ID that the avatar reports over OSC.
+pub struct CamConfig {
+    /// The avatar id that this config relates to
     pub id: String,
     /// The schema version. The loader takes the highest version of an ID.
     pub version: u32,
@@ -73,10 +62,10 @@ pub struct DataRefSchema {
     /// The total width of the code. 0 means the sum of the field widths.
     #[serde(default)]
     pub total_bits: u32,
-    pub fields: Vec<DataRefField>,
+    pub fields: Vec<CamField>,
 }
 
-impl DataRefSchema {
+impl CamConfig {
     /// The sum of the field widths.
     pub fn bit_sum(&self) -> u32 {
         self.fields.iter().map(|field| field.bits).sum()
@@ -91,10 +80,6 @@ impl DataRefSchema {
         }
     }
 
-    /// Checks the rules that the native library also checks.
-    ///
-    /// The check runs before `drd_open` so that a bad file reports a clear
-    /// reason instead of a status code.
     pub fn validate(&self) -> Result<(), SchemaError> {
         if self.id.is_empty() {
             return Err(SchemaError::EmptyId);
@@ -109,7 +94,7 @@ impl DataRefSchema {
                     bits: field.bits,
                 });
             }
-            if field.kind == DataRefKind::Bool && field.bits != 1 {
+            if field.kind == CamType::Bool && field.bits != 1 {
                 return Err(SchemaError::FieldWidth {
                     name: field.osc.clone(),
                     bits: field.bits,
@@ -128,7 +113,7 @@ impl DataRefSchema {
 }
 
 /// The reason that a schema file is not usable.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum SchemaError {
     EmptyId,
     NoFields,
@@ -152,8 +137,6 @@ impl fmt::Display for SchemaError {
         }
     }
 }
-
-impl std::error::Error for SchemaError {}
 
 /// One schema file on disk.
 ///
@@ -180,14 +163,14 @@ impl std::hash::Hash for LocalAvailableSchema {
 }
 
 /// Reads a schema file from disk.
-pub fn read_schema(path: &Path) -> Result<DataRefSchema, String> {
+pub fn read_schema(path: &Path) -> Result<CamConfig, String> {
     let content = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
     parse_schema(&content)
 }
 
 /// Parses a schema out of a plain JSON file or a markdown file.
-pub fn parse_schema(content: &str) -> Result<DataRefSchema, String> {
-    serde_json::from_str::<DataRefSchema>(json_body(content)).map_err(|err| err.to_string())
+pub fn parse_schema(content: &str) -> Result<CamConfig, String> {
+    serde_json::from_str::<CamConfig>(json_body(content)).map_err(|err| err.to_string())
 }
 
 /// Returns the JSON object inside a file.
@@ -208,8 +191,6 @@ pub fn json_body(content: &str) -> &str {
 }
 
 /// Finds the first fenced `json` block of a markdown file.
-///
-/// The scan works line by line, so a nested fence does not confuse it.
 fn fenced_json(content: &str) -> Option<&str> {
     let mut offset = 0usize;
     let mut start: Option<usize> = None;
@@ -263,7 +244,7 @@ mod tests {
     fn reads_plain_json() {
         let plain = json_body(MARKDOWN).to_string();
         let schema = parse_schema(&plain).expect("parse");
-        assert_eq!(schema.fields[3].kind, DataRefKind::Bool);
+        assert_eq!(schema.fields[3].kind, CamType::Bool);
     }
 
     #[test]

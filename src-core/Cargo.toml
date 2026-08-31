@@ -61,3 +61,6 @@ anyhow = "1.0.103"
 memchr = "2.8.2"
 thiserror = "2.0.19"
 arraydeque = "0.5.1"
+spout2-rs = "0.1.1"
+triple_buffer = "9.0.0"
+bytemuck = { version = "1.25.2", features = ["derive"] }

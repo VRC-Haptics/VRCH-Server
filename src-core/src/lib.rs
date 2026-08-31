@@ -8,13 +8,13 @@ pub mod bhaptics;
 pub mod devices;
 pub mod file;
 pub mod mapping;
+mod migrate;
 mod network;
 pub mod osc;
 pub mod state;
 pub mod util;
 pub mod vrc;
 pub(crate) mod wrappers;
-mod migrate;
 
 #[cfg(test)]
 mod tests;
@@ -37,7 +37,7 @@ use tokio::sync::Mutex;
 use crate::bhaptics::game::BhapticHandle;
 use crate::devices::websocket::start_websocket_devices;
 use crate::devices::{bhaptics::start_ble, DeviceHandle};
-use crate::file::{AppRoot, RESOURCE_DIR, ROOT_DIR, resolve_dir};
+use crate::file::{resolve_dir, AppRoot, RESOURCE_DIR, ROOT_DIR};
 use crate::mapping::start_interp_map;
 use crate::state::get_config;
 use crate::{mapping::MapHandle, vrc::VrcHandle};
@@ -46,11 +46,23 @@ use crate::{mapping::MapHandle, vrc::VrcHandle};
 pub mod __log_err {
     use std::fmt::{Debug, Display};
     pub struct Wrap<T>(pub T);
-    pub trait ViaDisplay { fn fmt_err(&self) -> String; }
-    pub trait ViaDebug   { fn fmt_err(&self) -> String; }
+    pub trait ViaDisplay {
+        fn fmt_err(&self) -> String;
+    }
+    pub trait ViaDebug {
+        fn fmt_err(&self) -> String;
+    }
     // Display wins (fewer autorefs); Debug is the fallback.
-    impl<T: Display> ViaDisplay for Wrap<&T>  { fn fmt_err(&self) -> String { format!("{:#}", self.0) } }
-    impl<T: Debug>   ViaDebug   for &Wrap<&T> { fn fmt_err(&self) -> String { format!("{:?}", self.0) } }
+    impl<T: Display> ViaDisplay for Wrap<&T> {
+        fn fmt_err(&self) -> String {
+            format!("{:#}", self.0)
+        }
+    }
+    impl<T: Debug> ViaDebug for &Wrap<&T> {
+        fn fmt_err(&self) -> String {
+            format!("{:?}", self.0)
+        }
+    }
 }
 
 #[macro_export]
@@ -69,7 +81,6 @@ pub mod __log_err {
 /// -> "Error performing action: Unique Error"
 ///
 /// ```
-#[macro_export]
 macro_rules! log_err {
     ($expr:expr) => {
         if let Err(e) = $expr {
@@ -93,7 +104,9 @@ macro_rules! log_err {
 pub static API_MANAGER: OnceLock<Mutex<ApiManager>> = OnceLock::new();
 pub static DEVICE_MANAGER: OnceCell<DeviceHandle> = OnceCell::new();
 
-async fn start_async_tasks(manager: DeviceHandle) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>) {
+async fn start_async_tasks(
+    manager: DeviceHandle,
+) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>) {
     let conf = get_config().server.load();
 
     // initialize input map.
@@ -134,11 +147,22 @@ async fn start_async_tasks(manager: DeviceHandle) -> (Option<VrcHandle>, MapHand
 }
 
 /// Handles spawning the various components of the haptic server.
-pub async fn start_server(root: AppRoot, resources: PathBuf) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
+pub async fn start_server(
+    root: AppRoot,
+    resources: PathBuf,
+) -> (
+    Option<VrcHandle>,
+    MapHandle,
+    Option<BhapticHandle>,
+    DeviceHandle,
+) {
     log_err!(ROOT_DIR.set(root));
     log_err!(RESOURCE_DIR.set(resources));
 
-    log_err!(file::seed_from_resources(), "Failed to seed bundled resources");
+    log_err!(
+        file::seed_from_resources(),
+        "Failed to seed bundled resources"
+    );
 
     // map fetching api points to cache in the cache folder
     let api_manager = ApiManager::new(resolve_dir(file::Directory::Maps));
@@ -173,7 +197,15 @@ pub async fn start_server(root: AppRoot, resources: PathBuf) -> (Option<VrcHandl
 /// Starts the various components of the server and returns their handles.
 ///
 /// Same as start_server but does not rely on an existing runtime.
-pub fn start_server_blocking(root: AppRoot, resources: PathBuf) -> (Option<VrcHandle>, MapHandle, Option<BhapticHandle>, DeviceHandle) {
+pub fn start_server_blocking(
+    root: AppRoot,
+    resources: PathBuf,
+) -> (
+    Option<VrcHandle>,
+    MapHandle,
+    Option<BhapticHandle>,
+    DeviceHandle,
+) {
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
     let _running_handle = std::thread::spawn(move || {

@@ -1,4 +1,4 @@
-pub mod schema;
+pub mod cam_schema;
 
 use crate::vrc::config::GameMap;
 use std::fs;
@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 use walkdir::WalkDir;
 use crate::network::fetch_text;
 
-pub use schema::{
-    DataRefField, DataRefKind, DataRefSchema, LocalAvailableSchema, SchemaError,
+pub use cam_schema::{
+    CamField, CamType, CamConfig, LocalAvailableSchema, SchemaError,
 };
 
 /// The folder under the config cache that holds camera schema files.
@@ -18,13 +18,11 @@ pub const SCHEMA_FOLDER: &str = "cameras";
 #[derive(Debug)]
 pub struct ApiManager {
     pub config_folder: PathBuf,
-    /// The folder that holds the data reference schema files.
-    pub schema_folder: PathBuf,
+    pub cam_folder: PathBuf,
     pub base_url: String,
     pub remote_maps: Arc<Mutex<Option<Vec<NetworkAvailableMap>>>>,
     pub local_maps: Arc<Mutex<HashSet<LocalAvailableMap>>>,
-    /// The schema files on disk, keyed by ID and version.
-    pub local_schemas: Arc<Mutex<HashSet<LocalAvailableSchema>>>,
+    pub local_cams: Arc<Mutex<HashSet<LocalAvailableSchema>>>,
     refresh_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -63,11 +61,11 @@ impl ApiManager {
 
         ApiManager {
             config_folder: cache,
-            schema_folder,
+            cam_folder: schema_folder,
             base_url,
             remote_maps: Arc::new(Mutex::new(None)),
             local_maps: Arc::new(Mutex::new(HashSet::new())),
-            local_schemas: Arc::new(Mutex::new(HashSet::new())),
+            local_cams: Arc::new(Mutex::new(HashSet::new())),
             refresh_handle: None,
         }
     }
@@ -82,11 +80,11 @@ impl ApiManager {
         }
 
         let config_folder = self.config_folder.clone();
-        let schema_folder = self.schema_folder.clone();
+        let schema_folder = self.cam_folder.clone();
         let base_url = self.base_url.clone();
         let local_maps = Arc::clone(&self.local_maps);
         let remote_maps = Arc::clone(&self.remote_maps);
-        let local_schemas = Arc::clone(&self.local_schemas);
+        let local_schemas = Arc::clone(&self.local_cams);
 
         let handle = tokio::spawn(async move {
             log::debug!("Starting async cache refresh");
@@ -151,7 +149,7 @@ impl ApiManager {
         let local = self.local_maps.lock().await;
         log::trace!("Local Cache: {:?} Maps", local.len());
 
-        let schemas = self.local_schemas.lock().await;
+        let schemas = self.local_cams.lock().await;
         log::trace!("Schema Cache: {:?} Schemas", schemas.len());
 
         let remote = self.remote_maps.lock().await;
@@ -325,8 +323,8 @@ impl ApiManager {
     /// to the next lower version.
     ///
     /// The remote source does not exist yet. The search stays local.
-    pub async fn load_schema(&self, id: &str) -> Result<DataRefSchema, ApiRetrievalError> {
-        Self::load_schema_from(&self.local_schemas, id).await
+    pub async fn load_cam(&self, id: &str) -> Result<CamConfig, ApiRetrievalError> {
+        Self::load_schema_from(&self.local_cams, id).await
     }
 
     /// Loads a camera schema straight out of the index.
@@ -336,7 +334,7 @@ impl ApiManager {
     pub async fn load_schema_from(
         index: &Arc<Mutex<HashSet<LocalAvailableSchema>>>,
         id: &str,
-    ) -> Result<DataRefSchema, ApiRetrievalError> {
+    ) -> Result<CamConfig, ApiRetrievalError> {
         let mut candidates: Vec<LocalAvailableSchema> = {
             let schemas = index.lock().await;
             schemas
@@ -358,7 +356,7 @@ impl ApiManager {
 
         let mut last_error = String::new();
         for entry in &candidates {
-            match schema::read_schema(&entry.path) {
+            match cam_schema::read_schema(&entry.path) {
                 Ok(parsed) => match parsed.validate() {
                     Ok(()) => return Ok(parsed),
                     Err(err) => {
@@ -383,7 +381,7 @@ impl ApiManager {
     /// Each config file is "probably" valid, it atleast has each of the needed fields.
     pub async fn refresh_local_index(&mut self) {
         // Find already locally cached maps.
-        let new_local_maps = Self::scan_map_folder(&self.config_folder, &self.schema_folder);
+        let new_local_maps = Self::scan_map_folder(&self.config_folder, &self.cam_folder);
 
         let mut maps = self.local_maps.lock().await;
         *maps = new_local_maps;
@@ -394,9 +392,9 @@ impl ApiManager {
     /// The scan reads every file under the schema folder. A file that does not
     /// hold a schema drops out of the index with a warning.
     pub async fn refresh_schema_index(&self) {
-        let found = Self::scan_schema_folder(&self.schema_folder);
+        let found = Self::scan_schema_folder(&self.cam_folder);
 
-        let mut schemas = self.local_schemas.lock().await;
+        let mut schemas = self.local_cams.lock().await;
         *schemas = found;
     }
 
@@ -461,7 +459,7 @@ impl ApiManager {
                 continue;
             }
 
-            match schema::read_schema(entry.path()) {
+            match cam_schema::read_schema(entry.path()) {
                 Ok(parsed) => {
                     if let Err(err) = parsed.validate() {
                         log::warn!("Unusable camera schema {:?}: {}", entry.path(), err);

@@ -1,33 +1,33 @@
 pub mod cache_node;
-pub mod config;
 pub mod cam;
+pub mod config;
 pub mod discovery;
 pub mod osc_query;
 pub mod parsing;
 pub mod ps;
 
 // crate dependencies
-use crate::api::{ApiManager, DataRefSchema, LocalAvailableSchema};
+use crate::api::{ApiManager, CamConfig, LocalAvailableSchema};
+use crate::log_err;
+use crate::mapping::input_node::InputNode;
 use crate::mapping::input_node::{History, Slot, SlotKey};
 use crate::mapping::{
-    input_node::InputNode,
+    InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind,
 };
-use crate::mapping::{InputEventMessage, MapHandle, NodeField, NodeFieldKind, NodeKey, SlotField, SlotFieldKind};
-use crate::osc::parse::{MsgType, RefMessage, first_message};
-use crate::state::{VrcSettings, get_config};
+use crate::osc::parse::{first_message, MsgType, RefMessage};
+use crate::state::{get_config, VrcSettings};
 use crate::util::next_free_port_with_address;
+use crate::vrc::cam::{start_cam, CamHandle, CameraInfo};
 use crate::vrc::config::InputType;
-use crate::vrc::cam::{CameraDecoder, CameraInfo, CameraSession, FieldRoute};
+use crate::vrc::parsing::OscInfo;
 use crate::vrc::ps::create_vfh_nodes;
 use arc_swap::{ArcSwap, Cache};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use tokio::net::UdpSocket;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
-use crate::vrc::parsing::OscInfo;
-use crate::{log_err};
 
 // module dependencies
 use config::GameMap;
@@ -40,9 +40,11 @@ use rosc::OscType;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Acquire;
 use std::time::{Duration, Instant};
 use std::{net::Ipv4Addr, sync::Arc};
 use tokio::sync::Mutex;
+use warp::filters::method::get;
 
 /// struct exposed to the UI.
 ///
@@ -59,21 +61,22 @@ pub struct VrcInfo {
     pub watched: Vec<(String, AddrInfo)>,
     pub available: Vec<OscInfo>,
     /// The state of the camera decode path.
-    pub camera: CameraInfo,
+    pub camera: Option<CameraInfo>,
 }
 
 impl Default for VrcInfo {
     fn default() -> Self {
+        let conf = get_config().vrc_settings.load();
         Self {
             is_connected: false,
             in_port: None,
             out_port: None,
             avatar: None,
-            velocity_ratio: 0.5,
-            velocity_mult: 0.5,
+            velocity_ratio: conf.velocity_ratio,
+            velocity_mult: conf.velocity_mult,
             watched: vec![],
             available: Vec::new(),
-            camera: CameraInfo::default(),
+            camera: None,
         }
     }
 }
@@ -149,14 +152,13 @@ impl Clone for VrcHandle {
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub enum AddrInfo
-{
+pub enum AddrInfo {
     Slot(SlotKey, SlotFieldKind),
-    Node(NodeKey, NodeFieldKind)
+    Node(NodeKey, NodeFieldKind),
 }
 
 /// One watched OSC address and the map targets that it drives.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WatchedAddr {
     /// The targets of this address.
     pub infos: SmallVec<[AddrInfo; 2]>,
@@ -197,14 +199,11 @@ pub struct VrcGame {
     dirty: bool,
     /// The camera schema index. The loader reads it without the api lock.
     schema_index: Arc<Mutex<HashSet<LocalAvailableSchema>>>,
-    /// The decode thread. A drop stops it.
-    camera: CameraDecoder,
-    /// The session that the decode thread runs.
-    camera_session: Option<Arc<CameraSession>>,
+    /// Handle to a listening Camera instance
+    camera: Option<CamHandle>,
     /// The camera ID that the avatar reports.
     camera_id: Option<String>,
-    /// The camera activity count of the last tick.
-    camera_activity: u64,
+    camera_active: bool,
 }
 
 /// I hate naming things
@@ -220,7 +219,7 @@ pub enum MsgToMainVrc {
     /// A camera schema load finished. `None` means no usable file.
     CameraSchema {
         id: String,
-        schema: Option<Box<DataRefSchema>>,
+        schema: Option<Box<CamConfig>>,
     },
     VrcDisconnected,
 }
@@ -239,7 +238,7 @@ impl VrcGame {
 
         // Take the schema index once. The decode path then needs no lock on the
         // api manager, which the config loader holds with try_lock.
-        let schema_index = Arc::clone(&api.lock().await.local_schemas);
+        let schema_index = Arc::clone(&api.lock().await.local_cams);
 
         // Instantiate
         let vrc = VrcGame {
@@ -249,15 +248,14 @@ impl VrcGame {
             query_server: None,
             avatar: None,
             rx: rx,
-            camera: CameraDecoder::start(map_handle.event_sender.clone()),
+            camera: None,
             map: map_handle,
             available_parameters: Arc::clone(&param_avail),
             watched: FxHashMap::default(),
             dirty: false,
             schema_index,
-            camera_session: None,
             camera_id: None,
-            camera_activity: 0,
+            camera_active: false,
         };
 
         // Start the thread that handles finding available vrc parameters
@@ -284,9 +282,10 @@ impl VrcGame {
             Ok(s) => s,
             Err(_) => {
                 // The desired port is not available. Look for a fallback.
-                if let Some(free_port) =
-                    next_free_port_with_address(used_port, std::net::IpAddr::V4(Ipv4Addr::from_str(&addr).unwrap()))
-                {
+                if let Some(free_port) = next_free_port_with_address(
+                    used_port,
+                    std::net::IpAddr::V4(Ipv4Addr::from_str(&addr).unwrap()),
+                ) {
                     used_port = free_port;
                     let addr = format!("{}:{}", used_port, free_port);
                     UdpSocket::bind(&addr).await.unwrap() //assume we will be able to bind to this one
@@ -305,7 +304,6 @@ impl VrcGame {
             log::warn!("Not using VRC dedicated ports, expect slower operations.");
         }
 
-
         let mut buf = [0u8; rosc::decoder::MTU];
         loop {
             tokio::select! {
@@ -316,18 +314,21 @@ impl VrcGame {
                     match res {
                         Ok((size, _)) => {
                             match first_message(&buf[..size]) {
-                                Err(e) => {},
+                                Err(e) => {log::error!("msg parsing error: {e}")},
                                 Ok(msg) => {
                                     let addr = remove_version(&msg.addr);
 
-                                    // if let Some(infos) = self.watched.get_mut(&addr) {
-                                    //     infos.last = Instant::now();
+                                    if let Some(infos) = self.watched.get_mut(&addr) {
+                                        if infos.camera && self.camera_active {
+                                            continue;
+                                        }
+                                        infos.last = Instant::now();
 
-                                    //     for info in &infos.infos {
-                                    //         log_err!(Self::push_info(&self.map.event_sender, info, &msg));
-                                    //     }
-                                    //     continue;
-                                    // }
+                                        for info in &infos.infos {
+                                            log_err!(Self::push_info(&self.map.event_sender, info, &msg));
+                                        }
+                                        continue;
+                                    }
 
                                     // Not a watched address. It may still name
                                     // the camera of this avatar.
@@ -368,7 +369,7 @@ impl VrcGame {
                             // The flush drops every node, so every key in the
                             // watch table is dead.
                             self.watched.clear();
-                            self.clear_camera();
+                            self.camera = None;
 
                             let cfg = settings.load();
                             let nodes = to_inputs(&avi, cfg);
@@ -417,7 +418,7 @@ impl VrcGame {
                             } else {
                                 match schema {
                                     Some(schema) => self.bind_camera(&schema),
-                                    None => self.clear_camera(),
+                                    None => self.camera = None,
                                 }
                                 self.dirty = true;
                             }
@@ -426,7 +427,7 @@ impl VrcGame {
                             log::warn!("Vrc Disconnected");
                             self.avatar = None;
                             self.available_parameters.clear();
-                            self.clear_camera();
+                            self.camera = None;
                             self.camera_id = None;
                             self.dirty = true;
                         }
@@ -436,9 +437,15 @@ impl VrcGame {
         }
     }
 
-    fn handle_info_update(&mut self, cfg: &Arc<VrcSettings>, mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
+    fn handle_info_update(
+        &mut self,
+        cfg: &Arc<VrcSettings>,
+        mult: f32,
+        ratio: f32,
+        samples: usize,
+        smooth_s: Duration,
+    ) {
         if (cfg.velocity_ratio - ratio).abs() < 0.0001 {
-            
             if let Some(avi) = &self.avatar {
                 // rebuilding the avatar takes the new cfg value into account.
                 self.handle.send(MsgToMainVrc::NewAvatar(avi.clone()));
@@ -471,68 +478,50 @@ impl VrcGame {
     ///
     /// A field name is an OSC path without the VRC Fury prefix. A name that no
     /// node watches drops out of the table.
-    fn bind_camera(&mut self, schema: &DataRefSchema) {
-        let watched = &mut self.watched;
-        for entry in watched.values_mut() {
-            entry.camera = false;
-        }
-
-        let built = CameraSession::build(
-            schema,
-            CAMERA_MIN_CONFIDENCE,
-            true,
-            None,
-            |name| match watched.get_mut(&remove_version(name)) {
-                Some(entry) => {
-                    entry.camera = true;
-                    entry.infos.clone()
-                }
-                None => FieldRoute::new(),
-            },
-        );
-
-        match built {
-            Ok(session) => {
-                self.camera.bind(Arc::clone(&session));
-                self.camera_session = Some(session);
+    fn bind_camera(&mut self, schema: &CamConfig) {
+        let built = match start_cam(schema.clone(), self.map.clone(), self.watched.clone()) {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Unable to build camera: {e}");
+                return;
             }
-            Err(err) => {
-                log::warn!("Unable to bind camera {}: {}", schema.id, err);
-                self.clear_camera();
+        };
+
+        for addr in &schema.fields {
+            if let Some(val) = self.watched.get_mut(&addr.osc) {
+                val.camera = true;
             }
         }
-    }
-
-    /// Stops the decode thread and clears the camera flags.
-    fn clear_camera(&mut self) {
-        if self.camera_session.take().is_some() {
-            self.camera.clear();
-        }
-        for entry in self.watched.values_mut() {
-            entry.camera = false;
-        }
+        self.camera = Some(built);
     }
 
     fn handle_dropped(&mut self) {
         let now = Instant::now();
         let tx = &self.map.event_sender.clone();
 
-        // The camera holds a value until the next change, so a camera address
-        // has no steady OSC traffic. Read the decoder counters instead.
-        let activity = self.camera.stats().activity();
-        let camera_alive = activity != self.camera_activity;
-        self.camera_activity = activity;
+        self.camera_active = self
+            .camera
+            .as_ref()
+            .map_or(false, |v| v.active.load(Acquire));
 
         for comg in self.watched.values_mut() {
-            if comg.camera && camera_alive {
+            if comg.camera && self.camera_active {
                 comg.last = now;
                 continue;
             }
 
-            if now.checked_duration_since(comg.last).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(1) {
+            if now
+                .checked_duration_since(comg.last)
+                .unwrap_or(Duration::from_secs(0))
+                > Duration::from_secs(1)
+            {
                 comg.last = now;
                 for inf in &comg.infos {
-                    let arg = &RefMessage { addr: "", t: MsgType::F32, contents: &0.0f32.to_be_bytes().clone() };
+                    let arg = &RefMessage {
+                        addr: "",
+                        t: MsgType::F32,
+                        contents: &0.0f32.to_be_bytes().clone(),
+                    };
                     log_err!(Self::push_info(tx, inf, arg));
                 }
             }
@@ -545,41 +534,71 @@ impl VrcGame {
             return;
         }
 
+        let conf = get_config().vrc_settings.load();
+
         let current = &self.ui_info;
         let changed = VrcInfo {
             is_connected: !self.available_parameters.is_empty(),
             in_port: Some(self.recv_port),
             out_port: Some(0),
-            available: self.available_parameters.iter().map(|entry| entry.value().clone()).collect(),
+            available: self
+                .available_parameters
+                .iter()
+                .map(|entry| entry.value().clone())
+                .collect(),
             avatar: self.avatar.clone(),
-            velocity_mult: 0.0, // these will be filled out by touching the state in the handle function
-            velocity_ratio: 0.0,
-            watched: self.watched.iter()
+            velocity_mult: conf.velocity_mult, // these will be filled out by touching the state in the handle function
+            velocity_ratio: conf.velocity_ratio,
+            watched: self
+                .watched
+                .iter()
                 .flat_map(|(s, entry)| entry.infos.iter().map(move |i| (s.clone(), i.clone())))
                 .collect(),
-            camera: self.camera.stats().snapshot(self.camera_session.as_deref()),
+            camera: self.camera.as_ref().map(|v| v.info()),
         };
 
         current.swap(Arc::new(changed));
         self.dirty = false;
     }
 
-    fn push_info<'a>(tx: &UnboundedSender<InputEventMessage>, info: &AddrInfo, msg: &RefMessage<'a>) -> anyhow::Result<()>{
+    fn push_info<'a>(
+        tx: &UnboundedSender<InputEventMessage>,
+        info: &AddrInfo,
+        msg: &RefMessage<'a>,
+    ) -> anyhow::Result<()> {
         match info {
             AddrInfo::Slot(s, kind) => {
                 let msg = match kind {
-                    SlotFieldKind::Weight => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Weight(msg.into_f32()?) },
-                    SlotFieldKind::Value => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Value(msg.into_f32()?) },
-                    SlotFieldKind::Muted => InputEventMessage::UpdateSlotField { key: s.clone(), field: SlotField::Muted(msg.into_bool().unwrap_or(false)) },
+                    SlotFieldKind::Weight => InputEventMessage::UpdateSlotField {
+                        key: s.clone(),
+                        field: SlotField::Weight(msg.into_f32()?),
+                    },
+                    SlotFieldKind::Value => InputEventMessage::UpdateSlotField {
+                        key: s.clone(),
+                        field: SlotField::Value(msg.into_f32()?),
+                    },
+                    SlotFieldKind::Muted => InputEventMessage::UpdateSlotField {
+                        key: s.clone(),
+                        field: SlotField::Muted(msg.into_bool().unwrap_or(false)),
+                    },
                 };
                 log_err!(tx.send(msg));
                 Ok(())
-            },
+            }
             AddrInfo::Node(n, kind) => {
                 let msg = match kind {
-                    NodeFieldKind::Location => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Location(msg.into_vec3()?) },
-                    NodeFieldKind::Radius => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Radius(msg.into_f32()?) },
-                    NodeFieldKind::Muted => InputEventMessage::UpdateNodeField { key: n.clone(), field: NodeField::Muted(msg.into_bool().unwrap_or(false)) },
+                    NodeFieldKind::Location => InputEventMessage::UpdateNodeField {
+                        key: n.clone(),
+                        field: NodeField::Location(msg.into_vec3()?),
+                    },
+                    NodeFieldKind::Radius => InputEventMessage::UpdateNodeField {
+                        key: n.clone(),
+                        field: NodeField::Radius(msg.into_f32()?),
+                    },
+                    NodeFieldKind::Muted => InputEventMessage::UpdateNodeField {
+                        key: n.clone(),
+                        field: NodeField::Muted(msg.into_bool().unwrap_or(false)),
+                    },
                 };
                 log_err!(tx.send(msg));
                 Ok(())
@@ -606,7 +625,10 @@ pub(crate) fn push_scalar(
                 SlotFieldKind::Value => SlotField::Value(value),
                 SlotFieldKind::Muted => SlotField::Muted(value > 0.5),
             };
-            InputEventMessage::UpdateSlotField { key: key.clone(), field }
+            InputEventMessage::UpdateSlotField {
+                key: key.clone(),
+                field,
+            }
         }
         AddrInfo::Node(key, kind) => {
             let field = match kind {
@@ -616,7 +638,10 @@ pub(crate) fn push_scalar(
                 NodeFieldKind::Radius => NodeField::Radius(value),
                 NodeFieldKind::Muted => NodeField::Muted(value > 0.5),
             };
-            InputEventMessage::UpdateNodeField { key: key.clone(), field }
+            InputEventMessage::UpdateNodeField {
+                key: key.clone(),
+                field,
+            }
         }
     };
 
@@ -632,15 +657,29 @@ fn try_vec(val: OscType) -> Vec3 {
     match val {
         OscType::Float(f) => Vec3::new(f, 0.0, 0.0),
         OscType::Array(a) => {
-            let x = try_f32(a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT)).clone());
-            let y = try_f32(a.content.get(1).unwrap_or(&OscType::Float(F32DEFAULT)).clone());
-            let z = try_f32(a.content.get(2).unwrap_or(&OscType::Float(F32DEFAULT)).clone());
+            let x = try_f32(
+                a.content
+                    .get(0)
+                    .unwrap_or(&OscType::Float(F32DEFAULT))
+                    .clone(),
+            );
+            let y = try_f32(
+                a.content
+                    .get(1)
+                    .unwrap_or(&OscType::Float(F32DEFAULT))
+                    .clone(),
+            );
+            let z = try_f32(
+                a.content
+                    .get(2)
+                    .unwrap_or(&OscType::Float(F32DEFAULT))
+                    .clone(),
+            );
             Vec3::new(x, y, z)
-        },
+        }
         OscType::Double(d) => Vec3::new(d as f32, 0.0, 0.0),
         // TODO: Look into better casting these values.
         _ => VECDEFAULT,
-
     }
 }
 
@@ -652,13 +691,12 @@ fn try_f32(val: OscType) -> f32 {
         OscType::Array(a) => {
             let first = a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT));
             try_f32(first.clone())
-        },
+        }
         OscType::Bool(b) => f32::from(u8::from(b)),
         OscType::Double(d) => d as f32,
         OscType::Inf => 1.0,
         // TODO: Look into better casting these values.
         _ => F32DEFAULT,
-
     }
 }
 
@@ -670,18 +708,20 @@ fn try_bool(val: OscType) -> bool {
         OscType::Array(a) => {
             let first = a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT));
             try_bool(first.clone())
-        },
+        }
         OscType::Bool(b) => b,
         OscType::Double(d) => d > 0.5,
         OscType::Inf => true,
         // TODO: Look into better casting these values.
         _ => false,
-
     }
 }
 
 /// Converts a vrc avatar descriptor into a list of input nodes for our input map.
-fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)>, Box<InputNode>)> {
+fn to_inputs(
+    avi: &Avatar,
+    settings: &Arc<VrcSettings>,
+) -> Vec<(Vec<(String, u8)>, Box<InputNode>)> {
     let mut nodes = vec![];
 
     // add ogb setup
@@ -700,29 +740,39 @@ fn to_inputs(avi: &Avatar, settings: &Arc<VrcSettings>) -> Vec<(Vec<(String, u8)
         for node in &conf.nodes {
             let location = node.location;
             let layer = &node.interpolation_layer;
-            let groups  = node.interaction_tags;
+            let groups = node.interaction_tags;
             let radius = node.radius;
-            
+
             let vel = settings.velocity_ratio;
-            let slots: Vec<(String, Slot)> = node.inputs.iter().map(|i| {
-                let weight = match i.source {
-                    InputType::Weight => (1.0 - vel) * i.weight,
-                    InputType::Velocity => (vel) * i.weight,
-                };
+            let slots: Vec<(String, Slot)> = node
+                .inputs
+                .iter()
+                .map(|i| {
+                    let weight = match i.source {
+                        InputType::Weight => (1.0 - vel) * i.weight,
+                        InputType::Velocity => (vel) * i.weight,
+                    };
 
-                return (
-                    i.vrc_prefix.to_owned() + &i.address.to_owned(), 
-                    Slot {
-                        muted: false,
-                        source: i.source.clone(),
-                        layer: i.layer.clone(),
-                        weight: weight,
-                        history: History::default(),
-                    }
-                );
-            }).collect();
+                    return (
+                        i.vrc_prefix.to_owned() + &i.address.to_owned(),
+                        Slot {
+                            muted: false,
+                            source: i.source.clone(),
+                            layer: i.layer.clone(),
+                            weight: weight,
+                            history: History::default(),
+                        },
+                    );
+                })
+                .collect();
 
-            let mut node = Box::new(InputNode::new(location, groups, layer.clone(), SmallVec::new(), radius));
+            let mut node = Box::new(InputNode::new(
+                location,
+                groups,
+                layer.clone(),
+                SmallVec::new(),
+                radius,
+            ));
             let mut addrs = vec![];
             for (idx, (addr, slot)) in slots.iter().enumerate() {
                 node.slots.push(slot.clone());
