@@ -37,7 +37,7 @@ impl CacheNode {
         smoothing_time: Duration,
     ) -> CacheNode {
         let mut values = VecDeque::with_capacity(max_entries);
-        let mut ray_values = VecDeque::with_capacity(max_entries);
+        let ray_values = VecDeque::with_capacity(max_entries);
         values.push_front((SpectaOscType::from(value_type.clone()), UNIX_EPOCH));
         CacheNode {
             values,

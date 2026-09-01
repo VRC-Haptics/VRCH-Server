@@ -1,8 +1,7 @@
-use crate::devices::{Device, DeviceInfo, HapticDevice, wifi::{WifiDeviceInfo, ota}};
+use crate::devices::{Device, DeviceInfo, HapticDevice, wifi::ota};
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::IpAddr,
     ops::{Deref, DerefMut},
-    str::FromStr,
 };
 
 /// Decides whether we have the capability of determining this devices eligibility.

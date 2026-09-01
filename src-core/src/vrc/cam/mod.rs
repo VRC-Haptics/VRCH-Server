@@ -2,10 +2,10 @@ mod algo;
 mod center;
 mod grid;
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::Result;
 #[cfg(windows)]
@@ -15,7 +15,7 @@ use tokio::runtime::Builder;
 use tokio::sync::Notify;
 use tokio::time::{self, Interval, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
-use triple_buffer::{Input, Output};
+use triple_buffer::Input;
 
 use crate::api::CamConfig;
 #[cfg(windows)]

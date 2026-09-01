@@ -2,7 +2,6 @@ use mdns_sd::{ServiceDaemon, ServiceInfo};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::net::UdpSocket;
-use tokio::task::JoinHandle;
 use warp::Filter;
 
 

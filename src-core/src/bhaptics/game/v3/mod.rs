@@ -8,13 +8,11 @@ use std::{
     sync::Arc,
 };
 
-use super::network::event_map::PatternLocation;
 use crate::{
     bhaptics::{game::network, maps::pattern_to_event},
     log_err,
     mapping::{EventKey, InputEventMessage, MapHandle},
 };
-use strum::IntoEnumIterator;
 
 use futures_util::{SinkExt, StreamExt};
 use rustls_pemfile::{certs, pkcs8_private_keys};

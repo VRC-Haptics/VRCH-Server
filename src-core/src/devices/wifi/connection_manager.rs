@@ -30,7 +30,7 @@ impl WifiConnManager {
 
         let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
 
-        let mut server = OscServer::new(local, Some(remote), on_receive).await?;
+        let server = OscServer::new(local, Some(remote), on_receive).await?;
         Ok(WifiConnManager {
             server: server,
         })

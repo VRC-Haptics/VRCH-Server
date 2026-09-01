@@ -1,4 +1,4 @@
-use crate::mapping::{groups::NodeGroup, input_node::InputNode};
+use crate::mapping::groups::NodeGroup;
 use glam::Vec3;
 
 /// Struct defining all needed properties for a haptic node.

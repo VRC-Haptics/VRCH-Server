@@ -44,7 +44,6 @@ use std::sync::atomic::Ordering::Acquire;
 use std::time::{Duration, Instant};
 use std::{net::Ipv4Addr, sync::Arc};
 use tokio::sync::Mutex;
-use warp::filters::method::get;
 
 /// struct exposed to the UI.
 ///
@@ -440,10 +439,10 @@ impl VrcGame {
     fn handle_info_update(
         &mut self,
         cfg: &Arc<VrcSettings>,
-        mult: f32,
+        _mult: f32,
         ratio: f32,
-        samples: usize,
-        smooth_s: Duration,
+        _samples: usize,
+        _smooth_s: Duration,
     ) {
         if (cfg.velocity_ratio - ratio).abs() < 0.0001 {
             if let Some(avi) = &self.avatar {
@@ -725,7 +724,7 @@ fn to_inputs(
     let mut nodes = vec![];
 
     // add ogb setup
-    if let Some((ogb, vfh)) = &avi.ps {
+    if let Some((ogb, _vfh)) = &avi.ps {
         // for param in ogb {
         //     nodes.append(&mut create_ogb_nodes(settings, param.full_path.0.clone()));
         // }

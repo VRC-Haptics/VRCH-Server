@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::vrc::cam::algo::{Img, Pixel};
+use crate::vrc::cam::algo::Pixel;
 
 // ---------------------------------------------------------------------------
 // Layout constants. These must mirror the shader / your C# `GridConstants`.

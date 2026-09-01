@@ -3,7 +3,6 @@ use arraydeque::{ArrayDeque, Wrapping};
 use glam::Vec3;
 use smallvec::SmallVec;
 
-use crate::log_err;
 use crate::mapping::NodeKey;
 use crate::mapping::groups::NodeGroup;
 use crate::vrc::config::{InputLayer, InputType};

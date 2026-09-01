@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::state::{self, Config};
+use crate::state::Config;
 
 pub enum Versions {
     V0,
@@ -33,7 +33,7 @@ pub fn migrate(value: Value) -> Option<Config> {
     }
 }
 
-pub fn v0_to_v1(value: Value) -> Option<Config> {
+pub fn v0_to_v1(_value: Value) -> Option<Config> {
     // add version tag.
     // interpret as v1.
     // migrate default scaling per known device.

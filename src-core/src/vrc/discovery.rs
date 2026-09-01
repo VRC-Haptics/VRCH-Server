@@ -1,13 +1,12 @@
 use super::parsing::{parse_incoming, remove_version, OscInfo};
 use super::{Avatar, GameMap, MsgToMainVrc, OscPath, VrcHandle, CAM_ID_PREFIX, PREFAB_PREFIX};
 use crate::api::ApiManager;
-use crate::file::{Directory, native_lib, sidecar};
+use crate::file::native_lib;
 use crate::vrc::AVATAR_ID_PATH;
 
 use dashmap::DashMap;
 use libloading::Library;
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Duration;

@@ -1,8 +1,7 @@
 use std::{fmt, str::FromStr};
-use anyhow::{Context, Result, anyhow};
-use smallvec::SmallVec;
+use anyhow::Result;
 use thiserror::Error;
-use crate::{mapping::{groups::NodeGroup, input_node::{InputNode, Slot}}, state::{AviOverride, VrcSettings}};
+use crate::{mapping::input_node::InputNode, state::VrcSettings};
 
 pub enum OGBType {
     Orf,
@@ -103,6 +102,6 @@ impl FromStr for OGBContacts {
 /// Takes in a string following the form:
 /// 
 /// `/avatar/parameters/VFH/<Type>/<Id>/<Contact>`
-pub fn create_vfh_nodes(cfg: &VrcSettings, param: String) -> Vec<(Vec<(String, u8)>, Box<InputNode>)> {
+pub fn create_vfh_nodes(_cfg: &VrcSettings, _param: String) -> Vec<(Vec<(String, u8)>, Box<InputNode>)> {
     vec![]
 }

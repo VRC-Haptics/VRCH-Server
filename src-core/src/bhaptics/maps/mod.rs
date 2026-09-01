@@ -1,7 +1,7 @@
 use x40_vest::{x40_vest_back, x40_vest_front};
 use x6_head::x6_headset;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use glam::Vec3;
 
 use super::game::network::event_map::{

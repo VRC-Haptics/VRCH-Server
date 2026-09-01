@@ -13,7 +13,6 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     bhaptics::maps::x40_vest::{x40_vest_back, x40_vest_front},
     devices::{bhaptics::ble::BleHandle, DeviceId, DeviceInfo, DeviceMessage},
-    log_err,
     mapping::{haptic_node::HapticNode, groups::NodeGroup},
 };
 
@@ -185,7 +184,7 @@ impl super::Device for BhapticBle {
             return;
         };
 
-        let BhapticInfo { id, nodes, model } = new;
+        let BhapticInfo { id: _, nodes: _, model: _ } = new;
 
         return;
     }

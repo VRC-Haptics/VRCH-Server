@@ -6,7 +6,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use directories::ProjectDirs;
 use event_map::{BaseMessage, GameMapping};
 
 use crate::network::{self, fetch_text};

@@ -1,4 +1,4 @@
-use crate::mapping::{groups::NodeGroup, haptic_node::HapticNode, input_node::InterpolationLayer};
+use crate::mapping::{groups::NodeGroup, input_node::InterpolationLayer};
 use glam::{Vec3, Vec4};
 
 pub type UuidString = String;

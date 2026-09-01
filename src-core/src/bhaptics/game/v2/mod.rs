@@ -20,7 +20,7 @@ use super::network::event_map::PatternLocation;
 use crate::{
     log_err,
     mapping::{
-        EventKey, InputEventMessage, MapHandle,
+        InputEventMessage, MapHandle,
         event::{Event, Frames, MaybeConst, Steps},
     },
 };
