@@ -10,6 +10,7 @@ use std::time::Duration;
 use anyhow::Result;
 #[cfg(windows)]
 use rustc_hash::FxHashMap;
+#[cfg(windows)]
 use spout2::dx;
 use tokio::runtime::Builder;
 use tokio::sync::Notify;
@@ -126,6 +127,7 @@ pub enum State {
     Cold,
 }
 
+#[cfg(windows)]
 /// the dx receiver is !Send so it can't be used in normal thread pool?
 pub fn spawn_spout_worker(
     active: Arc<AtomicBool>,
@@ -146,6 +148,7 @@ pub fn spawn_spout_worker(
         .expect("spawn spout-rx thread")
 }
 
+#[cfg(windows)]
 async fn spout_loop(
     active: Arc<AtomicBool>,
     conf: CamConfig,

@@ -17,7 +17,10 @@ use crate::mapping::{
 use crate::osc::parse::{first_message, MsgType, RefMessage};
 use crate::state::{get_config, VrcSettings};
 use crate::util::next_free_port_with_address;
-use crate::vrc::cam::{start_cam, CamHandle, CameraInfo};
+#[cfg(windows)]
+use crate::vrc::cam::start_cam;
+#[cfg(not(windows))]
+use crate::vrc::cam::{CamHandle, CameraInfo};
 use crate::vrc::config::InputType;
 use crate::vrc::parsing::OscInfo;
 use crate::vrc::ps::create_vfh_nodes;
@@ -477,6 +480,7 @@ impl VrcGame {
     ///
     /// A field name is an OSC path without the VRC Fury prefix. A name that no
     /// node watches drops out of the table.
+    #[cfg(windows)]
     fn bind_camera(&mut self, schema: &CamConfig) {
         let built = match start_cam(schema.clone(), self.map.clone(), self.watched.clone()) {
             Ok(c) => c,
@@ -493,6 +497,10 @@ impl VrcGame {
         }
         self.camera = Some(built);
     }
+
+    /// Camera streams are currently not supported on platforms other than windows. Does nothing
+    #[cfg(not(windows))]
+    fn bind_camera(&mut self, schema: &CamConfig) {}
 
     fn handle_dropped(&mut self) {
         let now = Instant::now();

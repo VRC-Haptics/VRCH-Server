@@ -1,17 +1,17 @@
-use std::time::{Duration, Instant};
 use arraydeque::{ArrayDeque, Wrapping};
 use glam::Vec3;
 use smallvec::SmallVec;
+use std::time::{Duration, Instant};
 
-use crate::mapping::NodeKey;
 use crate::mapping::groups::NodeGroup;
+use crate::mapping::NodeKey;
 use crate::vrc::config::{InputLayer, InputType};
 
 const DEFAULT_NODE_SLOTS: usize = 2;
 
 /// Points to an input slot, within a node, within an interpolation layer.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
 pub struct SlotKey {
     pub node: NodeKey,
     pub slot_idx: u8,
@@ -19,7 +19,10 @@ pub struct SlotKey {
 
 impl SlotKey {
     pub fn new(node: NodeKey, idx: u8) -> Self {
-        SlotKey { node, slot_idx: idx }
+        SlotKey {
+            node,
+            slot_idx: idx,
+        }
     }
 }
 
@@ -52,7 +55,9 @@ pub struct History {
 impl PartialEq for History {
     fn eq(&self, other: &Self) -> bool {
         self.samples.len() == other.samples.len()
-            && self.samples.iter()
+            && self
+                .samples
+                .iter()
                 .zip(other.samples.iter())
                 .all(|(a, b)| a.0 == b.0)
     }
@@ -119,7 +124,6 @@ impl History {
         }
     }
 
-
     pub fn view(&self) -> HistoryView {
         let mut values = [0.0f32; WINDOW];
         for (i, (v, _)) in self.samples.iter().enumerate() {
@@ -133,7 +137,7 @@ impl History {
 
     pub fn new() -> Self {
         Self {
-            samples: ArrayDeque::new()
+            samples: ArrayDeque::new(),
         }
     }
 
@@ -146,7 +150,9 @@ impl History {
     }
 
     /// Valid samples, newest-first. Each entry is (value, time).
-    pub fn history(&self) -> impl DoubleEndedIterator<Item = &(f32, Instant)> + ExactSizeIterator + '_ {
+    pub fn history(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &(f32, Instant)> + ExactSizeIterator + '_ {
         // newest were inserted via push_front, so front-to-back == newest-first
         self.samples.iter()
     }
@@ -155,8 +161,8 @@ impl History {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
 /// Represents information at a point in space that will go into computing outputs.
-/// 
-/// To have a Greedy layer drive multiple devices it must have the ALL group tag present. 
+///
+/// To have a Greedy layer drive multiple devices it must have the ALL group tag present.
 pub struct InputNode {
     pub muted: bool,
     pub location: Vec3,
@@ -175,7 +181,7 @@ pub struct InputNode {
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[repr(u8)]
-/// Describes how this node should affect the layers. 
+/// Describes how this node should affect the layers.
 pub enum InterpolationLayer {
     /// Grabs any nodes within it's radius,forcefully drives it at this value.
     Greedy,
