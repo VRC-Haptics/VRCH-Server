@@ -2,10 +2,10 @@
 pub mod serial;
 //mod traits;
 pub mod bhaptics;
-pub mod update;
-pub mod wifi;
-pub mod websocket;
 pub mod internal;
+pub mod update;
+pub mod websocket;
+pub mod wifi;
 
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
@@ -18,8 +18,14 @@ use tokio_util::sync::CancellationToken;
 use wifi::{WifiDevice, WifiDeviceInfo};
 
 use crate::{
-    devices::{bhaptics::{BhapticBle, BhapticInfo}, internal::{InternalDevice, InternalDeviceInfo}, websocket::{WebsocketDevice, WebsocketDeviceInfo}, wifi::start_wifi_devices},
-    mapping::haptic_node::HapticNode, state::get_config,
+    devices::{
+        bhaptics::{BhapticBle, BhapticInfo},
+        internal::{InternalDevice, InternalDeviceInfo},
+        websocket::{WebsocketDevice, WebsocketDeviceInfo},
+        wifi::start_wifi_devices,
+    },
+    mapping::haptic_node::HapticNode,
+    state::get_config,
 };
 
 pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
@@ -66,10 +72,10 @@ impl DeviceInfo {
     /// updates the nodes on this info instance. Does not send them to the device.
     pub fn set_nodes(&mut self, new: Vec<HapticNode>) {
         match self {
-            DeviceInfo::Wifi(ref mut inf) => inf.nodes = new,
-            DeviceInfo::BhapticBle(ref mut inf) => inf.nodes = new,
-            DeviceInfo::Websocket(ref mut inf) => inf.nodes = new,
-            DeviceInfo::Internal(ref mut inf) => inf.nodes = new,
+            DeviceInfo::Wifi(inf) => inf.nodes = new,
+            DeviceInfo::BhapticBle(inf) => inf.nodes = new,
+            DeviceInfo::Websocket(inf) => inf.nodes = new,
+            DeviceInfo::Internal(inf) => inf.nodes = new,
         }
     }
 
@@ -143,7 +149,6 @@ impl Clone for DeviceHandle {
 }
 
 impl DeviceHandle {
-
     /// checks if a device is still here.
     pub fn exists(&self, id: &DeviceId) -> bool {
         self.devices.contains_key(id)
@@ -221,7 +226,11 @@ impl DeviceManager {
     }
 
     pub fn get_handle(&self) -> DeviceHandle {
-        DeviceHandle { devices: Arc::clone(&self.devices), subscribers: Arc::clone(&self.subscribers), device_sender: self.device_sender.clone() }
+        DeviceHandle {
+            devices: Arc::clone(&self.devices),
+            subscribers: Arc::clone(&self.subscribers),
+            device_sender: self.device_sender.clone(),
+        }
     }
 
     pub async fn shutdown(&self) {
@@ -300,7 +309,6 @@ fn handle_device_message(
         }
     };
 }
-
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
