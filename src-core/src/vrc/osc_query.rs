@@ -79,7 +79,7 @@ impl OscQueryServer {
         let root = root_response.clone();
         let host = host_info.clone();
 
-        let routes = warp::get().and(warp::path::end()).and(warp::query::raw().or(warp::any().map(|| String::new())).unify()).map(move |query: String| {
+        let routes = warp::get().and(warp::path::end()).and(warp::query::raw().or(warp::any().map(String::new)).unify()).map(move |query: String| {
             if query.contains("HOST_INFO") {
                 warp::reply::json(&host)
             } else {
@@ -104,7 +104,7 @@ impl OscQueryServer {
         let service = ServiceInfo::new(
             "_oscjson._tcp.local.",
             "VRC Haptics",
-            &format!("VRC-Haptics.local."),
+            "VRC-Haptics.local.",
             &lan_ip,
             tcp_port,
             HashMap::new(),

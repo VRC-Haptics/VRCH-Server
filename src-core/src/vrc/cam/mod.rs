@@ -2,23 +2,17 @@ mod algo;
 mod center;
 mod grid;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::thread::JoinHandle;
 
-use anyhow::Result;
 #[cfg(windows)]
 use rustc_hash::FxHashMap;
 #[cfg(windows)]
 use spout2::dx;
-use tokio::runtime::Builder;
 use tokio::sync::Notify;
-use tokio::time::{self, Interval, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
-use triple_buffer::Input;
 
-use crate::api::CamConfig;
 #[cfg(windows)]
 use crate::log_err;
 #[cfg(windows)]
@@ -26,7 +20,7 @@ use crate::mapping::{
     BatchUpdateMsg, InputEventMessage, MapHandle, NodeField, NodeFieldKind, SlotField,
     SlotFieldKind,
 };
-use crate::vrc::cam::algo::{CamValue, Decoder};
+use crate::vrc::cam::algo::CamValue;
 #[cfg(windows)]
 use crate::vrc::{AddrInfo, WatchedAddr};
 

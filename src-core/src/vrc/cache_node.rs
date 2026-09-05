@@ -44,7 +44,7 @@ impl CacheNode {
             ray_values,
             osc_type: value_type.into(),
             max_len: max_entries,
-            smoothing_time: smoothing_time,
+            smoothing_time,
         }
     }
 
@@ -61,7 +61,7 @@ impl CacheNode {
         let (latest_value, latest_time) = self.values.front().unwrap();
         let (old_value, old_time) = &self.values[1];
         // (percentage / second) * second = new delta
-        let velocity = self.value_delta(latest_value.into(), &old_value)
+        let velocity = self.value_delta(latest_value, old_value)
             / latest_time.duration_since(*old_time).unwrap().as_secs_f32();
         let seconds_since_last = SystemTime::now()
             .duration_since(*latest_time)
@@ -118,18 +118,18 @@ impl CacheNode {
                 // try to get time delta
                 match time.duration_since(*time_late) {
                     Ok(dur) => {
-                        return Ok(self.value_delta(val, val_late) / dur.as_secs_f32());
+                        Ok(self.value_delta(val, val_late) / dur.as_secs_f32())
                     }
-                    Err(err) => return Err(RetrievalError::TimeError(err)),
-                };
+                    Err(err) => Err(RetrievalError::TimeError(err)),
+                }
             } else {
-                return Err(RetrievalError::CacheTooSmall(
+                Err(RetrievalError::CacheTooSmall(
                     self.values.len(),
                     entries_back,
-                ));
+                ))
             }
         } else {
-            return Err(RetrievalError::EmptyCache);
+            Err(RetrievalError::EmptyCache)
         }
     }
 
@@ -146,7 +146,7 @@ impl CacheNode {
         }
         self.values.push_front((value, SystemTime::now()));
 
-        return Ok(());
+        Ok(())
     }
 
     /// Pushes an update to the cached values with the current time as a timestamp.
@@ -162,7 +162,7 @@ impl CacheNode {
         }
         self.ray_values.push_front((value, SystemTime::now()));
 
-        return Ok(());
+        Ok(())
     }
 
     /// Returns the velocity and position mixed values

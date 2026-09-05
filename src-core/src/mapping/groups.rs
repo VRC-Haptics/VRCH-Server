@@ -66,47 +66,47 @@ impl NodeGroup {
         // to_points is contracted to be called per-flag (see interacts).
         bitflags_match!(*self, {
             NodeGroup::Head => Some((
-                Vec3::new(0., 1.70700002, 0.0529999994),
-                Vec3::new(0., 1.43400002, -0.0130000003),
+                Vec3::new(0., 1.707, 0.053),
+                Vec3::new(0., 1.434, -0.013),
             )),
 
             // All four torso faces share the same central vertical axis;
             // front/back and left/right are resolved by within_half_angle.
             NodeGroup::TorsoRight => Some((
-                Vec3::new(0., 0.735000014, -0.00800000038),
-                Vec3::new(0., 1.43400002, -0.0130000003),
+                Vec3::new(0., 0.735, -0.008),
+                Vec3::new(0., 1.434, -0.013),
             )),
             NodeGroup::TorsoLeft => Some((
-                Vec3::new(0., 0.735000014, -0.00800000038),
-                Vec3::new(0., 1.43400002, -0.0130000003),
+                Vec3::new(0., 0.735, -0.008),
+                Vec3::new(0., 1.434, -0.013),
             )),
             NodeGroup::TorsoFront => Some((
-                Vec3::new(0., 0.735000014, -0.00800000038),
-                Vec3::new(0., 1.43400002, -0.0130000003),
+                Vec3::new(0., 0.735, -0.008),
+                Vec3::new(0., 1.434, -0.013),
             )),
             NodeGroup::TorsoBack => Some((
-                Vec3::new(0., 0.735000014, -0.00800000038),
-                Vec3::new(0., 1.43400002, -0.0130000003),
+                Vec3::new(0., 0.735, -0.008),
+                Vec3::new(0., 1.434, -0.013),
             )),
 
             NodeGroup::UpperArmRight => Some((
-                Vec3::new(0.172999993, 1.35599995, -0.0260000005),
-                Vec3::new(0.336199999, 1.15139997, -0.0151000004),
+                Vec3::new(0.173, 1.356, -0.026),
+                Vec3::new(0.336_2, 1.151_4, -0.015_1),
             )),
 
             NodeGroup::UpperLegRight => Some((
-                Vec3::new(0.0689999983, 0.921999991, 0.00100000005),
-                Vec3::new(0.134000003, 0.479000002, -0.0280000009),
+                Vec3::new(0.069, 0.922, 0.001),
+                Vec3::new(0.134, 0.479, -0.028),
             )),
 
             NodeGroup::LowerLegRight => Some((
-                Vec3::new(0.134000003, 0.479000002, -0.0280000009),
-                Vec3::new(0.173999995, 0.0879999995, -0.0729999989),
+                Vec3::new(0.134, 0.479, -0.028),
+                Vec3::new(0.174, 0.088, -0.073),
             )),
 
             NodeGroup::FootRight => Some((
-                Vec3::new(0.173999995, 0.0879999995, -0.0729999989),
-                Vec3::new(0.226300001, 0.0199999996, 0.0320000015),
+                Vec3::new(0.174, 0.088, -0.073),
+                Vec3::new(0.226_3, 0.02, 0.032),
             )),
 
             NodeGroup::UpperArmLeft => mirror_x(NodeGroup::UpperArmRight.to_points()),

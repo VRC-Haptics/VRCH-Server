@@ -205,7 +205,7 @@ impl InputNode {
         slots: SmallVec<[Slot; DEFAULT_NODE_SLOTS]>,
         radius: f32,
     ) -> InputNode {
-        return InputNode {
+        InputNode {
             muted: false,
             location,
             slots,
@@ -213,7 +213,7 @@ impl InputNode {
             interpolation_layer: layer,
             groups,
             value: 0.0,
-        };
+        }
     }
 
     pub const fn always_apply(&self) -> bool {

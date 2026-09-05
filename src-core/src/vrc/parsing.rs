@@ -20,7 +20,7 @@ pub fn remove_version(path: &str) -> String {
 /// convenience function for parsing returned HTTP OSCQuery messages
 pub fn parse_incoming(input: &str) -> Vec<OscInfo> {
     let recursive_nodes: OscQueryNode = serde_json::from_str(input).expect("couldn't parse json");
-    return recursive_nodes.to_info();
+    recursive_nodes.to_info()
 }
 
 // Represents the raw JSON structure from the OSCQuery server.
@@ -59,19 +59,19 @@ impl OscQueryNode {
 
         // if has children nodes
         if let Some(children) = &self.contents {
-            for (_key, node) in children {
+            for node in children.values() {
                 node.recurse(&mut fill);
             }
         }
         fill.push(OscInfo::from_node(self));
 
-        return fill;
+        fill
     }
 
     /// DO NOT USE: to_info is teh correct api
     pub fn recurse(&self, fill: &mut Vec<OscInfo>) {
         if let Some(children) = &self.contents {
-            for (_key, node) in children {
+            for node in children.values() {
                 node.recurse(fill);
             }
         }
@@ -161,7 +161,7 @@ impl OscInfo {
 
         OscInfo {
             full_path: OscPath(node.full_path.clone()),
-            access: access,
+            access,
             value: types,
             description: node.description.clone(),
         }
@@ -226,7 +226,7 @@ fn match_tag(tag: char, content: &Value) -> Result<OscType, (OscType, String)> {
         'F' => Ok(OscType::Bool(false)),
         'I' => Ok(OscType::Inf),
         'N' => Ok(OscType::Nil),
-        't' => Err((OscType::Nil, format!("time tag types are unsupported"))),
+        't' => Err((OscType::Nil, "time tag types are unsupported".to_string())),
         tag => Err((
             OscType::Nil,
             format!(

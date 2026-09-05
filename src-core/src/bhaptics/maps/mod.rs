@@ -28,11 +28,11 @@ pub fn to_position(device: PatternLocation, index: usize) -> Vec3 {
         PatternLocation::Head => x6_headset().rows[index],
         PatternLocation::Unknown => {
             log::error!("Unknown pattern location!");
-            return Vec3::new(0., 0., 0.);
+            Vec3::new(0., 0., 0.)
         }
         _ => {
             log::trace!("Unimplemented pattern location!");
-            return Vec3::new(0., 0., 0.);
+            Vec3::new(0., 0., 0.)
         }
     }
 }
@@ -105,9 +105,9 @@ fn build_frames(
     }
 
     log::trace!("Clip: {:?} ms/frame", ratios);
-    log::trace!("Scaling: {:?}", duration / (line_count.iter().sum::<usize>() / line_count.len() as usize) as u32);
+    log::trace!("Scaling: {:?}", duration / (line_count.iter().sum::<usize>() / line_count.len()) as u32);
 
-    return Frames { nodes: nodes};
+    Frames { nodes}
 }
 
 /// Returns nested vector [device_motor_index][time_step] = value @ timestamp for a device motor.

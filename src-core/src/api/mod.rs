@@ -218,8 +218,8 @@ impl ApiManager {
         let should_refresh = {
             let local_maps = self.local_maps.lock().await;
             for local in local_maps.iter() {
-                if name == local.name && author == local.author {
-                    if local.version == version {
+                if name == local.name && author == local.author
+                    && local.version == version {
                         // if we can't load the desired map refresh the index and recursively try again.
                         if let Ok(content) = fs::read_to_string(&local.path) {
                             if let Ok(map) = serde_json::from_str::<GameMap>(&content) {
@@ -237,7 +237,6 @@ impl ApiManager {
                             )));
                         }
                     } // TODO: try to resolve versions
-                }
             }
             false
         }; // Lock is dropped here

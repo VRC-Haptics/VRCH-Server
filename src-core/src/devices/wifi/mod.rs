@@ -296,8 +296,8 @@ impl WifiDevice {
 
         let dev = WifiDevice {
             live_state: state,
-            name: name,
-            mac: mac,
+            name,
+            mac,
             manager: dev_tx,
             cancel: is_alive,
             connection: con,
@@ -322,7 +322,7 @@ impl WifiDevice {
         let state = self.live_state.lock();
         WifiDeviceInfo {
             nodes: state.nodes.clone(),
-            remote_addr: self.connection.server.remote.clone(),
+            remote_addr: self.connection.server.remote,
             name: self.name.clone(),
             mac: self.mac.clone(),
             rssi: 0,
@@ -386,7 +386,7 @@ impl Device for WifiDevice {
         let state = self.live_state.lock();
         let info = WifiDeviceInfo {
             nodes: state.nodes.clone(),
-            remote_addr: self.connection.server.remote.clone(),
+            remote_addr: self.connection.server.remote,
             name: self.name.clone(),
             mac: self.mac.clone(),
             rssi: 0,

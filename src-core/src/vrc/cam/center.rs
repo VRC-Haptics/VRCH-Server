@@ -67,11 +67,9 @@ fn plan_fields(schema: &CamConfig) -> Box<[FieldPlan]> {
         .collect()
 }
 
-fn kind_of(field: &CamField) -> Kind {
+fn kind_of(_field: &CamField) -> Kind {
     // Map your `CamField::kind` variants onto these four.
-    match field.kind {
-        _ => Kind::ClampedFloat,
-    }
+    Kind::ClampedFloat
 }
 
 /// Width of the code. `CamConfig::total_bits` of 0 means "sum of the fields",

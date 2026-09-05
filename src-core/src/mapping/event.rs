@@ -125,12 +125,12 @@ impl Event {
         }
 
         let ev = Event {
-            name: name,
-            frames: frames,
-            duration: duration,
+            name,
+            frames,
+            duration,
         };
 
-        return Ok(ev);
+        Ok(ev)
     }
 
     pub fn num_nodes(&self) -> usize {

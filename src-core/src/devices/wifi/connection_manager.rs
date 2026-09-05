@@ -32,7 +32,7 @@ impl WifiConnManager {
 
         let server = OscServer::new(local, Some(remote), on_receive).await?;
         Ok(WifiConnManager {
-            server: server,
+            server,
         })
     }
 
@@ -61,7 +61,7 @@ fn message(msg: OscMessage, tx: &mpsc::Sender<WifiTickSignal>) {
 
         // command was sent
     } else if msg.addr == "/command" {
-        if let Some(OscType::String(cmd_str)) = msg.args.get(0) {
+        if let Some(OscType::String(cmd_str)) = msg.args.first() {
             // if confirmation that we reset something, invalidate config
             if cmd_str.contains("set to") {
                 log::trace!("Recieved set to command: {:?}", cmd_str);
@@ -72,7 +72,7 @@ fn message(msg: OscMessage, tx: &mpsc::Sender<WifiTickSignal>) {
             // if a response to our get-platform command
             if cmd_str.contains("PLATFORM") {
                 log_err!(tx.try_send(WifiTickSignal::NewIdentifier(
-                    ESP32Model::from_platform_string(&cmd_str),
+                    ESP32Model::from_platform_string(cmd_str),
                 )));
                 return;
             }

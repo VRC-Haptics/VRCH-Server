@@ -291,7 +291,7 @@ impl InputMap {
         let map = Self {
             now: 0,
             generation: 0,
-            input_nodes: input_nodes,
+            input_nodes,
             device_manager: manager,
             devices: Vec::new(),
             dirty_since_snap: true,
@@ -307,10 +307,10 @@ impl InputMap {
 
         let handle = MapHandle {
             event_sender: tx,
-            snapshot: snapshot,
+            snapshot,
         };
 
-        return (map, handle);
+        (map, handle)
     }
 
     /// Blocks until this operation is cancelled.
@@ -320,7 +320,7 @@ impl InputMap {
         self.device_manager.register(dev_tx);
 
         let period = Duration::from_millis(10);
-        let mut event_interval = interval(period.clone());
+        let mut event_interval = interval(period);
         let mut last_tick = tokio::time::Instant::now();
         let mut cleanups = 0;
 
@@ -357,7 +357,7 @@ impl InputMap {
                         cleanups += 1
                     }
 
-                    if self.event_instance.len() > 0 {
+                    if !self.event_instance.is_empty() {
                         let t = Instant::now();
                         handle_events(self).await;
                         stats.events.record(t.elapsed().as_nanos());
@@ -441,37 +441,34 @@ impl InputMap {
         }
 
         fn handle_device(map: &mut InputMap, msg: Option<DeviceOutEvents>) {
-            match msg {
-                Some(e) => match e {
-                    DeviceOutEvents::DeviceInfoDirty(id) => {
-                        handle_dirty_info(id, &map.device_manager, &mut map.devices)
-                    }
-                    DeviceOutEvents::NewDevice(id) => {
-                        let Some(buf) = map
-                            .device_manager
-                            .with_device(&id, |d| d.get_feedback_buffer())
-                        else {
-                            log::warn!("Could not find new device: {id:?}");
-                            return;
-                        };
-                        let Some(info) = map.device_manager.with_device(&id, |f| f.info()) else {
-                            // This is actually the most common case with wifi devices
-                            log::trace!("Could not find info for new device: {id:?}");
-                            return;
-                        };
+            if let Some(e) = msg { match e {
+                DeviceOutEvents::DeviceInfoDirty(id) => {
+                    handle_dirty_info(id, &map.device_manager, &mut map.devices)
+                }
+                DeviceOutEvents::NewDevice(id) => {
+                    let Some(buf) = map
+                        .device_manager
+                        .with_device(&id, |d| d.get_feedback_buffer())
+                    else {
+                        log::warn!("Could not find new device: {id:?}");
+                        return;
+                    };
+                    let Some(info) = map.device_manager.with_device(&id, |f| f.info()) else {
+                        // This is actually the most common case with wifi devices
+                        log::trace!("Could not find info for new device: {id:?}");
+                        return;
+                    };
 
-                        map.devices.push(MappingDevice {
-                            id: id,
-                            outputs: buf,
-                            nodes: info.get_nodes().to_vec(),
-                        });
-                    }
-                    DeviceOutEvents::RemovedDevice(id) => {
-                        map.devices.retain(|d| d.id != id);
-                    }
-                },
-                None => {}
-            }
+                    map.devices.push(MappingDevice {
+                        id,
+                        outputs: buf,
+                        nodes: info.get_nodes().to_vec(),
+                    });
+                }
+                DeviceOutEvents::RemovedDevice(id) => {
+                    map.devices.retain(|d| d.id != id);
+                }
+            } }
         }
 
         fn handle_msg(map: &mut InputMap, msg: Option<InputEventMessage>) {
@@ -551,7 +548,7 @@ impl InputMap {
                     InputEventMessage::RequestInfo { reply } => {
                         if map.dirty_since_snap {
                             map.snapshot.swap(Arc::new(Snapshot {
-                                instant: map.now.clone(),
+                                instant: map.now,
                                 events: map.events.clone(),
                                 active_events: map.event_instance.clone(),
                                 input_nodes: map.input_nodes.clone(),
@@ -564,7 +561,7 @@ impl InputMap {
                     }
                     InputEventMessage::Register { node, reply } => {
                         let key = map.input_nodes.nodes.insert(*node);
-                        map.input_nodes.active_streaming.push(key.clone());
+                        map.input_nodes.active_streaming.push(key);
                         map.dirty_since_snap = true;
                         log_err!(reply.send(key));
                         map.map_dirty = true;

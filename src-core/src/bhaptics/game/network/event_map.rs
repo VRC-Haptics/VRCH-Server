@@ -95,11 +95,11 @@ impl PatternLocation {
             PatternLocation::Head => x6_headset().rows[index],
             PatternLocation::Unknown => {
                 log::error!("Unknown pattern location!");
-                return Vec3::new(0., 0., 0.);
+                Vec3::new(0., 0., 0.)
             }
             _ => {
                 log::error!("Unimplemented pattern location {}!", self.to_input_tag());
-                return Vec3::new(0., 0., 0.);
+                Vec3::new(0., 0., 0.)
             }
         }
     }

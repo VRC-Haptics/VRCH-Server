@@ -8,7 +8,7 @@ pub const MIN_PACKET_BYTES: i32 = 1 + 1 + 2;
 /// "#bundle\0" + timetag + 1 -> 4 bytes (i32)
 /// 8 + 8 + 1 = 17
 pub const BUNDLE_FIRST_SIZE: std::ops::Range<usize> = 17..(17 + 5);
-pub const EMPTY: &'static [u8] = &[];
+pub const EMPTY: &[u8] = &[];
 
 
 /// Pad a null-terminated string.
@@ -35,12 +35,12 @@ pub fn first_message(bytes: &[u8]) -> Result<RefMessage<'_>> {
     let (osc_type, args_start) = get_type(bytes, tag_start)?;
     let len = osc_type.size() as usize;
     let contents = if len > 0 {
-        bytes.get(args_start..(args_start + len  as usize)).ok_or_else(|| anyhow!("arguments out of range"))?
+        bytes.get(args_start..(args_start + len)).ok_or_else(|| anyhow!("arguments out of range"))?
     } else {
-        &EMPTY
+        EMPTY
     };
 
-    return Ok(RefMessage { addr, t: osc_type, contents });
+    Ok(RefMessage { addr, t: osc_type, contents })
 }
 
 /// returns type and the null byte index of the tag string

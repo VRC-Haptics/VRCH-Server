@@ -230,7 +230,7 @@ impl VrcGame {
     pub async fn new(map_handle: MapHandle, api: &'static Mutex<ApiManager>) -> VrcGame {
         log::trace!("Starting VRC");
         let (tx, rx) = unbounded_channel();
-        let info = Arc::new(ArcSwap::new(Arc::new(VrcInfo::default().into())));
+        let info = Arc::new(ArcSwap::new(Arc::new(VrcInfo::default())));
         let handle = VrcHandle {
             tx: tx.clone(),
             info: Arc::clone(&info),
@@ -249,7 +249,7 @@ impl VrcGame {
             handle: handle.clone(),
             query_server: None,
             avatar: None,
-            rx: rx,
+            rx,
             camera: None,
             map: map_handle,
             available_parameters: Arc::clone(&param_avail),
@@ -264,7 +264,7 @@ impl VrcGame {
         // (High latency server)
         start_filling_available_parameters(vrc.get_handle(), api, param_avail).await;
 
-        return vrc;
+        vrc
     }
 
     pub fn get_handle(&self) -> VrcHandle {
@@ -318,7 +318,7 @@ impl VrcGame {
                             match first_message(&buf[..size]) {
                                 Err(e) => {log::error!("msg parsing error: {e}")},
                                 Ok(msg) => {
-                                    let addr = remove_version(&msg.addr);
+                                    let addr = remove_version(msg.addr);
 
                                     if let Some(infos) = self.watched.get_mut(&addr) {
                                         if infos.camera && self.camera_active {
@@ -382,7 +382,7 @@ impl VrcGame {
                                 for (pairs, node) in nodes {
                                     let (tx, rx) = oneshot::channel();
                                     log_err!(self.map
-                                        .send_event(InputEventMessage::Register { node: node, reply: tx }));
+                                        .send_event(InputEventMessage::Register { node, reply: tx }));
                                     let Ok(resp) = rx.await else {
                                         log::error!("Error registering haptic node. Shutting down VRC Module");
                                         return;
@@ -500,7 +500,7 @@ impl VrcGame {
 
     /// Camera streams are currently not supported on platforms other than windows. Does nothing
     #[cfg(not(windows))]
-    fn bind_camera(&mut self, schema: &CamConfig) {}
+    fn bind_camera(&mut self, _schema: &CamConfig) {}
 
     fn handle_dropped(&mut self) {
         let now = Instant::now();
@@ -509,7 +509,7 @@ impl VrcGame {
         self.camera_active = self
             .camera
             .as_ref()
-            .map_or(false, |v| v.active.load(Acquire));
+            .is_some_and(|v| v.active.load(Acquire));
 
         for comg in self.watched.values_mut() {
             if comg.camera && self.camera_active {
@@ -577,15 +577,15 @@ impl VrcGame {
             AddrInfo::Slot(s, kind) => {
                 let msg = match kind {
                     SlotFieldKind::Weight => InputEventMessage::UpdateSlotField {
-                        key: s.clone(),
+                        key: *s,
                         field: SlotField::Weight(msg.into_f32()?),
                     },
                     SlotFieldKind::Value => InputEventMessage::UpdateSlotField {
-                        key: s.clone(),
+                        key: *s,
                         field: SlotField::Value(msg.into_f32()?),
                     },
                     SlotFieldKind::Muted => InputEventMessage::UpdateSlotField {
-                        key: s.clone(),
+                        key: *s,
                         field: SlotField::Muted(msg.into_bool().unwrap_or(false)),
                     },
                 };
@@ -595,15 +595,15 @@ impl VrcGame {
             AddrInfo::Node(n, kind) => {
                 let msg = match kind {
                     NodeFieldKind::Location => InputEventMessage::UpdateNodeField {
-                        key: n.clone(),
+                        key: *n,
                         field: NodeField::Location(msg.into_vec3()?),
                     },
                     NodeFieldKind::Radius => InputEventMessage::UpdateNodeField {
-                        key: n.clone(),
+                        key: *n,
                         field: NodeField::Radius(msg.into_f32()?),
                     },
                     NodeFieldKind::Muted => InputEventMessage::UpdateNodeField {
-                        key: n.clone(),
+                        key: *n,
                         field: NodeField::Muted(msg.into_bool().unwrap_or(false)),
                     },
                 };
@@ -633,7 +633,7 @@ pub(crate) fn push_scalar(
                 SlotFieldKind::Muted => SlotField::Muted(value > 0.5),
             };
             InputEventMessage::UpdateSlotField {
-                key: key.clone(),
+                key: *key,
                 field,
             }
         }
@@ -646,7 +646,7 @@ pub(crate) fn push_scalar(
                 NodeFieldKind::Muted => NodeField::Muted(value > 0.5),
             };
             InputEventMessage::UpdateNodeField {
-                key: key.clone(),
+                key: *key,
                 field,
             }
         }
@@ -665,8 +665,7 @@ fn try_vec(val: OscType) -> Vec3 {
         OscType::Float(f) => Vec3::new(f, 0.0, 0.0),
         OscType::Array(a) => {
             let x = try_f32(
-                a.content
-                    .get(0)
+                a.content.first()
                     .unwrap_or(&OscType::Float(F32DEFAULT))
                     .clone(),
             );
@@ -696,7 +695,7 @@ fn try_f32(val: OscType) -> f32 {
     match val {
         OscType::Float(f) => f,
         OscType::Array(a) => {
-            let first = a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT));
+            let first = a.content.first().unwrap_or(&OscType::Float(F32DEFAULT));
             try_f32(first.clone())
         }
         OscType::Bool(b) => f32::from(u8::from(b)),
@@ -713,7 +712,7 @@ fn try_bool(val: OscType) -> bool {
     match val {
         OscType::Float(f) => f > 0.5,
         OscType::Array(a) => {
-            let first = a.content.get(0).unwrap_or(&OscType::Float(F32DEFAULT));
+            let first = a.content.first().unwrap_or(&OscType::Float(F32DEFAULT));
             try_bool(first.clone())
         }
         OscType::Bool(b) => b,
@@ -760,16 +759,16 @@ fn to_inputs(
                         InputType::Velocity => (vel) * i.weight,
                     };
 
-                    return (
+                    (
                         i.vrc_prefix.to_owned() + &i.address.to_owned(),
                         Slot {
                             muted: false,
                             source: i.source.clone(),
                             layer: i.layer.clone(),
-                            weight: weight,
+                            weight,
                             history: History::default(),
                         },
-                    );
+                    )
                 })
                 .collect();
 

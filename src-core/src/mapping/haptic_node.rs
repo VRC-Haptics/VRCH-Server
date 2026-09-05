@@ -18,7 +18,7 @@ impl HapticNode {
     pub fn new(loc: Vec3, groups: NodeGroup) -> HapticNode {
         HapticNode {
             loc,
-            groups: groups,
+            groups,
         }
     }
 
@@ -93,7 +93,7 @@ impl HapticNode {
                 y_fixed as f32 / SCALE,
                 z_fixed as f32 / SCALE,
             ),
-            groups: groups,
+            groups,
         })
     }
 }

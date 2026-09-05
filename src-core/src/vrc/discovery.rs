@@ -79,7 +79,7 @@ pub async fn start_filling_available_parameters(
 
         while let Some((port, ip)) = receiver.recv().await {
             log::debug!("VRC discovery: {}:{}", ip, port);
-            run_vrc_http_polling(port, &ip, &params, vrc.clone(), &api).await;
+            run_vrc_http_polling(port, &ip, &params, vrc.clone(), api).await;
             vrc.send(MsgToMainVrc::VrcDisconnected);
         }
 
@@ -172,7 +172,7 @@ async fn create_avatar(
     let ogb: Vec<OscInfo> = params.iter().filter(|v | v.key().0.contains("avatar/parameters/OGB")).map(|v| v.value().clone()).collect();
     let vfh: Vec<OscInfo> = params.iter().filter(|v| v.key().0.contains("avatar/parameters/VFH/Zone")).map(|v| v.value().clone()).collect();
 
-    let ps = if ogb.len() > 0 || vfh.len() > 0 {
+    let ps = if !ogb.is_empty() || !vfh.is_empty() {
         Some((ogb, vfh))
     } else {
         None
@@ -181,7 +181,7 @@ async fn create_avatar(
     Avatar {
         id: new_id,
         prefab_names: names,
-        configs: configs,
+        configs,
         ps,
         cam_id: get_camera_id(params),
     }
@@ -256,7 +256,7 @@ async fn run_vrc_http_polling(
                     let mid = id_path.value.first().unwrap().clone();
                     let new_id = mid.string().unwrap();
 
-                    let new_avatar = Box::pin(create_avatar(params, new_id.to_string(), &api)).await;
+                    let new_avatar = Box::pin(create_avatar(params, new_id.to_string(), api)).await;
                     vrc.send(MsgToMainVrc::NewAvatar(new_avatar));
                 }
             }

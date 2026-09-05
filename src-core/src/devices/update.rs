@@ -29,9 +29,9 @@ pub struct Firmware {
 impl Firmware {
     pub fn new(bytes: Vec<u8>, method: UpdateMethod, id: String) -> Self {
         Firmware {
-            id: id,
-            method: method,
-            bytes: bytes,
+            id,
+            method,
+            bytes,
         }
     }
 

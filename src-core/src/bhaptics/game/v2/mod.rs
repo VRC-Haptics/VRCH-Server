@@ -799,7 +799,7 @@ async fn handle_turn_off_all(state: &mut ConnectionState, map: &MapHandle) {
 
 fn build_response(state: &ConnectionState) -> PlayerResponse {
     let connected: Vec<String> = PatternLocation::iter()
-        .filter_map(|loc| pattern_to_position_str(loc))
+        .filter_map(pattern_to_position_str)
         .collect();
 
     PlayerResponse {

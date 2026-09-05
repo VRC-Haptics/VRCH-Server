@@ -22,7 +22,7 @@ static IS_SCANNING: AtomicBool = AtomicBool::new(false);
 static BLE_ADAPTER: RwLock<Option<Arc<Adapter>>> = RwLock::const_new(None);
 static BLE_MANAGER: OnceCell<Manager> = OnceCell::const_new();
 pub(crate) static CONNECTED_DEVICES: LazyLock<boxcar::Vec<Mutex<Option<Arc<Peripheral>>>>> =
-    LazyLock::new(|| boxcar::Vec::new());
+    LazyLock::new(boxcar::Vec::new);
 
 /// If this fails to initialize the manager and another instance is called it will try to initailize every time.
 /// Be careful of repeated failed calling across tasks.
@@ -31,7 +31,7 @@ pub(crate) static CONNECTED_DEVICES: LazyLock<boxcar::Vec<Mutex<Option<Arc<Perip
 ///  - `ManagerCreation`
 async fn ble_manager() -> Result<&'static Manager, BleError> {
     BLE_MANAGER
-        .get_or_try_init(|| async { Manager::new().await.map_err(|e| BleError::from(e)) })
+        .get_or_try_init(|| async { Manager::new().await.map_err(BleError::from) })
         .await
 }
 
@@ -138,7 +138,7 @@ pub async fn start_ble(
                                                 let addr = p.address();
                                                 let already_connected = {
                                                     CONNECTED_DEVICES.iter().any(|(_, slot)| {
-                                                        slot.lock().as_ref().map_or(false, |per| per.address() == addr)
+                                                        slot.lock().as_ref().is_some_and(|per| per.address() == addr)
                                                     })
                                                 };
                                                 if already_connected {
@@ -280,7 +280,7 @@ impl DeviceChar {
         &self,
         chars: &'a BTreeSet<Characteristic>,
     ) -> Option<&'a Characteristic> {
-        chars.iter().find(|c| &c.uuid == &self.to_uuid())
+        chars.iter().find(|c| c.uuid == self.to_uuid())
     }
 }
 

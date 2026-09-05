@@ -216,7 +216,7 @@ impl DeviceManager {
             device_receiver: Some(rx),
             device_sender: tx,
             subscribers: Arc::new(Mutex::new(vec![])),
-            shutdown: shutdown,
+            shutdown,
         }
     }
 
@@ -356,9 +356,9 @@ impl ESP32Model {
             | ESP32Model::ESP32C6
             | ESP32Model::ESP32S2FH16
             | ESP32Model::ESP32S2FH32
-            | ESP32Model::ESP32S3 => return 3232,
-            ESP32Model::ESP8266 => return 8266,
-            ESP32Model::Unknown => return 3232,
+            | ESP32Model::ESP32S3 => 3232,
+            ESP32Model::ESP8266 => 8266,
+            ESP32Model::Unknown => 3232,
         }
     }
 }

@@ -131,7 +131,7 @@ pub fn save_config() {
 
 /// returns bare static reference to global app configuration (state)
 pub fn get_config() -> &'static Config {
-    &*CONFIG
+    &CONFIG
 }
 
 /// Main method for retrieving a read-only view of a device configuration.
@@ -148,7 +148,7 @@ pub fn get_device(id: &DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
     else {
         let idx = update_device(Arc::new(PerDevice::default(id.clone())));
         return (
-            idx.clone(),
+            idx,
             CONFIG
                 .devices
                 .states
@@ -252,7 +252,7 @@ impl serde::Serialize for Devices {
 
         Proxy {
             ota_repositories: self.ota_repositories.lock().clone(),
-            wifi_device_timeout: self.wifi_device_timeout.load_full().as_ref().clone(),
+            wifi_device_timeout: *self.wifi_device_timeout.load_full().as_ref(),
             states: self
                 .states
                 .iter()
@@ -333,7 +333,7 @@ impl Default for StandardMenu {
 impl PerDevice {
     fn default(id: DeviceId) -> Self {
         Self {
-            id: id,
+            id,
             intensity: 1.0,
             offset: 0.0,
             interp_algo: InterpState::default(),

@@ -143,7 +143,7 @@ async fn start_async_tasks(
         None
     };
 
-    return (vrc, map_handle, bhaptic);
+    (vrc, map_handle, bhaptic)
 }
 
 /// Handles spawning the various components of the haptic server.

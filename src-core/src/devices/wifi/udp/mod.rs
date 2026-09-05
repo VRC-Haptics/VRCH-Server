@@ -64,7 +64,7 @@ pub async fn start_discovery(dev: DeviceHandle) -> anyhow::Result<()> {
                                 HapticDevice::Wifi(d) => d.reset_ping(),
                                 _ => log::error!("Device with id:{id:?} already registered and is not wifi"),
                             };
-                            dev.with_device(id, &fun);
+                            dev.with_device(id, fun);
                             log::debug!("Multicast for {}, which already exists", name);
                         }
                     } else {

@@ -112,7 +112,7 @@ impl BhapticsModel {
                         .map(|&i| {
                             let v = all[i];
                             HapticNode {
-                                loc: v.clone(),
+                                loc: *v,
                                 groups: NodeGroup::All,
                             }
                         })
@@ -185,8 +185,6 @@ impl super::Device for BhapticBle {
         };
 
         let BhapticInfo { id: _, nodes: _, model: _ } = new;
-
-        return;
     }
 
     fn get_feedback_buffer(&self) -> Arc<RwLock<Vec<f32>>> {
