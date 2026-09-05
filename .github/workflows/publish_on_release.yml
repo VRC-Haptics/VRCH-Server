@@ -43,7 +43,11 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             clang \
-            zlib1g-dev
+            zlib1g-dev \
+            openjdk-17-jdk \
+            libglib2.0-dev \
+            libudev-dev \
+            libgdk-pixbuf2.0-dev
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
