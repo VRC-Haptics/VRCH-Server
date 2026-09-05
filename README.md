@@ -1,6 +1,11 @@
 # VRC Haptics
 
-A GUI interface for the haptic server.
+A simple user interface for the haptic server backend. 
+
+Designed from the ground up to run massive haptics arrays in the background with acceptable efficiency and resource usage.
+
+**Layout and look is likely to change**
+![Beta Image](.github/resources/MainPage.jpg)
 
 # Usage
 
@@ -10,7 +15,7 @@ Simply launch the manager when starting VRC or other games, devices will auto co
 
 Grab either of the installers from the releases page and click through it.
 
-Everything should configure itself and auto connect if you have either a bhaptics device closeby or a native vrch device on the same wifi network.
+Everything should configure itself and auto connect if you have either a bhaptics device close by or a native vrch device on the same wifi network.
 
 When starting vrc, the red dot on the **VRC** page on the right side of the screen will turn green when it is connected to a vrc instance.
 
@@ -22,29 +27,10 @@ To connect to a Quest standalone VRC instance the computer running this manager 
 #### Development
 - `pnpm i` -> Installs dependencies (both rust and node)
 - `pnpm run tauri dev` -> Start the dev server. 
-- `pnpm tauri dev --features dhat-heap` -> dhat profiling.
 
 #### Build:
 - `pnpm i` -> Installs dependencies (both rust and node)
 - `pnpm run tauri build` -> Builds installer under: `./src-tauri/target/release/bundle/<some_subfolder>`
-
-**LINUX**
-
-CachyOS(Arch): 
-
-```bash
-pnpm run tauri build --bundles deb
-cd packaging
-makepkg -sif
-```
-
-#### Test:
- - `cargo binstall cargo-nextest --secure` 
- - (In src-core directory)`cargo nextest run` -> Because state is a static global the isolation from nextest is needed for tests that mess with configuration settings.
-
-#### Frontend:
- - `pnpm run typecheck` -> checks all typescript ui files.
- - `pnpm run typecheck:watch` -> watches type changes, (dedicated terminal)
 
 #### Sidecars:
 This project has a few sidecars
@@ -57,12 +43,12 @@ This is a project VERY early in its development so reporting issues and making c
 ## TODO's:
 
 ### Backend:
-
+ - Clean up device protocol
  - Add game support
  - Support more BLE devices (only x16 vests are supported)
 
 ### Frontend:
-
+ - Re-evaluate frontend frameworks and strategies.
  - Reimplement OTA updates
  - Implement device settings editor
  - Implement Serial device updates
