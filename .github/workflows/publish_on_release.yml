@@ -15,17 +15,35 @@ jobs:
       matrix:
         include:
           - platform: 'windows-latest'
-            args: ''
+            args: '--config src-tauri/tauri.windows.conf.json'
+          - platform: 'ubuntu-22.04'
+            args: '--config src-tauri/tauri.linux.conf.json'
+          - platform: 'ubuntu-22.04-arm'
+            args: '--config src-tauri/tauri.linux.conf.json'
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
+      - name: Install dependencies (Linux only)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            patchelf \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            clang \
+            zlib1g-dev
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -35,11 +53,13 @@ jobs:
       - name: Install dotnet for sidecars
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.x.x
 
       - name: Compile Dotnet Library
-        run: dotnet publish "src-vrc-oscquery/listen-for-vrc/listen-for-vrc.csproj" -c Release -r "win-x64" -p:PublishAot=true -p:NativeLib=Shared -p:SelfContained=true -p:StripSymbols=true -p:IlcGenerateDebugInfo=false -p:IlcGenerateCompletePdb=false -o "src-tauri\sidecars"
-      
+        run: |
+          chmod +x ./src-vrc-oscquery/listen-for-vrc/build.sh
+          ./src-vrc-oscquery/listen-for-vrc/build.sh
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -47,17 +67,16 @@ jobs:
           cache: 'pnpm'
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+        uses: dtolnay/rust-toolchain@nightly
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Compile rust sidecars
-        run: | 
+      - name: Compile rust sidecars (Windows only)
+        if: runner.os == 'Windows'
+        run: |
           cd "src-proxy"
           cargo build --release
           cd "../src-elevated-register"
@@ -72,8 +91,9 @@ jobs:
           copy "target\release\elevated-register.exe" "src-tauri\sidecars\elevated-register.exe"
 
       - name: List sidecar files
-        shell: pwsh
-        run: dir "src-tauri\sidecars" -Recurse -File
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ls -lR src-tauri/sidecars || true
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -88,4 +108,3 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
-
