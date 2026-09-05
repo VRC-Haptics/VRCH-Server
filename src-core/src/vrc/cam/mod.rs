@@ -4,15 +4,29 @@ mod grid;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+#[cfg(windows)]
+use std::sync::atomic::Ordering;
+#[cfg(windows)]
+use std::thread;
 use std::thread::JoinHandle;
+#[cfg(windows)]
+use std::time::Duration;
 
 #[cfg(windows)]
 use rustc_hash::FxHashMap;
 #[cfg(windows)]
 use spout2::dx;
+#[cfg(windows)]
+use tokio::runtime::Builder;
 use tokio::sync::Notify;
+#[cfg(windows)]
+use tokio::time::{self, Interval, MissedTickBehavior};
 use tokio_util::sync::CancellationToken;
+#[cfg(windows)]
+use triple_buffer::Input;
 
+#[cfg(windows)]
+use crate::api::CamConfig;
 #[cfg(windows)]
 use crate::log_err;
 #[cfg(windows)]
@@ -22,6 +36,8 @@ use crate::mapping::{
 };
 use crate::vrc::cam::algo::CamValue;
 #[cfg(windows)]
+use crate::vrc::cam::algo::Decoder;
+#[cfg(windows)]
 use crate::vrc::{AddrInfo, WatchedAddr};
 
 /// starts sending updates from a spout stream to the global map
@@ -30,7 +46,7 @@ pub fn start_cam(
     conf: CamConfig,
     map: MapHandle,
     watched: FxHashMap<String, WatchedAddr>,
-) -> Result<CamHandle> {
+) -> anyhow::Result<CamHandle> {
     let (input, output) = triple_buffer::triple_buffer(&Vec::with_capacity(conf.fields.len()));
 
     log::trace!("Creating cam with config: {conf:?}");

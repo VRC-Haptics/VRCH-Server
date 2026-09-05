@@ -19,7 +19,6 @@ use crate::state::{get_config, VrcSettings};
 use crate::util::next_free_port_with_address;
 #[cfg(windows)]
 use crate::vrc::cam::start_cam;
-#[cfg(not(windows))]
 use crate::vrc::cam::{CamHandle, CameraInfo};
 use crate::vrc::config::InputType;
 use crate::vrc::parsing::OscInfo;
