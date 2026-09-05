@@ -1,5 +1,5 @@
-use super::parsing::{parse_incoming, remove_version, OscInfo};
-use super::{Avatar, GameMap, MsgToMainVrc, OscPath, VrcHandle, CAM_ID_PREFIX, PREFAB_PREFIX};
+use super::parsing::{OscInfo, parse_incoming, remove_version};
+use super::{Avatar, CAM_ID_PREFIX, GameMap, MsgToMainVrc, OscPath, PREFAB_PREFIX, VrcHandle};
 use crate::api::ApiManager;
 use crate::file::native_lib;
 use crate::vrc::AVATAR_ID_PATH;
@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Duration;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 type PortCallback = unsafe extern "C" fn(u16, *const u8);
 type StartListener = unsafe extern "C" fn(PortCallback);
@@ -22,7 +22,7 @@ unsafe extern "C" fn dispatch_port(port: u16, ip_ptr: *const u8) {
     let ip = if ip_ptr.is_null() {
         "127.0.0.1".to_string()
     } else {
-        let cstr = std::ffi::CStr::from_ptr(ip_ptr as *const i8);
+        let cstr = std::ffi::CStr::from_ptr(ip_ptr as *const std::ffi::c_char);
         cstr.to_str().unwrap_or("127.0.0.1").to_string()
     };
 
@@ -70,12 +70,15 @@ pub async fn start_filling_available_parameters(
         let mut receiver = {
             let (tx, rx) = mpsc::channel::<(u16, String)>(2);
             let storage = PORT_SENDER.get_or_init(|| Mutex::new(None));
-            let mut guard: tokio::sync::MutexGuard<'_, Option<mpsc::Sender<(u16, String)>>> = storage.lock().await;
+            let mut guard: tokio::sync::MutexGuard<'_, Option<mpsc::Sender<(u16, String)>>> =
+                storage.lock().await;
             *guard = Some(tx);
             rx
         };
 
-        unsafe { start(dispatch_port); }
+        unsafe {
+            start(dispatch_port);
+        }
 
         while let Some((port, ip)) = receiver.recv().await {
             log::debug!("VRC discovery: {}:{}", ip, port);
@@ -169,8 +172,16 @@ async fn create_avatar(
         .collect();
     log::info!("Updated avatar with new configuration");
 
-    let ogb: Vec<OscInfo> = params.iter().filter(|v | v.key().0.contains("avatar/parameters/OGB")).map(|v| v.value().clone()).collect();
-    let vfh: Vec<OscInfo> = params.iter().filter(|v| v.key().0.contains("avatar/parameters/VFH/Zone")).map(|v| v.value().clone()).collect();
+    let ogb: Vec<OscInfo> = params
+        .iter()
+        .filter(|v| v.key().0.contains("avatar/parameters/OGB"))
+        .map(|v| v.value().clone())
+        .collect();
+    let vfh: Vec<OscInfo> = params
+        .iter()
+        .filter(|v| v.key().0.contains("avatar/parameters/VFH/Zone"))
+        .map(|v| v.value().clone())
+        .collect();
 
     let ps = if !ogb.is_empty() || !vfh.is_empty() {
         Some((ogb, vfh))
@@ -295,12 +306,10 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
                 let num_str = parts[2].strip_prefix('v').unwrap_or("0");
 
                 // parse the remainder as an i32
-                let version = num_str
-                    .parse::<u32>()
-                    .unwrap_or_else(|_|{
-                        log::error!("Could not parse verison number: {:?}", key_str);
-                        0
-                    });
+                let version = num_str.parse::<u32>().unwrap_or_else(|_| {
+                    log::error!("Could not parse verison number: {:?}", key_str);
+                    0
+                });
 
                 // sometimes I hate this language
                 log::info!("Avatar has prefab: {:?}", (&author, &name, &version));
