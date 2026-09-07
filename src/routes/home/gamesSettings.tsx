@@ -14,7 +14,7 @@ export default function VrcInfoCard() {
   const { vrcInfo } = useVrcContext();
 
   const [velocityRatio, setVelocityRatio] = useState(0.5);
-  const [velocityMult, setVelocityMult] = useState(1.0);
+  const [velocityMult, setVelocityMult] = useState(0.5);
 
   useEffect(() => {
     if (!vrcInfo) return;
@@ -105,7 +105,7 @@ export default function VrcInfoCard() {
           <label className="form-control">
             <span>Velocity scaling</span>
             <div className="flex items-center gap-2">
-              <input type="range" min="0" max="2" step="0.01"
+              <input type="range" min="0.01" max="0.75" step="0.01"
                 value={velocityMult} onChange={handleVelMultChange}
                 className="range range-sm flex-1" />
               <span className="w-12 text-right tabular-nums">{velocityMult.toFixed(2)}x</span>
@@ -145,11 +145,11 @@ export default function VrcInfoCard() {
                 return (
                   <>
                     <span className="font-medium">Map Name:</span>
-                    <span>{conf.meta.map_name}</span>
+                    <span>{conf.identification.mapName}</span>
                     <span className="font-medium">Version:</span>
-                    <span>{conf.meta.map_version}</span>
+                    <span>{conf.identification.mapVersion}</span>
                     <span className="font-medium">Author:</span>
-                    <span>{conf.meta.map_author}</span>
+                    <span>{conf.identification.authorName}</span>
                     <div className="col-span-2 mt-2">
                       <HapticNodesSummary nodes={vrcInfo.avatar!.configs.flatMap(c => c.nodes)} />
                     </div>

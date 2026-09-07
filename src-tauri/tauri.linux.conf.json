@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["deb", "rpm"],
+    "resources": [
+      "sidecars/listen-for-vrc.so",
+      "security/localhost.crt",
+      "security/localhost.key",
+      "security/README.md",
+      "security/selfsigned_cert.sh",
+      "map_configs/**/*.json"
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libudev1", "libdbus-1-3"]
+      }
+    }
+  }
+}

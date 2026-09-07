@@ -1,145 +1,85 @@
 pub mod event;
 //pub mod global_map;
+pub mod groups;
 pub mod haptic_node;
 pub mod input_node;
 pub mod interp;
 
-use crate::log_err;
-use parking_lot::{Mutex, RwLock};
-use std::{
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
-use tokio::sync::{
-    mpsc::{
-        self,
-        error::{SendError, TrySendError},
+use crate::{
+    log_err,
+    mapping::{
+        event::{Frames, Steps},
+        input_node::{InterpolationLayer, SlotKey},
     },
-    Notify,
+    state::{get_config, VrcSettings},
+    vrc::config::{InputLayer, InputType},
+};
+use arc_swap::{ArcSwap, Cache, Guard};
+use nohash_hasher::IntMap;
+use parking_lot::RwLock;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use slotmap::SlotMap;
+use std::{sync::Arc, time::Duration};
+use strum::EnumDiscriminants;
+use tokio::{
+    sync::{
+        mpsc::{self, error::SendError},
+        oneshot,
+    },
+    time::{interval, Instant},
 };
 
 use event::Event;
+use glam::Vec3;
 use haptic_node::HapticNode;
 use input_node::InputNode;
-use interp::Interpolate;
-use uuid::Uuid;
-use glam::Vec3;
 
 use crate::{
     devices::{Device, DeviceHandle, DeviceId, DeviceInfo, DeviceOutEvents},
+    mapping::{
+        groups::NodeGroup,
+        input_node::{History, Slot},
+    },
     state::{self, PerDevice},
 };
 
-/// Snapshot of map state.
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct MapInfo {
-    nodes: Vec<InputNode>,
-    events: Vec<Event>,
-}
+pub type EventInstant = u64;
+pub type EventDuration = u64;
 
 /// Implements cheap clone, can be shared between threads safely.
 pub struct MapHandle {
-    event_sender: mpsc::Sender<InputEventMessage>,
-    input_nodes: Arc<RwLock<Vec<InputNode>>>,
-    active_events: Arc<RwLock<Vec<Event>>>,
-    map_dirty: Arc<Notify>,
+    pub snapshot: Arc<ArcSwap<Snapshot>>,
+    pub event_sender: mpsc::UnboundedSender<InputEventMessage>,
 }
 
 impl MapHandle {
-    /// marks that some change has been made and should be propogated to devices
+    /// marks that some change has been made and should be propagated to devices
     pub fn mark_dirty(&self) {
-        self.map_dirty.notify_one();
+        log_err!(self.event_sender.send(InputEventMessage::MapDirty));
     }
 
-    /// clones snapshot of map state
-    pub fn get_state(&self) -> MapInfo {
-        let nodes = self.input_nodes.read().clone();
-        let events = self.active_events.read().clone();
-        MapInfo {
-            nodes: nodes,
-            events: events,
-        }
+    /// Gets new snapshot if it is dirty, returns
+    pub async fn get_state(&self) -> Guard<Arc<Snapshot>> {
+        let (tx, rx) = oneshot::channel::<()>();
+
+        log_err!(self
+            .event_sender
+            .send(InputEventMessage::RequestInfo { reply: tx }));
+        log_err!(rx.await); // wait till refreshed
+        self.snapshot.load()
     }
 
-    pub async fn send_event(
-        &self,
-        msg: InputEventMessage,
-    ) -> Result<(), SendError<InputEventMessage>> {
-        self.event_sender.send(msg).await
-    }
-
-    pub fn send_event_blocking(
-        &self,
-        msg: InputEventMessage,
-    ) -> Result<(), TrySendError<InputEventMessage>> {
-        self.event_sender.try_send(msg)
-    }
-
-    /// collects the outputs of function f, for each node that has the given tag
-    ///
-    /// Similar to `has_tag`
-    pub fn has_tag_mut<F, T>(&self, tag: &String, fun: F) -> Vec<T>
-    where
-        F: Fn(&mut InputNode) -> T,
-    {
-        let mut gather = vec![];
-        let mut nodes = self.input_nodes.write();
-        for node in nodes.iter_mut() {
-            if node.tags.contains(tag) {
-                gather.push(fun(node));
-            }
-        }
-        gather
-    }
-
-    /// collects the outputs of function f, for each node that has the given tag
-    pub fn has_tag<F, T>(&self, tag: String, fun: F) -> Vec<T>
-    where
-        F: Fn(&InputNode) -> T,
-    {
-        let mut gather = vec![];
-        let nodes = self.input_nodes.read();
-        for node in nodes.iter() {
-            if node.tags.contains(&tag) {
-                gather.push(fun(node));
-            }
-        }
-        gather
-    }
-
-    /// Performs function f on input node with id: `id`
-    pub fn with_node<F, T>(&self, id: &NodeId, f: F) -> Option<T>
-    where
-        F: FnOnce(&InputNode) -> T,
-    {
-        let nodes = self.input_nodes.read();
-        let node = nodes.iter().find(|n| *n.get_id() == *id)?;
-        Some(f(node))
-    }
-
-    /// Same as `with_node` but with a mutable reference.
-    ///
-    /// This does take a mutable write and locks the entire map list.
-    /// Spamming this function is not desireable.
-    pub fn with_node_mut<F, T>(&self, id: &NodeId, f: F) -> Option<T>
-    where
-        F: FnOnce(&mut InputNode) -> T,
-    {
-        let mut nodes = self.input_nodes.write();
-        let node = nodes.iter_mut().find(|n| *n.get_id() == *id)?;
-        Some(f(node))
+    pub fn send_event(&self, msg: InputEventMessage) -> Result<(), SendError<InputEventMessage>> {
+        self.event_sender.send(msg)
     }
 }
 
 impl Clone for MapHandle {
-    /// Cheap clone, ideally not every itteration but not expensive either.
+    /// Cheap clone, ideally not every iteration but not expensive either.
     fn clone(&self) -> Self {
         Self {
+            snapshot: self.snapshot.clone(),
             event_sender: self.event_sender.clone(),
-            input_nodes: Arc::clone(&self.input_nodes),
-            active_events: Arc::clone(&self.active_events),
-            map_dirty: self.map_dirty.clone(),
         }
     }
 }
@@ -168,7 +108,7 @@ impl MappingDevice {
     ///
     /// NOTE: This does not update the remote device, to force an update remember to use the `crate::devices::Device` trait as specified
     ///
-    pub fn update_buffer(&self, in_nodes: &Vec<InputNode>, settings: &PerDevice) {
+    pub fn update_buffer(&self, in_nodes: &Nodes, settings: &PerDevice) {
         let mut buf = self.outputs.write();
         if buf.len() != self.nodes.len() {
             log::trace!(
@@ -178,12 +118,14 @@ impl MappingDevice {
             );
             return;
         }
-        settings.interp_algo.interp(&self.nodes, &mut buf, in_nodes, settings);
+        settings
+            .interp_algo
+            .interp(&self.nodes, &mut buf, in_nodes, settings);
     }
 }
 
-pub async fn start_interp_map(manager: &DeviceHandle) -> MapHandle {
-    let (mut input_map, map_handle) = InputMap::new(manager.clone()).await;
+pub async fn start_interp_map(manager: DeviceHandle) -> MapHandle {
+    let (mut input_map, map_handle) = InputMap::new(manager).await;
     tokio::spawn(async move {
         input_map.start().await;
     });
@@ -196,199 +138,684 @@ pub async fn start_interp_map(manager: &DeviceHandle) -> MapHandle {
 /// Triggering update pushed to devices;
 ///
 struct InputMap {
-    /// Needs to be shareable so that events can be ticked asyncrhonously.
-    active_events: Arc<RwLock<Vec<Event>>>,
-    input_nodes: Arc<RwLock<Vec<InputNode>>>,
-    manager: DeviceHandle,
-    devices: Arc<Mutex<Vec<MappingDevice>>>,
-    event_recv: mpsc::Receiver<InputEventMessage>,
-    event_send: mpsc::Sender<InputEventMessage>,
+    generation: u64,
+    /// Increments by one each event tick. roughly 10ms per instant tick
+    now: EventInstant,
+    input_nodes: Nodes,
+    device_manager: DeviceHandle,
+    devices: Vec<MappingDevice>,
+    event_recv: mpsc::UnboundedReceiver<InputEventMessage>,
+    event_send: mpsc::UnboundedSender<InputEventMessage>,
+    dirty_since_snap: bool,
+    snapshot: Arc<ArcSwap<Snapshot>>,
     /// Whether input mapping has changed in a way that should require device output updates
-    map_dirty: Arc<Notify>,
+    map_dirty: bool,
+    event_marker: EventId,
+    quick_event: Option<EventKey>,
+    /// last map tick they were triggered.
+    events: Vec<Event>,
+    /// When "Triggered" it creates an event instance.
+    event_instance: Vec<(EventInstant, EventKey, EventId)>,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
+pub struct EventKey(usize);
+
+pub type EventId = usize;
+
+slotmap::new_key_type! {
+    pub struct NodeKey;
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
+#[cfg(feature = "specta")]
+#[derive(specta::Type)]
+#[specta(remote = NodeKey)]
+#[serde(rename = "NodeKey")]
+struct NodeKeyDef {
+    idx: u32,
+    version: u32,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
+pub struct Nodes {
+    /// List of event's active nodes.
+    #[cfg_attr(feature = "specta", specta(type = std::collections::HashMap<EventId, Vec<NodeKey>>))]
+    pub transient: IntMap<EventId, Vec<NodeKey>>,
+    #[cfg_attr(feature = "specta", specta(type = Vec<Option<InputNode>>))]
+    pub nodes: SlotMap<NodeKey, InputNode>,
+    pub active_streaming: Vec<NodeKey>,
+}
+
+impl Nodes {
+    /// Updates nodes' final output value.
+    /// Gets called each update, be careful.
+    pub fn update_nodes(&mut self, cfg: &Arc<VrcSettings>) {
+        let now = std::time::Instant::now();
+        // TODO: Add velocity calculations/handling
+        for key in self
+            .active_streaming
+            .iter()
+            .chain(self.transient.values().flatten())
+        {
+            let Some(node) = self.nodes.get_mut(*key) else {
+                log::error!("can't find node in active nodes");
+                continue;
+            };
+
+            let mut add = 0.0_f32;
+            let mut mult = 1.0_f32;
+            let mut max = 0.0_f32;
+            let mut min = 1.0_f32;
+            let mut overridden = None;
+            for slot in node.slots.iter_mut() {
+                let val = match slot.source {
+                    InputType::Weight => slot.history.latest().unwrap_or(0.0),
+                    InputType::Velocity => slot.history.velocity_at(now).abs() * cfg.velocity_mult,
+                };
+                let weighted = val * slot.weight;
+
+                match slot.layer {
+                    InputLayer::Additive => add += weighted,
+                    InputLayer::Subtractive => add -= weighted,
+                    InputLayer::Multiplicative => mult *= weighted,
+                    InputLayer::Max => max = max.max(weighted),
+                    InputLayer::Gate => min = min.min(weighted),
+                    InputLayer::Override => {
+                        overridden = Some(weighted);
+                        break; // override wins; stop accumulating
+                    }
+                }
+            }
+
+            node.value = match overridden {
+                Some(v) => v.clamp(0.0, 1.0),
+                None => (add * mult).max(max).min(min).clamp(0.0, 1.0),
+            };
+        }
+    }
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
+pub struct Snapshot {
+    pub instant: EventInstant,
+    pub active_events: Vec<(EventInstant, EventKey, EventId)>,
+    pub events: Vec<Event>,
+    pub input_nodes: Nodes,
+}
+
+#[derive(Default)]
+struct ArmStat {
+    count: u64,
+    total_ns: u128,
+    max_ns: u128,
+}
+
+impl ArmStat {
+    #[inline]
+    fn record(&mut self, ns: u128) {
+        self.count += 1;
+        self.total_ns += ns;
+        if ns > self.max_ns {
+            self.max_ns = ns;
+        }
+    }
+    fn avg_us(&self) -> f64 {
+        if self.count == 0 {
+            0.0
+        } else {
+            (self.total_ns as f64 / self.count as f64) / 1000.0
+        }
+    }
+}
+
+#[derive(Default)]
+struct LoopStats {
+    dirty: ArmStat,
+    device: ArmStat,
+    events: ArmStat,
+    msg: ArmStat,
+    max_backlog: usize,
 }
 
 impl InputMap {
-    /// Assumes `DeviceManager` has been intialized.
+    /// Assumes `DeviceManager` has been initialized.
     pub async fn new(manager: DeviceHandle) -> (Self, MapHandle) {
-        let (tx, rx) = mpsc::channel(10);
-        let input_nodes = Arc::new(RwLock::new(Vec::new()));
-        let events = Arc::new(RwLock::new(Vec::new()));
-        let dirty_flag = Arc::new(Notify::new());
+        let (tx, rx) = mpsc::unbounded_channel();
+        let input_nodes = Nodes::default();
+        let snapshot = Arc::new(ArcSwap::new(Arc::new(Snapshot::default())));
 
         let map = Self {
-            active_events: events.clone(),
-            input_nodes: Arc::clone(&input_nodes),
-            manager: manager,
-            devices: Arc::new(Mutex::new(Vec::new())),
+            now: 0,
+            generation: 0,
+            input_nodes,
+            device_manager: manager,
+            devices: Vec::new(),
+            dirty_since_snap: true,
+            snapshot: snapshot.clone(),
             event_recv: rx,
             event_send: tx.clone(),
-            map_dirty: Arc::clone(&dirty_flag),
+            map_dirty: false,
+            events: Vec::new(),
+            event_marker: 15,
+            quick_event: None,
+            event_instance: Vec::new(),
         };
 
         let handle = MapHandle {
             event_sender: tx,
-            input_nodes: input_nodes,
-            active_events: events,
-            map_dirty: dirty_flag,
+            snapshot,
         };
 
-        return (map, handle);
+        (map, handle)
     }
 
     /// Blocks until this operation is cancelled.
     pub async fn start(&mut self) {
         let (dev_tx, mut dev_rx) = mpsc::channel(10);
 
-        // handle messages about devices being added/removed/changed
-        let man_clone = self.manager.clone();
-        let devices_clone = Arc::clone(&self.devices);
-        tokio::spawn(async move {
-            loop {
-                match dev_rx.recv().await {
-                    Some(e) => match e {
-                        DeviceOutEvents::DeviceInfoDirty(id) => {
-                            handle_dirty_info(id, &man_clone, &devices_clone)
-                        }
-                        DeviceOutEvents::NewDevice(id) => {
-                            let mut devices = devices_clone.lock();
-                            let Some(buf) = man_clone.with_device(&id, |d| d.get_feedback_buffer())
-                            else {
-                                log::warn!("Could not find new device: {id:?}");
-                                drop(devices);
-                                continue;
-                            };
-                            let Some(info) = man_clone.with_device(&id, |f| f.info()) else {
-                                // This is actually the most common case with wifi devices
-                                log::trace!("Could not find info for new device: {id:?}");
-                                drop(devices);
-                                continue;
-                            };
+        self.device_manager.register(dev_tx);
 
-                            devices.push(MappingDevice {
-                                id: id,
-                                outputs: buf,
-                                nodes: info.get_nodes().to_vec(),
-                            });
-                        }
-                        DeviceOutEvents::RemovedDevice(id) => {
-                            let mut devices = devices_clone.lock();
-                            devices.retain(|d| d.id != id);
-                        }
-                    },
-                    None => {}
+        let period = Duration::from_millis(10);
+        let mut event_interval = interval(period);
+        let mut last_tick = tokio::time::Instant::now();
+        let mut cleanups = 0;
+
+        let mut stats = LoopStats::default();
+        let mut last_report = Instant::now();
+        let mut cache = Cache::new(&get_config().vrc_settings);
+        loop {
+            // sample backlog before we block on select
+            let backlog = self.event_recv.len();
+            if backlog > stats.max_backlog {
+                stats.max_backlog = backlog;
+            }
+
+            tokio::select! {
+                msg = dev_rx.recv() => {
+                    let t = Instant::now();
+                    handle_device(self, msg);
+                    stats.device.record(t.elapsed().as_nanos());
+                }
+                instant = event_interval.tick() => {
+                    let diff = instant.duration_since(last_tick);
+                    if diff > period + Duration::from_millis(2) {
+                        log::warn!("Late event Tick: {:?}", diff);
+                    }
+
+                    if self.map_dirty || cleanups == 10 {
+                        let cfg = cache.load();
+                        let t = Instant::now();
+                        self.update_devices(cfg);
+                        self.map_dirty = false;
+                        stats.dirty.record(t.elapsed().as_nanos());
+                        cleanups = 0
+                    } else {
+                        cleanups += 1
+                    }
+
+                    if !self.event_instance.is_empty() {
+                        let t = Instant::now();
+                        handle_events(self).await;
+                        stats.events.record(t.elapsed().as_nanos());
+
+                    }
+                    last_tick = instant;
+                }
+                msg = self.event_recv.recv() => {
+                    let t = Instant::now();
+                    handle_msg(self, msg);
+                    stats.msg.record(t.elapsed().as_nanos());
                 }
             }
-        });
 
-        // handle our 100hz event ticks
-        let events = self.active_events.clone();
-        let in_nodes = self.input_nodes.clone();
-        let dirty_event_clone = self.map_dirty.clone();
-        tokio::spawn(async move {
-            loop {
-                {
-                    let mut nodes = in_nodes.write();
-                    let mut events = events.write();
-                    events.retain_mut(|event| {
-                        let finished = event.tick(&mut nodes);
-                        !finished
+            #[cfg(debug_assertions)]
+            if last_report.elapsed() >= Duration::from_secs(1) {
+                // log::info!(
+                //     "[map] msg/s={} (avg {:.1}us max {:.1}us) | events/s={} (avg {:.1}us max {:.1}us) | dirty/s={} (avg {:.1}us) | dev/s={} | backlog_max={}",
+                //     stats.msg.count, stats.msg.avg_us(), stats.msg.max_ns as f64 / 1000.0,
+                //     stats.events.count, stats.events.avg_us(), stats.events.max_ns as f64 / 1000.0,
+                //     stats.dirty.count, stats.dirty.avg_us(),
+                //     stats.device.count,
+                //     stats.max_backlog,
+                // );
+                stats = LoopStats::default();
+                last_report = Instant::now();
+            }
+        }
+
+        async fn handle_events(map: &mut InputMap) {
+            /// Frees the transient key list and the InputNodes it owns.
+            fn drop_instance(nodes: &mut Nodes, id: &EventId) {
+                let Some(keys) = nodes.transient.remove(id) else {
+                    return;
+                };
+                for key in keys {
+                    nodes.nodes.remove(key);
+                }
+            }
+
+            let instant = map.now;
+            let nodes = &mut map.input_nodes;
+            let events = &map.events;
+            let mut changed = false;
+
+            map.event_instance.retain(|(start, key, id)| {
+                let Some(event) = events.get(key.0) else {
+                    log::error!("Unable to find event definition for instance {}", id);
+                    drop_instance(nodes, id);
+                    changed = true;
+                    return false;
+                };
+
+                // Not started yet. This also stops the u64 underflow on the first tick.
+                if instant < *start {
+                    return true;
+                }
+
+                let elapsed = instant - *start;
+                if elapsed >= event.duration {
+                    drop_instance(nodes, id);
+                    changed = true;
+                    return false;
+                }
+
+                let Some(node_keys) = nodes.transient.get(id) else {
+                    log::error!("Nodes not present for event instance {}", id);
+                    changed = true;
+                    return false; // drop the instance instead of logging it every tick.
+                };
+
+                event.tick(&mut nodes.nodes, node_keys, elapsed);
+                true
+            });
+
+            map.now += 1;
+            map.map_dirty = true;
+            if changed {
+                map.dirty_since_snap = true;
+            }
+        }
+
+        fn handle_device(map: &mut InputMap, msg: Option<DeviceOutEvents>) {
+            if let Some(e) = msg { match e {
+                DeviceOutEvents::DeviceInfoDirty(id) => {
+                    handle_dirty_info(id, &map.device_manager, &mut map.devices)
+                }
+                DeviceOutEvents::NewDevice(id) => {
+                    let Some(buf) = map
+                        .device_manager
+                        .with_device(&id, |d| d.get_feedback_buffer())
+                    else {
+                        log::warn!("Could not find new device: {id:?}");
+                        return;
+                    };
+                    let Some(info) = map.device_manager.with_device(&id, |f| f.info()) else {
+                        // This is actually the most common case with wifi devices
+                        log::trace!("Could not find info for new device: {id:?}");
+                        return;
+                    };
+
+                    map.devices.push(MappingDevice {
+                        id,
+                        outputs: buf,
+                        nodes: info.get_nodes().to_vec(),
                     });
                 }
-                dirty_event_clone.notify_one();
-                tokio::time::sleep(Duration::from_millis(10)).await;
+                DeviceOutEvents::RemovedDevice(id) => {
+                    map.devices.retain(|d| d.id != id);
+                }
+            } }
+        }
+
+        fn handle_msg(map: &mut InputMap, msg: Option<InputEventMessage>) {
+            fn register_event(map: &mut InputMap, event: Event) -> EventKey {
+                let idx = map.events.len();
+                map.events.push(event);
+                EventKey(idx)
             }
-        });
 
-        // register for device events last to hopefully stop big race conditions.
-        self.manager.register(dev_tx);
+            fn start_event(map: &mut InputMap, key: EventKey) {
+                let Some(event) = map.events.get(key.0) else {
+                    log::error!("Unable to find event");
+                    return;
+                };
 
-        loop {
-            tokio::select! {
-                msg = self.event_recv.recv() => {
-                    match msg {
-                        Some(msg) => match msg {
-                            InputEventMessage::InsertNode(node) => {
-                                let mut nodes = self.input_nodes.write();
-                                if !nodes.iter().any(|f| f.get_id() == node.get_id()) {
-                                    nodes.push(node);
-                                }
-                            }
-                            InputEventMessage::UpdateNode(id, int, radius) => {
-                                let mut nodes = self.input_nodes.write();
-                                let Some(node) = nodes.iter_mut().find(|d| *d.get_id() == id) else {
-                                    log::warn!("Tried to update node that doesn't exist with id: {id:?}");
-                                    return;
-                                };
-                                node.intensity = int.unwrap_or(node.intensity);
-                                node.radius = radius.unwrap_or(node.radius);
-                            }
-                            InputEventMessage::RemoveWithTags(tags) => {
-                                let mut nodes = self.input_nodes.write();
-                                for tag in tags {
-                                    nodes.retain(|n| !n.tags.contains(&tag));
-                                }
-                            }
-                            InputEventMessage::StartEvent(e) => self.start_event(e),
-                            InputEventMessage::StartEvents(mut e) => self.start_events(&mut e),
-                            InputEventMessage::CancelAllWithTags(t) => {
-                                let num = self.cancel_tags(&t);
-                                log::trace!("Canceled {num} events with tags: {:?}", t);
-                            }
-                        },
-                        None => {
-                            log::warn!("All channels dropped for map input. Restart required");
-                            break;
+                if event.frames.nodes.is_empty() {
+                    log::error!("Event '{}' has no frames", event.name);
+                    return;
+                }
+
+                let id = map.event_marker;
+                map.event_marker += 1;
+
+                let now = std::time::Instant::now();
+                let mut keys: Vec<NodeKey> = Vec::with_capacity(event.frames.nodes.len());
+
+                for steps in event.frames.nodes.iter() {
+                    // Const fields never come back from Steps::get, so seed the node here.
+                    let mut slot = Slot {
+                        muted: false,
+                        source: InputType::Weight, // SET THIS: the InputType variant for scripted/event input.
+                        layer: InputLayer::Additive,
+                        weight: *steps.weight.first(),
+                        history: History::new(),
+                    };
+                    slot.history.push_at(*steps.value.first(), now);
+
+                    let mut node = InputNode::new(
+                        *steps.position.first(),
+                        NodeGroup::All,
+                        InterpolationLayer::Default,
+                        smallvec::smallvec![slot],
+                        *steps.radius.first(),
+                    );
+                    node.muted = *steps.muted.first();
+
+                    keys.push(map.input_nodes.nodes.insert(node));
+                }
+
+                map.input_nodes.transient.insert(id, keys);
+                map.event_instance.push((map.now, key, id));
+                map.map_dirty = true;
+                map.dirty_since_snap = true;
+            }
+
+            match msg {
+                Some(msg) => match msg {
+                    InputEventMessage::MapDirty => {
+                        map.map_dirty = true;
+                    }
+                    InputEventMessage::CancelEvents => {
+                        map.input_nodes.transient.clear();
+                        map.event_instance.clear();
+                        map.dirty_since_snap = true;
+                        map.map_dirty = true;
+                    }
+                    InputEventMessage::Flush => {
+                        map.dirty_since_snap = true;
+                        map.input_nodes.transient.clear();
+                        map.input_nodes.nodes.clear();
+                        map.input_nodes.active_streaming.clear();
+                        map.events.clear();
+                        map.generation += 1;
+                        map.quick_event = None;
+                        map.map_dirty = true;
+                    }
+                    InputEventMessage::RequestInfo { reply } => {
+                        if map.dirty_since_snap {
+                            map.snapshot.swap(Arc::new(Snapshot {
+                                instant: map.now,
+                                events: map.events.clone(),
+                                active_events: map.event_instance.clone(),
+                                input_nodes: map.input_nodes.clone(),
+                            }));
+                            log_err!(reply.send(()));
+                            map.dirty_since_snap = false;
+                        } else {
+                            log_err!(reply.send(()));
                         }
                     }
-                }
-                _ = self.map_dirty.notified() => {
-                    self.update_devices();
+                    InputEventMessage::Register { node, reply } => {
+                        let key = map.input_nodes.nodes.insert(*node);
+                        map.input_nodes.active_streaming.push(key);
+                        map.dirty_since_snap = true;
+                        log_err!(reply.send(key));
+                        map.map_dirty = true;
+                    }
+                    InputEventMessage::UpdateNode {
+                        key,
+                        muted,
+                        location,
+                        radius,
+                    } => {
+                        let Some(node) = map.input_nodes.nodes.get_mut(key) else {
+                            log::error!("Unable to find node with key");
+                            return; // TODO: Replace with continue when drain introduced.
+                        };
+
+                        node.mute(muted);
+                        node.location = location;
+                        node.radius = radius;
+                        map.dirty_since_snap = true;
+                        map.map_dirty = true;
+                    }
+                    InputEventMessage::UpdateSlot {
+                        key,
+                        value,
+                        weight,
+                        muted,
+                    } => {
+                        let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
+                            log::error!("Unable to find node with key (slot)");
+                            return; // TODO: Replace with continue when drain introduced.
+                        };
+
+                        // check on node insert that it has at least one slot.
+                        if let Some(slot) = node.slots.get_mut(key.slot_idx as usize) {
+                            map.dirty_since_snap = true;
+                            slot.history.push_at(value, std::time::Instant::now());
+                            slot.weight = weight;
+                            slot.muted = muted;
+                            map.map_dirty = true;
+                        } else {
+                            log::error!("unable to find Slot #{} on key", key.slot_idx);
+                        }
+                    }
+                    InputEventMessage::UpdateNodeField { key, field } => {
+                        let Some(node) = map.input_nodes.nodes.get_mut(key) else {
+                            log::error!("Unable to find node with key");
+                            return; // TODO: Replace with continue when drain introduced.
+                        };
+
+                        match field {
+                            NodeField::Location(l) => node.location = l,
+                            NodeField::Muted(m) => node.mute(m),
+                            NodeField::Radius(r) => node.radius = r,
+                        }
+                        map.map_dirty = true;
+                        map.dirty_since_snap = true;
+                    }
+                    InputEventMessage::UpdateSlotField { key, field } => {
+                        let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
+                            log::error!("Unable to find node with key");
+                            return; // TODO: Replace with continue when drain introduced.
+                        };
+
+                        // check on node insert that it has at least one slot.
+                        if let Some(slot) = node.slots.get_mut(key.slot_idx as usize) {
+                            match field {
+                                SlotField::Muted(m) => slot.muted = m,
+                                SlotField::Value(v) => {
+                                    slot.history.push_at(v, std::time::Instant::now())
+                                }
+                                SlotField::Weight(w) => slot.weight = w,
+                            }
+                            map.map_dirty = true;
+                            map.dirty_since_snap = true;
+                        } else {
+                            log::error!("unable to find Slot #{} on key", key.slot_idx);
+                        }
+                    }
+                    InputEventMessage::BatchUpdate(batch) => handle_batch(map, &batch),
+                    InputEventMessage::StartEvent(e) => {
+                        start_event(map, e);
+                    }
+                    InputEventMessage::RegisterEvent { event, reply } => {
+                        let key = register_event(map, *event);
+                        log_err!(reply.send(key));
+                    }
+                    InputEventMessage::QuickEvent {
+                        duration,
+                        power,
+                        location,
+                    } => {
+                        let duration = duration.max(1);
+                        let key = match map.quick_event.clone() {
+                            Some(key) => {
+                                let Some(event) = map.events.get_mut(key.0) else {
+                                    log::error!("Unable to retrieve event key");
+                                    return;
+                                };
+                                event.duration = duration;
+                                let Some(slot) = event.frames.nodes.get_mut(0) else {
+                                    log::error!("QuickTrigger event has no frames");
+                                    return;
+                                };
+                                slot.position = location.into();
+                                slot.value = power.into();
+                                key
+                            }
+                            None => {
+                                let step = Steps {
+                                    position: location.into(),
+                                    muted: false.into(),
+                                    value: power.into(),
+                                    weight: 1.0.into(),
+                                    radius: 0.0375.into(),
+                                };
+
+                                let event = Event {
+                                    name: "QuickTrigger".to_string(),
+                                    frames: Frames::new(vec![step]),
+                                    duration,
+                                };
+
+                                let key = register_event(map, event);
+                                map.quick_event = Some(key.clone());
+                                key
+                            }
+                        };
+
+                        start_event(map, key);
+                    }
+                },
+                None => {
+                    log::warn!("All channels dropped for map input. Restart required");
                 }
             }
         }
     }
 
-    /// pushes updates from map to devices
-    fn update_devices(&self) {
-        let devices = self.devices.lock();
-        let in_nodes = self.input_nodes.read();
-        for device in devices.iter() {
-            // could be done in parallel here. but few devices means not effeicnet (probably)
-            let (_, settings) = state::get_device(&device.id);
-            device.update_buffer(&in_nodes, &settings.load());
-            self.manager.with_device(&device.id, |d| d.buffer_updated());
+    /// pushes updates from map to devices, using our intermediary devices.
+    fn update_devices(&mut self, cfg: &Arc<VrcSettings>) {
+        // Calculate internal node values from slots.
+        self.input_nodes.update_nodes(cfg);
+
+        let _: () = self
+            .devices
+            .par_iter()
+            .map(|d| {
+                // could be done in parallel here. but few devices means not efficient (probably)
+                let (_, settings) = state::get_device(&d.id);
+                d.update_buffer(&self.input_nodes, &settings.load());
+                self.device_manager
+                    .with_device(&d.id, |d| d.buffer_updated());
+            })
+            .collect();
+    }
+}
+
+fn handle_batch(map: &mut InputMap, msgs: &[BatchUpdateMsg]) {
+    for msg in msgs {
+        match msg {
+            BatchUpdateMsg::Node {
+                key,
+                muted,
+                location,
+                radius,
+            } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(*key) else {
+                    log::error!("Unable to find node with key");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                node.mute(*muted);
+                node.location = *location;
+                node.radius = *radius;
+                map.dirty_since_snap = true;
+                map.map_dirty = true;
+            }
+            BatchUpdateMsg::Slot {
+                key,
+                value,
+                weight,
+                muted,
+            } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
+                    log::error!("Unable to find node with key (slot)");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                // check on node insert that it has at least one slot.
+                if let Some(slot) = node.slots.get_mut(key.slot_idx as usize) {
+                    map.dirty_since_snap = true;
+                    slot.history.push_at(*value, std::time::Instant::now());
+                    slot.weight = *weight;
+                    slot.muted = *muted;
+                    map.map_dirty = true;
+                } else {
+                    log::error!("unable to find Slot #{} on key", key.slot_idx);
+                }
+            }
+            BatchUpdateMsg::NodeField { key, field } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(*key) else {
+                    log::error!("Unable to find node with key");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                match field {
+                    NodeField::Location(l) => node.location = *l,
+                    NodeField::Muted(m) => node.mute(*m),
+                    NodeField::Radius(r) => node.radius = *r,
+                }
+                map.map_dirty = true;
+                map.dirty_since_snap = true;
+            }
+            BatchUpdateMsg::SlotField { key, field } => {
+                let Some(node) = map.input_nodes.nodes.get_mut(key.node) else {
+                    log::error!("Unable to find node with key");
+                    continue; // TODO: Replace with continue when drain introduced.
+                };
+
+                // check on node insert that it has at least one slot.
+                if let Some(slot) = node.slots.get_mut(key.slot_idx as usize) {
+                    match field {
+                        SlotField::Muted(m) => slot.muted = *m,
+                        SlotField::Value(v) => slot.history.push_at(*v, std::time::Instant::now()),
+                        SlotField::Weight(w) => slot.weight = *w,
+                    }
+                    map.map_dirty = true;
+                    map.dirty_since_snap = true;
+                } else {
+                    log::error!("unable to find Slot #{} on key", key.slot_idx);
+                }
+            }
         }
-    }
-
-    fn cancel_tags(&mut self, tags: &Vec<String>) -> usize {
-        let mut events = self.active_events.write();
-        let num = events.len();
-        for tag in tags {
-            events.retain(|e| e.tags.contains(&tag));
-        }
-        num - events.len()
-    }
-
-    /// Start a singular input event.
-    fn start_event(&mut self, event: Event) {
-        let mut lock = self.active_events.write();
-        lock.push(event);
-    }
-
-    /// Start a list of events, consumes the events vector.
-    fn start_events(&mut self, events: &mut Vec<Event>) {
-        let mut lock = self.active_events.write();
-        lock.append(events);
     }
 }
 
 /// pull dirty info from individual devices
-fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &Mutex<Vec<MappingDevice>>) {
+fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &mut Vec<MappingDevice>) {
     if let Some(info) = dev.with_device(&id, |d| d.info()) {
         match info {
+            DeviceInfo::Websocket(w) => {
+                let Some(device) = devices.iter_mut().find(|d| d.id == id) else {
+                    // if device not found on our list, just continue.
+                    return;
+                };
+
+                device.nodes = w.nodes;
+                let out_len = device.outputs.read().len();
+                if device.nodes.len() != out_len {
+                    log::error!("Output buffer not same length on device: {}", w.name);
+                }
+            }
             DeviceInfo::Wifi(i) => {
-                let mut lock = devices.lock();
-                let Some(device) = lock.iter_mut().find(|d| d.id == id) else {
+                let Some(device) = devices.iter_mut().find(|d| d.id == id) else {
                     // if device not found on our list, just continue.
                     return;
                 };
@@ -397,10 +824,9 @@ fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &Mutex<Vec<Mappi
                 if device.nodes.len() != out_len {
                     log::error!("Output buffer not same length on device: {}", i.mac);
                 }
-            },
+            }
             DeviceInfo::BhapticBle(i) => {
-                let mut lock = devices.lock();
-                let Some(device) = lock.iter_mut().find(|d| d.id == id) else {
+                let Some(device) = devices.iter_mut().find(|d| d.id == id) else {
                     // if device not found on our list, just continue.
                     return;
                 };
@@ -410,242 +836,113 @@ fn handle_dirty_info(id: DeviceId, dev: &DeviceHandle, devices: &Mutex<Vec<Mappi
                     log::error!("Output buffer not same length on device: {:?}", i.id);
                 }
             }
-        }
-    }
-}
-
-pub enum InputEventMessage {
-    /// Sets node with `NodeId`'s intensity, and radius.
-    UpdateNode(NodeId, Option<f32>, Option<f32>),
-    InsertNode(InputNode),
-    /// Removes all `InputNodes` with tags. This includes all input nodes created by events.
-    RemoveWithTags(Vec<String>),
-    StartEvent(Event),
-    StartEvents(Vec<Event>),
-    /// cancels all events with tags in string
-    CancelAllWithTags(Vec<String>),
-}
-
-/// Descriptors for location groups.
-/// Allows for segmented Interpolation
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(
-    PartialEq, serde::Deserialize, serde::Serialize, Clone, Debug, strum::EnumIter, Copy
-)]
-pub enum NodeGroup {
-    Head,
-    UpperArmRight,
-    UpperArmLeft,
-    LowerArmRight,
-    LowerArmLeft,
-    TorsoRight,
-    TorsoLeft,
-    TorsoFront,
-    TorsoBack,
-    UpperLegRight,
-    UpperLegLeft,
-    LowerLegRight,
-    LowerLegLeft,
-    FootRight,
-    FootLeft,
-    /// A meta tag reserved for in-server use only.
-    /// Should not be exported to devices or imported from games.
-    All,
-}
-
-
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-/// Id unique to the node it references.
-/// if an Id is equal, it is garunteed to be the same HapticNode, with location in space and tags
-pub struct NodeId(pub String);
-
-impl PartialEq<str> for NodeId {
-    fn eq(&self, other: &str) -> bool {
-        self.0 == other
-    }
-}
-
-impl Into<String> for NodeId {
-    fn into(self) -> String {
-        self.0
-    }
-}
-
-impl From<String> for NodeId {
-    fn from(value: String) -> Self {
-        NodeId(value)
-    }
-}
-
-impl NodeId {
-    pub fn new() -> Self {
-        NodeId(Uuid::new_v4().to_string())
-    }
-}
-
-impl NodeGroup {
-    /// maps node groups into two points defining an axis that runs through the center of the model.
-    /// See NodeGroupPoints in standard unity project.
-    pub const fn to_points(&self) -> (Vec3, Vec3) {
-        // helper: flip the sign of the X component for both points
-        const fn mirror_x(p: (Vec3, Vec3)) -> (Vec3, Vec3) {
-            let (a, b) = p;
-            (Vec3::new(-a.x, a.y, a.z), Vec3::new(-b.x, b.y, b.z))
-        }
-
-        return match self {
-            NodeGroup::TorsoRight
-            | NodeGroup::TorsoLeft
-            | NodeGroup::TorsoFront
-            | NodeGroup::TorsoBack => (
-                Vec3::new(0., 0.735000014, -0.00800000038),
-                Vec3::new(0., 1.43400002, -0.0130000003),
-            ),
-            NodeGroup::Head => (
-                Vec3::new(0., 1.70700002, 0.0529999994),
-                Vec3::new(0., 1.43400002, -0.0130000003),
-            ),
-            NodeGroup::UpperArmRight => (
-                Vec3::new(0.172999993, 1.35599995, -0.0260000005),
-                Vec3::new(0.336199999, 1.15139997, -0.0151000004),
-            ),
-            NodeGroup::LowerArmRight => (
-                Vec3::new(0.336199999, 1.14470005, -0.0244999994),
-                Vec3::new(0.4736, 0.944899976, 0.0469000004),
-            ),
-            NodeGroup::UpperLegRight => (
-                Vec3::new(0.0689999983, 0.921999991, 0.00100000005),
-                Vec3::new(0.134000003, 0.479000002, -0.0280000009),
-            ),
-            NodeGroup::LowerLegRight => (
-                Vec3::new(0.134000003, 0.479000002, -0.0280000009),
-                Vec3::new(0.173999995, 0.0879999995, -0.0729999989),
-            ),
-            NodeGroup::FootRight => (
-                Vec3::new(0.173999995, 0.0879999995, -0.0729999989),
-                Vec3::new(0.226300001, 0.0199999996, 0.0320000015),
-            ),
-            NodeGroup::UpperArmLeft => mirror_x(NodeGroup::UpperArmRight.to_points()),
-            NodeGroup::LowerArmLeft => mirror_x(NodeGroup::LowerArmRight.to_points()),
-            NodeGroup::UpperLegLeft => mirror_x(NodeGroup::UpperLegRight.to_points()),
-            NodeGroup::LowerLegLeft => mirror_x(NodeGroup::LowerLegRight.to_points()),
-            NodeGroup::FootLeft => mirror_x(NodeGroup::FootRight.to_points()),
-            NodeGroup::All => (Vec3::new(0., 0., 0.), Vec3::new(0., 0., 0.)),
-        };
-    }
-
-    #[inline]
-    pub fn iter(self) -> impl Iterator<Item = NodeGroup> {
-        const BIT_TO_GROUP: [(u16, NodeGroup); 15] = [
-            (0,  NodeGroup::Head),
-            (1,  NodeGroup::UpperArmRight),
-            (2,  NodeGroup::UpperArmLeft),
-            (3,  NodeGroup::TorsoRight),
-            (4,  NodeGroup::TorsoLeft),
-            (5,  NodeGroup::TorsoFront),
-            (6,  NodeGroup::TorsoBack),
-            (7,  NodeGroup::UpperLegRight),
-            (8,  NodeGroup::UpperLegLeft),
-            (9,  NodeGroup::FootRight),
-            (10, NodeGroup::FootLeft),
-            (11, NodeGroup::LowerArmRight),
-            (12, NodeGroup::LowerArmLeft),
-            (13, NodeGroup::LowerLegRight),
-            (14, NodeGroup::LowerLegLeft),
-        ];
-        let bits = NodeGroup::to_bitflag(&[self]);
-        BIT_TO_GROUP.into_iter()
-            .filter(move |(bit, _)| bits & (1 << bit) != 0)
-            .map(|(_, group)| group)
-    }
-
-    /// Given a string containing at least 2 raw bytes, interpret the first two bytes as
-    /// a little-endian u16 bitflag and convert that into a Vec<NodeGroup>.
-    pub fn parse_from_str(s: &str) -> Vec<NodeGroup> {
-        let bytes = s.as_bytes();
-        if bytes.len() < 2 {
-            // Not enough data; return an empty vector
-            return Vec::new();
-        }
-        let flag = u16::from_le_bytes([bytes[0], bytes[1]]);
-        Self::from_bitflag(flag)
-    }
-
-    /// Converts a slice of NodeGroup into a bitflag.
-    pub fn to_bitflag(groups: &[NodeGroup]) -> u16 {
-        let mut flag: u16 = 0;
-        for group in groups {
-            flag |= match group {
-                NodeGroup::Head => 1 << 0,
-                NodeGroup::UpperArmRight => 1 << 1,
-                NodeGroup::UpperArmLeft => 1 << 2,
-                NodeGroup::TorsoRight => 1 << 3,
-                NodeGroup::TorsoLeft => 1 << 4,
-                NodeGroup::TorsoFront => 1 << 5,
-                NodeGroup::TorsoBack => 1 << 6,
-                NodeGroup::UpperLegRight => 1 << 7,
-                NodeGroup::UpperLegLeft => 1 << 8,
-                NodeGroup::FootRight => 1 << 9,
-                NodeGroup::FootLeft => 1 << 10,
-                NodeGroup::LowerArmRight => 1 << 11,
-                NodeGroup::LowerArmLeft => 1 << 12,
-                NodeGroup::LowerLegRight => 1 << 13,
-                NodeGroup::LowerLegLeft => 1 << 14,
-                NodeGroup::All => 0,
+            DeviceInfo::Internal(i) => {
+                let Some(device) = devices.iter_mut().find(|d| d.id == id) else {
+                    // if device not found on our list, just continue.
+                    return;
+                };
+                device.nodes = i.nodes;
+                let out_len = device.outputs.read().len();
+                if device.nodes.len() != out_len {
+                    log::error!("Output buffer not same length on internal device");
+                }
             }
         }
-        flag
     }
+}
 
-    /// Converts a bitflag back into a vector of NodeGroup variants.
-    pub fn from_bitflag(flag: u16) -> Vec<NodeGroup> {
-        let mut groups = Vec::new();
-        if flag & (1 << 0) != 0 {
-            groups.push(NodeGroup::Head);
-        }
-        if flag & (1 << 1) != 0 {
-            groups.push(NodeGroup::UpperArmRight);
-        }
-        if flag & (1 << 2) != 0 {
-            groups.push(NodeGroup::UpperArmLeft);
-        }
-        if flag & (1 << 3) != 0 {
-            groups.push(NodeGroup::TorsoRight);
-        }
-        if flag & (1 << 4) != 0 {
-            groups.push(NodeGroup::TorsoLeft);
-        }
-        if flag & (1 << 5) != 0 {
-            groups.push(NodeGroup::TorsoFront);
-        }
-        if flag & (1 << 6) != 0 {
-            groups.push(NodeGroup::TorsoBack);
-        }
-        if flag & (1 << 7) != 0 {
-            groups.push(NodeGroup::UpperLegRight);
-        }
-        if flag & (1 << 8) != 0 {
-            groups.push(NodeGroup::UpperLegLeft);
-        }
-        if flag & (1 << 9) != 0 {
-            groups.push(NodeGroup::FootRight);
-        }
-        if flag & (1 << 10) != 0 {
-            groups.push(NodeGroup::FootLeft);
-        }
-        if flag & (1 << 11) != 0 {
-            groups.push(NodeGroup::LowerArmRight);
-        }
-        if flag & (1 << 12) != 0 {
-            groups.push(NodeGroup::LowerArmLeft);
-        }
-        if flag & (1 << 13) != 0 {
-            groups.push(NodeGroup::LowerLegRight);
-        }
-        if flag & (1 << 14) != 0 {
-            groups.push(NodeGroup::LowerLegLeft);
-        }
-        groups
-    }
+//const _: [u8; std::mem::size_of::<BatchUpdateMsg>()] = [];
+
+pub enum InputEventMessage {
+    /// Treats the map as if it has been changed on next map tick.
+    MapDirty,
+    /// increments generation, flushes all nodes.
+    /// USE WITH CAUTION. INVALIDATES ALL nodeKeys, SlotKeys, and EventKeys
+    Flush,
+    /// updates the snapshot info if dirty since last call.
+    RequestInfo {
+        reply: oneshot::Sender<()>,
+    },
+    /// Sets node with `NodeId`'s intensity, and radius.
+    Register {
+        node: Box<InputNode>,
+        reply: oneshot::Sender<NodeKey>,
+    },
+    UpdateNode {
+        key: NodeKey,
+        muted: bool,
+        location: Vec3,
+        radius: f32,
+    },
+    UpdateSlot {
+        key: SlotKey,
+        value: f32,
+        weight: f32,
+        muted: bool,
+    },
+    UpdateSlotField {
+        key: SlotKey,
+        field: SlotField,
+    },
+    UpdateNodeField {
+        key: NodeKey,
+        field: NodeField,
+    },
+    BatchUpdate(Box<Vec<BatchUpdateMsg>>),
+    /// Register events for use in this map epoch
+    RegisterEvent {
+        event: Box<Event>,
+        reply: oneshot::Sender<EventKey>,
+    },
+    /// Call a registered event.
+    StartEvent(EventKey),
+    QuickEvent {
+        duration: u64,
+        power: f32,
+        location: Vec3,
+    },
+    CancelEvents,
+}
+
+pub enum BatchUpdateMsg {
+    Node {
+        key: NodeKey,
+        muted: bool,
+        location: Vec3,
+        radius: f32,
+    },
+    Slot {
+        key: SlotKey,
+        value: f32,
+        weight: f32,
+        muted: bool,
+    },
+    SlotField {
+        key: SlotKey,
+        field: SlotField,
+    },
+    NodeField {
+        key: NodeKey,
+        field: NodeField,
+    },
+}
+
+#[derive(EnumDiscriminants)]
+#[strum_discriminants(derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "specta", strum_discriminants(derive(specta::Type)))]
+#[strum_discriminants(name(NodeFieldKind))]
+pub enum NodeField {
+    Muted(bool),
+    Location(Vec3),
+    Radius(f32),
+}
+
+#[derive(EnumDiscriminants)]
+#[strum_discriminants(name(SlotFieldKind))]
+#[cfg_attr(feature = "specta", strum_discriminants(derive(specta::Type)))]
+#[strum_discriminants(derive(serde::Serialize, serde::Deserialize))]
+pub enum SlotField {
+    Value(f32),
+    Weight(f32),
+    Muted(bool),
 }

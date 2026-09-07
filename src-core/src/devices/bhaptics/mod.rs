@@ -13,8 +13,7 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     bhaptics::maps::x40_vest::{x40_vest_back, x40_vest_front},
     devices::{bhaptics::ble::BleHandle, DeviceId, DeviceInfo, DeviceMessage},
-    log_err,
-    mapping::{haptic_node::HapticNode, NodeGroup},
+    mapping::{haptic_node::HapticNode, groups::NodeGroup},
 };
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -113,10 +112,8 @@ impl BhapticsModel {
                         .map(|&i| {
                             let v = all[i];
                             HapticNode {
-                                x: v.x,
-                                y: v.y,
-                                z: v.z,
-                                groups: vec![NodeGroup::All],
+                                loc: *v,
+                                groups: NodeGroup::All,
                             }
                         })
                         .collect()
@@ -187,9 +184,7 @@ impl super::Device for BhapticBle {
             return;
         };
 
-        let BhapticInfo { id, nodes, model } = new;
-
-        return;
+        let BhapticInfo { id: _, nodes: _, model: _ } = new;
     }
 
     fn get_feedback_buffer(&self) -> Arc<RwLock<Vec<f32>>> {

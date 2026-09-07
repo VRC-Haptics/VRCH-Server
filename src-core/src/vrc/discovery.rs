@@ -1,17 +1,16 @@
-use super::parsing::{parse_incoming, remove_version, OscInfo};
-use super::{Avatar, GameMap, MsgToMainVrc, OscPath, VrcHandle, PREFAB_PREFIX};
+use super::parsing::{OscInfo, parse_incoming, remove_version};
+use super::{Avatar, CAM_ID_PREFIX, GameMap, MsgToMainVrc, OscPath, PREFAB_PREFIX, VrcHandle};
 use crate::api::ApiManager;
+use crate::file::native_lib;
 use crate::vrc::AVATAR_ID_PATH;
 
 use dashmap::DashMap;
 use libloading::Library;
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
-use std::thread;
 use std::time::Duration;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 type PortCallback = unsafe extern "C" fn(u16, *const u8);
 type StartListener = unsafe extern "C" fn(PortCallback);
@@ -23,7 +22,7 @@ unsafe extern "C" fn dispatch_port(port: u16, ip_ptr: *const u8) {
     let ip = if ip_ptr.is_null() {
         "127.0.0.1".to_string()
     } else {
-        let cstr = std::ffi::CStr::from_ptr(ip_ptr as *const i8);
+        let cstr = std::ffi::CStr::from_ptr(ip_ptr as *const std::ffi::c_char);
         cstr.to_str().unwrap_or("127.0.0.1").to_string()
     };
 
@@ -41,7 +40,7 @@ pub async fn start_filling_available_parameters(
     params: Arc<DashMap<OscPath, OscInfo>>,
 ) {
     tokio::spawn(async move {
-        let library_path = Path::new("./sidecars/listen-for-vrc.dll");
+        let library_path = native_lib("listen-for-vrc").expect("Should be allowed");
         let library = match unsafe { Library::new(library_path) } {
             Ok(lib) => lib,
             Err(err) => {
@@ -71,17 +70,20 @@ pub async fn start_filling_available_parameters(
         let mut receiver = {
             let (tx, rx) = mpsc::channel::<(u16, String)>(2);
             let storage = PORT_SENDER.get_or_init(|| Mutex::new(None));
-            let mut guard = storage.lock().await;
+            let mut guard: tokio::sync::MutexGuard<'_, Option<mpsc::Sender<(u16, String)>>> =
+                storage.lock().await;
             *guard = Some(tx);
             rx
         };
 
-        unsafe { start(dispatch_port); }
+        unsafe {
+            start(dispatch_port);
+        }
 
         while let Some((port, ip)) = receiver.recv().await {
             log::debug!("VRC discovery: {}:{}", ip, port);
-            run_vrc_http_polling(port, &ip, &params, vrc.clone(), &api).await;
-            vrc.send(MsgToMainVrc::VrcDisconnected).await;
+            run_vrc_http_polling(port, &ip, &params, vrc.clone(), api).await;
+            vrc.send(MsgToMainVrc::VrcDisconnected);
         }
 
         unsafe {
@@ -166,14 +168,33 @@ async fn create_avatar(
     let configs = load_configs(params, api).await;
     let names = configs
         .iter()
-        .map(|conf| conf.meta.map_name.clone())
+        .map(|conf| conf.identification.map_name.clone())
         .collect();
     log::info!("Updated avatar with new configuration");
+
+    let ogb: Vec<OscInfo> = params
+        .iter()
+        .filter(|v| v.key().0.contains("avatar/parameters/OGB"))
+        .map(|v| v.value().clone())
+        .collect();
+    let vfh: Vec<OscInfo> = params
+        .iter()
+        .filter(|v| v.key().0.contains("avatar/parameters/VFH/Zone"))
+        .map(|v| v.value().clone())
+        .collect();
+
+    let ps = if !ogb.is_empty() || !vfh.is_empty() {
+        Some((ogb, vfh))
+    } else {
+        None
+    };
 
     Avatar {
         id: new_id,
         prefab_names: names,
-        configs: configs,
+        configs,
+        ps,
+        cam_id: get_camera_id(params),
     }
 }
 
@@ -246,9 +267,8 @@ async fn run_vrc_http_polling(
                     let mid = id_path.value.first().unwrap().clone();
                     let new_id = mid.string().unwrap();
 
-                    let new_avatar = Box::pin(create_avatar(params, new_id.to_string(), &api)).await;
-                    vrc.send(MsgToMainVrc::FlushCache).await;
-                    vrc.send(MsgToMainVrc::NewAvatar(new_avatar)).await;
+                    let new_avatar = Box::pin(create_avatar(params, new_id.to_string(), api)).await;
+                    vrc.send(MsgToMainVrc::NewAvatar(new_avatar));
                 }
             }
             Err(err) => {
@@ -286,12 +306,10 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
                 let num_str = parts[2].strip_prefix('v').unwrap_or("0");
 
                 // parse the remainder as an i32
-                let version = num_str
-                    .parse::<u32>()
-                    .unwrap_or_else(|_|{ 
-                        log::error!("Could not parse verison number: {:?}", key_str);
-                        0
-                    });
+                let version = num_str.parse::<u32>().unwrap_or_else(|_| {
+                    log::error!("Could not parse verison number: {:?}", key_str);
+                    0
+                });
 
                 // sometimes I hate this language
                 log::info!("Avatar has prefab: {:?}", (&author, &name, &version));
@@ -305,4 +323,40 @@ pub fn get_prefab_info(map: &DashMap<OscPath, OscInfo>) -> Option<Vec<(String, S
     } else {
         Some(results)
     }
+}
+
+/// Searches the DashMap for the camera ID. Paths must follow the pattern:
+/// `/avatar/parameters/haptic/cam_id/<uuid>`
+///
+/// An avatar is allowed one camera ID, because the game gives one camera
+/// output. A second ID is a build error on the avatar, so the search warns and
+/// takes the lowest name.
+pub fn get_camera_id(map: &DashMap<OscPath, OscInfo>) -> Option<String> {
+    let mut found: Option<String> = None;
+
+    for entry in map.iter() {
+        let Some(id) = entry.key().0.strip_prefix(CAM_ID_PREFIX) else {
+            continue;
+        };
+        if id.is_empty() || id.contains('/') {
+            continue; // a partial path, not an ID
+        }
+
+        match &found {
+            Some(first) if first.as_str() != id => {
+                log::warn!("Avatar has more than one camera id: {} and {}", first, id);
+                if id < first.as_str() {
+                    found = Some(id.to_string());
+                }
+            }
+            Some(_) => {}
+            None => found = Some(id.to_string()),
+        }
+    }
+
+    if let Some(id) = &found {
+        log::info!("Avatar has camera: {}", id);
+    }
+
+    found
 }

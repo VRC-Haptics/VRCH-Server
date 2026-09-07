@@ -1,0 +1,8358 @@
+{
+  "service": {
+    "name": "VRChat-Client-1B5610._oscjson._tcp.local.",
+    "http_host": "127.0.0.1",
+    "http_port": 53769
+  },
+  "host_info": {
+    "NAME": "VRChat-Client-1B5610",
+    "EXTENSIONS": {
+      "ACCESS": true,
+      "CLIPMODE": false,
+      "RANGE": true,
+      "TYPE": true,
+      "VALUE": true
+    },
+    "OSC_IP": "127.0.0.1",
+    "OSC_PORT": 9000,
+    "OSC_TRANSPORT": "UDP"
+  },
+  "endpoint_count": 762,
+  "endpoints": [
+    {
+      "address": "/avatar/change",
+      "type": "s",
+      "type_readable": "s",
+      "access": "read/write",
+      "value": [
+        "avtr_b3dc7ff9-1be2-4821-97e7-b0e21e005611"
+      ],
+      "range": null,
+      "description": "Avatar ID, updated whenever the user switches into a valid avatar."
+    },
+    {
+      "address": "/avatar/eyeheight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        1.1675241
+      ],
+      "range": null,
+      "description": "The current eye height of the avatar in meters."
+    },
+    {
+      "address": "/avatar/eyeheightmax",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        5.0
+      ],
+      "range": null,
+      "description": "The maximum eye height the current world recommends."
+    },
+    {
+      "address": "/avatar/eyeheightmin",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.2
+      ],
+      "range": null,
+      "description": "The minimum eye height the current world recommends."
+    },
+    {
+      "address": "/avatar/eyeheightscalingallowed",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": "Whether the current world allows avatar scaling."
+    },
+    {
+      "address": "/avatar/parameters/AFK",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/AngularY",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/AvatarLimbScaling_Arms",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/AvatarLimbScaling_Legs",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/AvatarLimbScaling_Reset",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Bangs",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/BasicDynamics/Synced/Boop",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/BasicDynamics/Synced/Headpat",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Black_Lip",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Black_Sclera",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Body_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.6
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Boobs_Slider",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Boop_Enabled",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Breedable_Holo",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Butt_Slider",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Decal",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Demon",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Demon_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Earmuffs",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/EyeDilationEnable",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/EyeHeightAsMeters",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        1.1675241
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/EyeHeightAsPercent",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.201567516
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/EyeTrackingActive",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Eyebrows_Swap",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/Debug",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionLeft",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionLeft1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionLeft2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionLeft4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionLeftNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionRight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionRight1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionRight2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionRight4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/BrowExpressionRightNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckLeft",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckLeft1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckLeft2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckLeft4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckLeftNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckRight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckRight1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckRight2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckRight4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/CheekPuffSuckRightNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeLeftX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeLidLeft",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.75
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeLidRight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.75
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeRightX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintLeft",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintLeft1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintLeft2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintLeft4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintRight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintRight1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintRight2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeSquintRight4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/EyeY",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawForward",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawForward1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawForward2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawForward4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawOpen",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawX1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawX2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawX4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/JawXNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipFunnel",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipFunnel1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipFunnel2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipFunnel4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipPucker",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipPucker1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipPucker2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipPucker4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckLower",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckLower1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckLower2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckLower4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckUpper",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckUpper1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckUpper2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/LipSuckUpper4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthClosed",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthDimple",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthDimple1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthDimple2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthDimple4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthLowerDown",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthLowerDown1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthLowerDown2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthLowerDown4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthPress",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthPress1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthPress2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthPress4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserLower",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserLower1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserLower2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserLower4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserUpper",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserUpper1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserUpper2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthRaiserUpper4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchLeft",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchLeft1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchLeft2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchLeft4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchRight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchRight1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchRight2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthStretchRight4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerLeft",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerLeft1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerLeft2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerLeft4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerRight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerRight1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerRight2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthTightenerRight4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthUpperUp",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthX1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthX2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthX4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthX8",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/MouthXNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/NoseSneer",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/NoseSneer1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/NoseSneer2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/NoseSneer4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/PupilDilation",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/PupilDilation1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/PupilDilation2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/PupilDilation4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownLeft",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownLeft1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownLeft2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownLeft4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownLeftNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownRight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownRight1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownRight2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownRight4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/SmileFrownRightNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueOut",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueOut1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueOut2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueOut4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueX1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueX2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueX4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueXNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueY",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueY1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueY2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueY4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FT/v2/TongueYNegative",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/FacialExpressionsDisabled",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/General_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/General_Hue_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/General_Sat_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.8
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/General_Saturation",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/GestureLeft",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read",
+      "value": [
+        2
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/GestureLeftWeight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/GestureRight",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read",
+      "value": [
+        2
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/GestureRightWeight",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Action",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Crouch",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/CrouchIdle",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/CrouchIdleMirror",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Float",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/FloatEnd",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/FloatFactor",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/FloatSave",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Head",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Height",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/HipDriftX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/HipDriftY",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/HipDriftZ",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/JSRF/ReadyToGrind",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/JSRF/Timer",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Jump",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Jump&Fall",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Locomotion",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Mirror",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Pose",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/PosePlaySpace",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/PoseRadial",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Prone",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/ProneIdle",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        2
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/ProneIdleMirror",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/PuppetX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/PuppetY",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/SVRB/Grounded",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/StandIdle",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/StandIdleMirror",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/StandType",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Stationary",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/Swimming",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/TrackingTypeProxy",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        3.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/UprightMobile",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/VRCEmote",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Go/VRModeProxy",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Grounded",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_2_Brightness",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.99
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_2_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_2_Saturation",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Black_Tips",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Brightness",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.99
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Emi_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Emi_Hue_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Emi_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.6
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Emi_Sat_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.6
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Emi_Strenght",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Hair_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/1tM996T3gL",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/KYBu3jmg2I",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/Q0AHGPn8Uw",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/W6ZRiRKy2u",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/gDj5VzfPTJ",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/h983IdVsLu",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/jqb4srC6uG",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Haptics/Nodes/yzvpgOYT7O",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/HasLoaded",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Headpat_Enabled",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Heart",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Highlights",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/InStation",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/IsAnimatorEnabled",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/IsOnFriendsList",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Jackets_White",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/L_Eye_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/L_Eye_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.99
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/LipTrackingActive",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Metal_Colors",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Middle_Lashes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/More_Lashes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/MuteSelf",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/FrotOthers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/PenOthers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/PenOthersClose",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/TouchOthers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/TouchOthersClose",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/TouchSelf",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Anal/TouchSelfClose",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Blowjob/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Blowjob/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Blowjob/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Blowjob/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Footjob/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Footjob/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Footjob/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Footjob/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Left/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Left/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Left/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Left/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Right/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Right/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Right/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Feet_Steppies_Right/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Double_Handjob/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Double_Handjob/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Double_Handjob/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Double_Handjob/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Left/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Left/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Left/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Left/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Right/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Right/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Right/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Handjob_Handjob_Right/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/FrotOthers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/PenOthers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/PenOthersClose",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/TouchOthers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/TouchOthersClose",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/TouchSelf",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Pussy/TouchSelfClose",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Assjob/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Assjob/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Assjob/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Assjob/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Thighjob/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Thighjob/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Thighjob/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Thighjob/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Titjob/PenOthersNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Titjob/PenOthersNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Titjob/PenSelfNewRoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB/Orf/Special_Titjob/PenSelfNewTip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/OGB_ENABLED",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Phys/Tail_Angle",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.117534183
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Phys/Tail_IsGrabbed",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Phys/Tail_IsPosed",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Phys/Tail_Squish",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Phys/Tail_Stretch",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Piercings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/PreviewMode",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/RGB",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/R_Eye_Hue_",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/R_Eye_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.99
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/RemoteModeActive",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/ScaleFactor",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/ScaleFactorInverse",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/ScaleModified",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Seated",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Shadow",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Skin_Color",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Smoothing/Local",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.25
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/State/TrackingActive",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/State/VisemesEnable",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Tattoos",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Tattoos_Emi",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Arm_Potions",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Body_Piercings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Chain_Necklace",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Cross_Garter",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Elbow_Pads",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Garters",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Hand_Harness",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Harness",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Heart_Choker",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Hips_Potions",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Knee_Pads",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Leg_Potion",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/More_Tactical_Bags",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Rings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Spiked_Choker",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Body_Accs/Tactical_Bag",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Bottoms/Bodysuit",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Bottoms/Jeans",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Bottoms/Panties",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Bottoms/Shorts",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Bottoms/Skirt",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Bottoms/Star_Bodysuit",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Bottoms/Tactical_Pants",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Foot_Wear/Heeled_Boots",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Foot_Wear/Heels",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Foot_Wear/Roller_Skates",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Foot_Wear/Sneakers",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Foot_Wear/Socks",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Foot_Wear/Stockings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Hair_Menu/Buns",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Head_Accs/Ear_Piercings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Head_Accs/Glasses",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Head_Accs/Stickers",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Jackets/Leather_Jacket",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Jackets/Long_Sleeves_Jacket",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Jackets/Puffer",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Jackets/Puffer_Hood",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Jackets/Tech_Jacket",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Sleeves/Mesh_Sleeves",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Sleeves/Puffy_Sleeves",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Angel_Wings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Cat_Ears",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Cat_Tail",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Demon_Tail",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Demon_Wings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Elf_Ears",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Halo",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Horn",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Horn_Chain",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Puppy_Ears",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Species/Puppy_Tail",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Bra",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Corset",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Crop_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Full_BodySuit",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Heart_Bra",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Laced_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Mesh_Corset",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Star_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Toggle/Tops/Tank_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/TrackingType",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read",
+      "value": [
+        3
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Upright",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.9244124
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF165_Random_Clap",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        1
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF165_Random_In",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF165_Random_Out",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF167_Random_Clap",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        2
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF167_Random_In",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF167_Random_Out",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        1
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF181_Heartrate",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF187_Haptics/DropCam",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF188_Haptics/ShowCam",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Anal",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_AutoActiveDist",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_AutoCurrentDist",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_AutoSocketNum",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        -1
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Blowjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Feet/Footjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Feet/Steppies_Left",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Feet/Steppies_Right",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Handjob/Double_Handjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Handjob/Handjob_Left",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Handjob/Handjob_Right",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Pussy",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_SPS_PLAYER_ID_HIGH",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        57767.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_SPS_PLAYER_ID_HIGH_RANDOM",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        57767
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_SPS_PLAYER_ID_LOW",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        63666.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_SPS_PLAYER_ID_LOW_RANDOM",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        63666
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Special/Assjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Special/Thighjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_Special/Titjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_WSD_-_Anal_-_Rcv",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_WSD_-_Blowjob_-_Rcv",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_WSD_-_Pussy_-_Rcv",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_autoMode",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_legacy",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF80_stealth",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_AvatarLimbScaling_Arms",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_AvatarLimbScaling_Legs",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Bangs",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Black_Lip",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Black_Sclera",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Body_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.6
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Boobs_Slider",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Boop_Enabled",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Breedable_Holo",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Butt_Slider",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Decal",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Demon",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Demon_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_EyeDilationEnable",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_EyeTrackingActive",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Eyebrows_Swap",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_FT/Debug",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_FacialExpressionsDisabled",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_General_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_General_Hue_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_General_Sat_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.8
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_General_Saturation",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.5
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_2_Brightness",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.99
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_2_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_2_Saturation",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Black_Tips",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Brightness",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Emi_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Emi_Hue_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Emi_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Emi_Sat_2",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.6
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Emi_Strenght",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Hair_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Headpat_Enabled",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Heart",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Highlights",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Jackets_White",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_L_Eye_Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_L_Eye_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_LipTrackingActive",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Metal_Colors",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Middle_Lashes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_More_Lashes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Piercings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_R_Eye_Hue_",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_R_Eye_Sat",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.99
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Shadow",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Skin_Color",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool0",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool10",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool11",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool12",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool13",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool14",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool15",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool16",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool17",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool18",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool19",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool20",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool3",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool5",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool6",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool7",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool8",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataBool9",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataNum0",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        127
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataNum1",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        127
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataNum2",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        127
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataNum3",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        127
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataNum4",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        127
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncDataNum5",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        127
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncIndex0",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncIndex1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_SyncIndex2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Tattoos",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Tattoos_Emi",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Arm_Potions",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Body_Piercings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Chain_Necklace",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Cross_Garter",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Elbow_Pads",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Garters",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Hand_Harness",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Harness",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Heart_Choker",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Hips_Potions",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Knee_Pads",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Leg_Potion",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/More_Tactical_Bags",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Rings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Spiked_Choker",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Body_Accs/Tactical_Bag",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Bottoms/Bodysuit",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Bottoms/Jeans",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Bottoms/Panties",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Bottoms/Shorts",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Bottoms/Skirt",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Bottoms/Star_Bodysuit",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Bottoms/Tactical_Pants",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Foot_Wear/Heeled_Boots",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Foot_Wear/Heels",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Foot_Wear/Roller_Skates",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Foot_Wear/Sneakers",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Foot_Wear/Socks",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Foot_Wear/Stockings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Hair_Menu/Buns",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Head_Accs/Ear_Piercings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Head_Accs/Glasses",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Head_Accs/Stickers",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Jackets/Leather_Jacket",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Jackets/Long_Sleeves_Jacket",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Jackets/Puffer",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Jackets/Puffer_Hood",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Jackets/Tech_Jacket",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Sleeves/Mesh_Sleeves",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Sleeves/Puffy_Sleeves",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Angel_Wings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Cat_Ears",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Cat_Tail",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Demon_Tail",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Demon_Wings",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Elf_Ears",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Halo",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Horn",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Horn_Chain",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Puppy_Ears",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Species/Puppy_Tail",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Bra",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Corset",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Crop_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Full_BodySuit",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Heart_Bra",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Laced_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Mesh_Corset",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Star_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Toggle/Tops/Tank_Top",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF181_Heartrate",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF187_Haptics/DropCam",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF188_Haptics/ShowCam",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Anal",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Blowjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Feet/Footjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Feet/Steppies_Left",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Feet/Steppies_Right",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Handjob/Double_Handjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Handjob/Handjob_Left",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Handjob/Handjob_Right",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Pussy",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Special/Assjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Special/Thighjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_Special/Titjob",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_legacy",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_VF80_stealth",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_WH_SFX_On",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Wet_Skin",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Whip",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Whip_Sound_Enable",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_White_Accs",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_White_Bottoms",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_White_Lashes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_White_Shoes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_White_Tops",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_Yaeba",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF89_haptic/global/show",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingHead",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingHip",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingLeftFingers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingLeftFoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingLeftHand",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingRightFingers",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingRightFoot",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_GogoLoco_All_(VRCFury)_trackingRightHand",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_VF_UE_VRCFT/VF_EyeRotation_trackingEyes",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_VF_UE_VRCFT_trackingEyes",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_FullControllerBuilder.Apply_on_VF_UE_VRCFT_trackingMouth",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingEyes",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingHead",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingHip",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingLeftFingers",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingLeftFoot",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingLeftHand",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingMouth",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingRightFingers",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingRightFoot",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF8_TC_current_trackingRightHand",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VFH/Version/10",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF_1.1407.0",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF_2022.3.22f1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF_3.10.4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VF_D",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VRCOSC/Heartrate/Value",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VRMode",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read",
+      "value": [
+        1
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VelocityMagnitude",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VelocityX",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VelocityY",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VelocityZ",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Viseme",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/VisemesEnable",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Voice",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/WH_SFX_On",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Wet_Skin",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Whip",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/WhipSound",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Whip_Sound_Enable",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/White_Accs",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/White_Bottoms",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/White_Lashes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/White_Shoes",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/White_Tops",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/Yaeba",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/haptic/cam_id/2ad16c2e-7daf-46b9-9d1e-fa2b69d52eae",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/haptic/global/enable_colliders",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/haptic/global/enable_rays",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/haptic/global/intensity",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/haptic/global/show",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/avatar/parameters/haptic/prefabs/Average/Headset-8x/1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/chatbox/input",
+      "type": "sTT",
+      "type_readable": "[sTT]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/chatbox/typing",
+      "type": "s",
+      "type_readable": "s",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/dolly/Export",
+      "type": "s",
+      "type_readable": "s",
+      "access": "write",
+      "value": [
+        null
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/dolly/ExportLocal",
+      "type": "s",
+      "type_readable": "s",
+      "access": "write",
+      "value": [
+        null
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/dolly/Import",
+      "type": "s",
+      "type_readable": "s",
+      "access": "write",
+      "value": [
+        null
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/dolly/Play",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/dolly/PlayDelayed",
+      "type": "i",
+      "type_readable": "i",
+      "access": "write",
+      "value": [
+        0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/input/AFKToggle",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Toggles AFK mode on and off. Only has an effect when changing from 0 to 1."
+    },
+    {
+      "address": "/input/ComfortLeft",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Spins you instantly to the left. Only has an effect in VR."
+    },
+    {
+      "address": "/input/ComfortRight",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Spins you instantly to the right. Only has an effect in VR."
+    },
+    {
+      "address": "/input/DropLeft",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Drops the item in your left hand."
+    },
+    {
+      "address": "/input/DropRight",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Drops the item in your right hand."
+    },
+    {
+      "address": "/input/GrabLeft",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Grabs the item near your left hand."
+    },
+    {
+      "address": "/input/GrabRight",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Grabs the item near your right hand."
+    },
+    {
+      "address": "/input/Horizontal",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": "Moves you right for values above 0, and left for values below 0."
+    },
+    {
+      "address": "/input/Jump",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Jumps when the input changes to 1. Only has an effect when changing from 0 to 1."
+    },
+    {
+      "address": "/input/LookHorizontal",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": "Looks to the right for values above 0, and to the left for values below 0."
+    },
+    {
+      "address": "/input/LookLeft",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Looks to the left while the input equals 1.."
+    },
+    {
+      "address": "/input/LookRight",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Looks to the right while the input equals 1.."
+    },
+    {
+      "address": "/input/LookVertical",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": "Looks up for values above 0, and down for values below 0."
+    },
+    {
+      "address": "/input/MoveBackward",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Moves you backward while the input equals 1.."
+    },
+    {
+      "address": "/input/MoveForward",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Moves you forward while the input equals 1.."
+    },
+    {
+      "address": "/input/MoveLeft",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Moves you Left while the input equals 1.."
+    },
+    {
+      "address": "/input/MoveRight",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Moves you Right while the input equals 1.."
+    },
+    {
+      "address": "/input/PanicButton",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Turns on Panic mode for your safety."
+    },
+    {
+      "address": "/input/QuickMenuToggleLeft",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Toggles the state of the QuickMenu attached to your left hand. Only has an effect when changing from 0 to 1."
+    },
+    {
+      "address": "/input/QuickMenuToggleRight",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Toggles the state of the QuickMenu attached to your left hand. Only has an effect when changing from 0 to 1."
+    },
+    {
+      "address": "/input/Run",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Applies run speed while the input equals 1."
+    },
+    {
+      "address": "/input/ShowDebugInfo0",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays some debugging visualizations for VRC_UiShapes (interactable UIs). Only accessible to the world creator unless they have turned on 'World Debugging' via the website."
+    },
+    {
+      "address": "/input/ShowDebugInfo1",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays information about loaded asset bundles. It is mostly irrelevant to world development."
+    },
+    {
+      "address": "/input/ShowDebugInfo2",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays the current build of VRChat that you are using, along with your FPS."
+    },
+    {
+      "address": "/input/ShowDebugInfo3",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays your output log."
+    },
+    {
+      "address": "/input/ShowDebugInfo4",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays various stats about other users. VR?: Whether or not the user is in VR. More info at https://docs.vrchat.com/docs/world-debug-views#debug-menu-4"
+    },
+    {
+      "address": "/input/ShowDebugInfo5",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays some graphs related to networking. They are unlabeled and mostly not useful."
+    },
+    {
+      "address": "/input/ShowDebugInfo6",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays all the networked objects in your world, along with various stats. Only accessible to the world creator unless they have turned on 'World Debugging' via the website."
+    },
+    {
+      "address": "/input/ShowDebugInfo7",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Overlays visual representations of every PhysBone and Contact in the world near the local player. Only accessible to the world creator unless they have turned on 'World Debugging' via the website."
+    },
+    {
+      "address": "/input/ShowDebugInfo8",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Overlays a panel on top of every synced object in the world. Each panel displays various stats about that specific object. Only accessible to the world creator unless they have turned on 'World Debugging' via the website. More info at https://docs.vrchat.com/docs/world-debug-views#debug-menu-8"
+    },
+    {
+      "address": "/input/ShowDebugInfo9",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Displays debug stats for every player in the instance at their feet. Only accessible to the world creator unless they have turned on 'World Debugging' via the website."
+    },
+    {
+      "address": "/input/SpinHoldCwCcw",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": "Spins the held item Clockwise for values above 0, and Counter-Clockwise for values below 0."
+    },
+    {
+      "address": "/input/SpinHoldLR",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": "Spins the held item Left for values above 0, and Right for values below 0."
+    },
+    {
+      "address": "/input/SpinHoldUD",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": "Spins the held item Up for values above 0, and Down for values below 0."
+    },
+    {
+      "address": "/input/ToggleSitStand",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Toggles between Sitting and Standing modes. Only has an effect in VR."
+    },
+    {
+      "address": "/input/UseLeft",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Uses the item in your left hand."
+    },
+    {
+      "address": "/input/UseRight",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "Uses the item in your right hand."
+    },
+    {
+      "address": "/input/Vertical",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": "Moves you forward for values above 0, and backwards for values below 0."
+    },
+    {
+      "address": "/input/Voice",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": "In 'Toggle Mic' mode, Toggles your Mic when changing the input from 0 to 1. In Push-To-Talk Mode, 0 = Muted and 1 = Unmuted."
+    },
+    {
+      "address": "/tracking/eye/CenterPitchYaw",
+      "type": "ff",
+      "type_readable": "[ff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/eye/CenterPitchYawDist",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/eye/CenterVec",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/eye/CenterVecFull",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/eye/EyesClosedAmount",
+      "type": "f",
+      "type_readable": "f",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/eye/LeftRightPitchYaw",
+      "type": "ffff",
+      "type_readable": "[ffff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/eye/LeftRightVec",
+      "type": "ffffff",
+      "type_readable": "[ffffff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/1/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/1/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/2/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/2/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/3/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/3/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/4/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/4/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/5/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/5/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/6/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/6/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/7/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/7/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/8/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/8/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/head/position",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/trackers/head/rotation",
+      "type": "fff",
+      "type_readable": "[fff]",
+      "access": "write",
+      "value": null,
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/vrsystem/head/pose",
+      "type": "ffffff",
+      "type_readable": "[ffffff]",
+      "access": "read",
+      "value": [
+        null
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/vrsystem/leftwrist/pose",
+      "type": "ffffff",
+      "type_readable": "[ffffff]",
+      "access": "read",
+      "value": [
+        null
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/tracking/vrsystem/rightwrist/pose",
+      "type": "ffffff",
+      "type_readable": "[ffffff]",
+      "access": "read",
+      "value": [
+        null
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Aperture",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        15.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/AudioFromCamera",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/AutoLevelPitch",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/AutoLevelRoll",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Capture",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/CaptureDelayed",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Close",
+      "type": "T",
+      "type_readable": "T",
+      "access": "write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/DollyPathsStayVisible",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Duration",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Environment",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Exposure",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/FlySpeed",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.2
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Flying",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/FocalDistance",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        2.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/GreenScreen",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Hue",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        120.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Lightness",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        50.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/LocalPlayer",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Lock",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/LookAtMe",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/LookAtMeXOffset",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/LookAtMeYOffset",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        0.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Mode",
+      "type": "i",
+      "type_readable": "i",
+      "access": "read/write",
+      "value": [
+        2
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/OrientationIsLandscape",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/PhotoRate",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Pose",
+      "type": "ffffff",
+      "type_readable": "[ffffff]",
+      "access": "read",
+      "value": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/RemotePlayer",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/RollWhileFlying",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Saturation",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        100.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/ShowFocus",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/ShowUIInCamera",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/SmoothMovement",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/SmoothingStrength",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        5.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Streaming",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        true
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/TriggerTakesPhotos",
+      "type": "T",
+      "type_readable": "T",
+      "access": "read/write",
+      "value": [
+        false
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/TurnSpeed",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        1.0
+      ],
+      "range": null,
+      "description": ""
+    },
+    {
+      "address": "/usercamera/Zoom",
+      "type": "f",
+      "type_readable": "f",
+      "access": "read/write",
+      "value": [
+        "NaN"
+      ],
+      "range": null,
+      "description": ""
+    }
+  ]
+}

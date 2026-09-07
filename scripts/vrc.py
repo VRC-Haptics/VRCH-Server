@@ -30,29 +30,52 @@ def load_configs(paths: list[str]) -> list[tuple[dict, list[dict]]]:
     configs = []
     for p in paths:
         data = json.loads(Path(p).read_text())
-        configs.append((data["meta"], data["nodes"]))
+        configs.append((data["identification"], data["nodes"]))
     return configs
 
 
 # ─── OSCQuery tree ────────────────────────────────────────────────────────────
 
 def build_tree(configs):
-    """Return (tree_root, list_of_float_addresses)."""
+    """Return (tree_root, list_of_float_addresses, avatar_id)."""
     leaves: dict[str, dict] = {}
 
     # Fake avatar change parameter
     avatar_id = "avtr_" + "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     leaves["/avatar/change"] = {"TYPE": "s", "VALUE": [avatar_id], "ACCESS": 1}
 
+    def qualify(prefix: str, address: str) -> str:
+        # address is a short-name; the OSC path is always vrcPrefix + short-name.
+        short = address.rstrip("/").rsplit("/", 1)[-1]
+        return prefix.rstrip("/") + "/" + short
+
     for meta, nodes in configs:
         prefab = (
             f"/avatar/parameters/haptic/prefabs"
-            f"/{meta['map_author']}/{meta['map_name']}/v{meta['map_version']}"
+            f"/{meta['authorName']}/{meta['mapName']}/v{meta['mapVersion']}"
         )
-        leaves[prefab] = {"TYPE": "i", "VALUE": [meta["map_version"]], "ACCESS": 1}
+        leaves[prefab] = {"TYPE": "i", "VALUE": [meta["mapVersion"]], "ACCESS": 1}
 
         for node in nodes:
-            leaves[node["address"]] = {"TYPE": "f", "VALUE": [0.0], "ACCESS": 1}
+            # New format: each node has an `inputs` list; each input carries a
+            # short-name `address` and a `vrcPrefix`. Fully-qualified = prefix + short-name.
+            # Old format fallback: a single top-level address/prefix on the node.
+            inputs = node.get("inputs")
+            if inputs is None:
+                addrs = (
+                    [qualify(node["vrcPrefix"], node["address"])]
+                    if "address" in node else []
+                )
+            else:
+                addrs = [
+                    qualify(inp["vrcPrefix"], inp["address"])
+                    for inp in inputs
+                    if "address" in inp and "vrcPrefix" in inp
+                ]
+
+            for addr in addrs:
+                # dict keyed by address -> duplicate addresses collapse to one leaf
+                leaves[addr] = {"TYPE": "f", "VALUE": [0.0], "ACCESS": 1}
 
     root = {"FULL_PATH": "/", "CONTENTS": {}}
     for full_path, leaf_data in leaves.items():

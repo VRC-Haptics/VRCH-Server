@@ -1,19 +1,18 @@
 use arc_swap::ArcSwap;
 use boxcar::Vec as AppendVec;
+use glam::Vec3;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
-    path::PathBuf,
-    sync::{Arc, LazyLock, OnceLock, atomic::AtomicBool},
-    time::Duration,
+    fs, path::PathBuf, sync::{Arc, LazyLock, OnceLock, atomic::AtomicBool}, time::Duration
 };
 
-use crate::{
-    devices::DeviceId, log_err, mapping::interp::{GaussianState, InterpAlgo}
-};
+use crate::{devices::DeviceId, log_err, mapping::{input_node::InterpolationLayer, interp::InterpState}, migrate::migrate};
+
+pub const CONFIG_VERSION: u32 = 1;
 
 // not intended to be accessed publicly. Use functions below
-static CONFIG: LazyLock<Config> = LazyLock::new(|| {load_config().unwrap_or_default()});
+static CONFIG: LazyLock<Config> = LazyLock::new(|| load_config().unwrap_or_default());
 /// init by set_config_dir
 static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
 /// init by load_config
@@ -22,19 +21,58 @@ static DIRTY: AtomicBool = AtomicBool::new(false);
 
 /// Only intended to be called once
 fn load_config() -> Option<Config> {
-    let mut dir = CONFIG_DIR.get()?.clone();
+    let Some(dir_root) = CONFIG_DIR.get() else {
+        log::warn!("config directory not set, using default settings");
+        return None;
+    };
+
+    let mut dir = dir_root.clone();
     dir.push("memory");
     dir.set_extension("json");
     log_err!(CONFIG_FILE.set(dir.clone()));
+    log::info!("Loading memory file: {}", dir.display());
 
-    let data = fs::read_to_string(dir).ok()?;
-    serde_json::from_str(&data).ok()
+    let data = match fs::read_to_string(&dir) {
+        Ok(d) => d,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            log::info!("No memory file yet, starting from defaults");
+            return None;
+        }
+        Err(e) => {
+            log::error!("Failed to read memory file {}: {e}", dir.display());
+            return None;
+        }
+    };
+
+    let value: serde_json::Value = match serde_json::from_str(&data) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Memory file is not valid JSON ({e}); backing up and using defaults");
+            let _ = fs::rename(&dir, dir.with_extension("json.corrupt"));
+            return None;
+        }
+    };
+
+    let on_disk = value.get("version").and_then(|v| v.as_u64());
+    match migrate(value) {
+        Some(cfg) => {
+            log::info!("Loaded memory file (on-disk version {on_disk:?})");
+            Some(cfg)
+        }
+        None => {
+            log::error!(
+                "migrate() rejected memory file (on-disk version {on_disk:?}, expected {CONFIG_VERSION}); \
+                 backing up to memory.json.rejected and using defaults"
+            );
+            let _ = fs::copy(&dir, dir.with_extension("json.rejected"));
+            None
+        }
+    }
 }
 
 pub fn set_config_dir(path: PathBuf) {
     log_err!(CONFIG_DIR.set(path));
 }
-
 
 /// ONLY USED AT PROGRAM START. NOT A GENERAL USE FUNCTION.
 pub async fn init_save_loop() {
@@ -56,17 +94,44 @@ pub fn mark_dirty() {
 
 /// Heavy function, persists a snapshot of our config to the disk.
 pub fn save_config() {
-    let path = CONFIG_FILE.get().expect("Should have initialized config before calling save loop");
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    let _ = fs::write(path, serde_json::to_string_pretty(get_config()).unwrap());
-}
+    let cfg = get_config();
 
+    let Some(path) = CONFIG_FILE.get() else {
+        log::error!("save_config called before config was initialized; skipping save");
+        return;
+    };
+
+    if let Some(parent) = path.parent() {
+        if let Err(e) = fs::create_dir_all(parent) {
+            log::error!("Could not create config dir {}: {e}", parent.display());
+            return;
+        }
+    }
+
+    let json = match serde_json::to_string_pretty(cfg) {
+        Ok(j) => j,
+        Err(e) => {
+            log::error!("Failed to serialize config: {e}");
+            return;
+        }
+    };
+
+    // write to temp then rename, so a crash mid-write can't truncate the real file
+    let tmp = path.with_extension("json.tmp");
+    if let Err(e) = fs::write(&tmp, &json) {
+        log::error!("Failed to write {}: {e}", tmp.display());
+        return;
+    }
+    if let Err(e) = fs::rename(&tmp, path) {
+        log::error!("Failed to replace {}: {e}", path.display());
+        return;
+    }
+    log::trace!("Saved config ({} bytes)", json.len());
+}
 
 /// returns bare static reference to global app configuration (state)
 pub fn get_config() -> &'static Config {
-    &*CONFIG
+    &CONFIG
 }
 
 /// Main method for retrieving a read-only view of a device configuration.
@@ -82,9 +147,14 @@ pub fn get_device(id: &DeviceId) -> (usize, &'static ArcSwap<PerDevice>) {
         .find(|(_, d)| d.load().id == *id)
     else {
         let idx = update_device(Arc::new(PerDevice::default(id.clone())));
-        return (idx.clone(), CONFIG
-            .devices
-            .states.get(idx).expect("The device should have just been created."))
+        return (
+            idx,
+            CONFIG
+                .devices
+                .states
+                .get(idx)
+                .expect("The device should have just been created."),
+        );
     };
     existing
 }
@@ -109,10 +179,22 @@ pub fn update_device(state: Arc<PerDevice>) -> usize {
 ///
 /// This is never intended to be moved at runtime and references to the children are of static lifetime.
 pub struct Config {
+    pub version: u32,
+    pub server: ArcSwap<ServerSettings>,
     pub mapping_menu: ArcSwap<StandardMenu>,
     pub devices: Devices,
     pub vrc_settings: ArcSwap<VrcSettings>,
     pub ui: ArcSwap<UiSettings>,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerSettings {
+    pub enable_websocket_devices: bool,
+    pub enable_vrc: bool,
+    pub enable_ble_bhaptic: bool,
+    pub enable_bhaptic_game: bool,
+    pub enable_wifi_vrch: bool,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -170,8 +252,12 @@ impl serde::Serialize for Devices {
 
         Proxy {
             ota_repositories: self.ota_repositories.lock().clone(),
-            wifi_device_timeout: self.wifi_device_timeout.load_full().as_ref().clone(),
-            states: self.states.iter().map(|(_, d)| d.load_full().as_ref().clone()).collect(),
+            wifi_device_timeout: *self.wifi_device_timeout.load_full().as_ref(),
+            states: self
+                .states
+                .iter()
+                .map(|(_, d)| d.load_full().as_ref().clone())
+                .collect(),
         }
         .serialize(serializer)
     }
@@ -190,7 +276,11 @@ impl<'de> serde::Deserialize<'de> for Devices {
             pub states: Vec<PerDevice>,
         }
 
-        let Proxy { ota_repositories, wifi_device_timeout, states } = Proxy::deserialize(deserializer)?;
+        let Proxy {
+            ota_repositories,
+            wifi_device_timeout,
+            states,
+        } = Proxy::deserialize(deserializer)?;
 
         let arc_states = AppendVec::new();
         for state in states {
@@ -208,17 +298,25 @@ impl<'de> serde::Deserialize<'de> for Devices {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            version: CONFIG_VERSION,
+            server: ArcSwap::new(Arc::new(ServerSettings {
+                enable_websocket_devices: true,
+                enable_vrc: true,
+                enable_ble_bhaptic: true,
+                enable_bhaptic_game: true,
+                enable_wifi_vrch: true,
+            })),
             devices: Devices {
                 ota_repositories: parking_lot::Mutex::new(vec![GitRepo {
-                owner: "VRC-Haptics".into(),
-                name: "VRCH-Firmware".into(),
-            }]),
+                    owner: "VRC-Haptics".into(),
+                    name: "VRCH-Firmware".into(),
+                }]),
                 wifi_device_timeout: ArcSwap::new(Arc::new(3.0)),
                 states: AppendVec::new(),
             },
             mapping_menu: ArcSwap::new(Arc::new(StandardMenu::default())),
             vrc_settings: ArcSwap::new(Arc::new(VrcSettings::default())),
-            ui: ArcSwap::new(Arc::new(UiSettings::default()))
+            ui: ArcSwap::new(Arc::new(UiSettings::default())),
         }
     }
 }
@@ -235,13 +333,16 @@ impl Default for StandardMenu {
 impl PerDevice {
     fn default(id: DeviceId) -> Self {
         Self {
-            id: id,
+            id,
             intensity: 1.0,
-            offset: 0.01,
-            interp_algo: InterpAlgo::Gaussian(GaussianState::default()),
+            offset: 0.0,
+            interp_algo: InterpState::default(),
         }
     }
 }
+
+pub type AviId = String;
+pub type OgbID = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Persistant state related to vrc specifically.
@@ -261,6 +362,21 @@ pub struct VrcSettings {
     ///
     /// Smooths motor acceleration.
     pub smoothing_time: Duration,
+    #[serde(default)]
+    pub enable_ps: bool,
+    #[serde(default)]
+    pub avatar_overrides: FxHashMap<AviId, AviOverride>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AviOverride {
+    pub ps: FxHashMap<OgbID, PsSettings>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PsSettings {
+    // location, radius, layer
+    pub outputs: Vec<(Vec3, f32, InterpolationLayer)>,
 }
 
 impl Default for VrcSettings {
@@ -271,6 +387,8 @@ impl Default for VrcSettings {
             size: 1.0,
             sample_cache: 10,
             smoothing_time: Duration::from_secs_f32(0.12),
+            enable_ps: false,
+            avatar_overrides: FxHashMap::default(),
         }
     }
 }
@@ -281,5 +399,5 @@ pub struct PerDevice {
     pub id: DeviceId,
     pub intensity: f32,
     pub offset: f32,
-    pub interp_algo: InterpAlgo,
+    pub interp_algo: InterpState,
 }

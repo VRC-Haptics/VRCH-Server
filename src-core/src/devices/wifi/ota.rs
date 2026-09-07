@@ -241,13 +241,13 @@ pub fn authenticate(
 
         log::trace!("Auth response recieved: {}", response);
 
-        return recv_buff[0..len].starts_with(b"OK");
+        recv_buff[0..len].starts_with(b"OK")
     } else if auth_buf[..len_recv].starts_with(b"OK") {
         // no need for auth
-        return true;
+        true
     } else {
         log::error!("Authentication from device not valid");
-        return false;
+        false
     }
 }
 

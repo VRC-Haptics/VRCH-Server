@@ -1,6 +1,7 @@
 import { Canvas, useFrame, type Camera } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
 import { useState, useRef } from "react";
+import type { InputNode, NodeKeyDef, Nodes } from "../../bindings";
 import { useMapContext } from "../../context/mapContext";
 import { useDeviceContext } from "../../context/DevicesContext";
 import StandardModel from "./standard";
@@ -20,50 +21,52 @@ function CameraTracker({ onUpdate }: { onUpdate: (c: Camera) => void }) {
   return null;
 }
 
-// Desired default camera transform (matches HUD in screenshot):
-// position: 1.17, 1.54, 0.74
-// rotation (deg): -34°, 47.3°, 26.3° → (rad): -0.593, 0.826, 0.459
 const DEFAULT_POS: [number, number, number] = [1.35, 1.64, 1.36];
 const DEFAULT_ROT: [number, number, number] = [-0.593, 0.826, 0.459];
+
+/**
+ * InputNode no longer carries tags — only the numeric `groups` bitfield.
+ * Tag/prefab filtering therefore can't match against it; these modes
+ * pass through until mapContext exposes a tag source. `all` works.
+ */
+function nodeMatchesFilter(_node: InputNode, filter: NodeFilter): boolean {
+  if (filter.mode === "all") return true;
+  // TODO: wire to a real tag source once mapContext provides one.
+  return true;
+}
+
+/** Slotmap entries arrive as either a bare InputNode or { value: InputNode }. */
+function unwrapNode(slot: any): InputNode | null {
+  if (slot == null) return null;
+  const node = "location" in slot ? slot : slot.value;
+  return node ?? null;
+}
+
+function mergedKeys(n: Nodes): NodeKeyDef[] {
+	return [...n.active_streaming, ...Object.values(n.transient).flat()];
+}
 
 export default function InputNodesViewer() {
   const { globalMap } = useMapContext();
   const { devices } = useDeviceContext();
 
-  // store a unique string for the mesh we’re hovering, not just a number
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const controlsRef = useRef<any>(null);
 
-  const inputNodes = globalMap?.nodes;
+  const visibleKeys = globalMap ? mergedKeys(globalMap.input_nodes) : [];
+  const inputNodes = globalMap?.input_nodes.nodes ?? [];
 
-  // filter state
+  const visibleNodes = visibleKeys
+    .map((key) => inputNodes[key.idx])
+    .filter((node): node is InputNode => node != null);
+  
   const [filter, setFilter] = useState<NodeFilter>({ mode: "all" });
+  const visibleInputNodes = visibleNodes
+    .map(unwrapNode)
+    .filter(
+      (node): node is InputNode => node != null && nodeMatchesFilter(node, filter)
+    );
 
-  const visibleInputNodes = inputNodes?.filter((node) => {
-    if (filter.mode === "all") return true;
-    if (filter.mode === "prefab") {
-      const tag = filter.tag;
-      if (!tag) return true;
-      const nt = node.tags || [];
-      return nt.some((t) => t.includes(tag));
-    }
-    if (filter.mode === "tags") {
-      const required = filter.tags;
-      if (!required.length) return true;
-      const nt = node.tags || [];
-      if (filter.ignoreCase) {
-        const lowerTags = nt.map((t) => t.toLowerCase());
-        return required.some((q) => {
-          const qq = q.toLowerCase();
-          return lowerTags.some((t) => t.includes(qq));
-        });
-      }
-      return required.some((q) => nt.some((t) => t.includes(q)));
-    }
-    return true;
-  });
-
-  // camera tracking
   const [cam, setCam] = useState<Camera | null>(null);
   const fmt = (v: number) => v.toFixed(2);
   const handleReset = () => {
@@ -84,20 +87,20 @@ export default function InputNodesViewer() {
         camera={{ position: DEFAULT_POS, rotation: DEFAULT_ROT, fov: 90 }}
       >
         <CameraTracker onUpdate={setCam} />
-        {/* helpers */}
         <gridHelper args={[2, 5, "gray", "lightgray"]} />
         <axesHelper args={[0.2]} />
         <ambientLight intensity={1} />
         <OrbitControls ref={controlsRef} enablePan enableZoom enableRotate />
-        {/* The human standard model */}
         <StandardModel />
+
         {/* Input nodes */}
-        {visibleInputNodes?.map((node) => {
-          const key = `input-${node.id}`;
+        {visibleInputNodes.map((node, idx) => {
+          const key = `input-${idx}`;
+          const [x, y, z] = node.location;
           return (
             <group
               key={key}
-              position={[-node.haptic_node.x, node.haptic_node.y, node.haptic_node.z]}
+              position={[-x, y, z]}
               onPointerOver={() => setHoveredKey(key)}
               onPointerOut={() => setHoveredKey(null)}
             >
@@ -111,7 +114,7 @@ export default function InputNodesViewer() {
               <mesh>
                 <sphereGeometry args={[node.radius, 16, 16]} />
                 <meshStandardMaterial
-                  color={intensityToColor(node.intensity)}
+                  color={intensityToColor(node.value)}
                   transparent
                   opacity={0.5}
                 />
@@ -128,25 +131,27 @@ export default function InputNodesViewer() {
                     borderRadius: "4px",
                   }}
                 >
-                  <div>{node.tags.join(", ") || "(no tags)"}</div>
-                  <div>{node.haptic_node.groups.join(", ") || "(No groups; will not affect anything)"}</div>
+                  <div>groups: {node.groups}</div>
+                  <div>value: {node.value.toFixed(3)}{node.muted ? " (muted)" : ""}</div>
                   <span>
-                    ({node.haptic_node.x}, {node.haptic_node.y}, {node.haptic_node.z})
+                    ({x.toFixed(3)}, {y.toFixed(3)}, {z.toFixed(3)})
                   </span>
                 </Html>
               )}
             </group>
           );
         })}
+
         {/* Device nodes */}
         {devices.flatMap((device) => {
           const nodeMap = device?.value?.nodes ?? [];
           return nodeMap.map((node, idx) => {
             const key = `dev-${getDeviceId(device)}-${idx}`;
+            const [x, y, z] = node.loc;
             return (
               <mesh
                 key={key}
-                position={[-node.x, node.y, node.z]}
+                position={[-x, y, z]}
                 onPointerOver={() => setHoveredKey(key)}
                 onPointerOut={() => setHoveredKey(null)}
               >
@@ -164,9 +169,9 @@ export default function InputNodesViewer() {
                       borderRadius: "4px",
                     }}
                   >
-                    <div>{getDeviceName(device) + ": " + idx + "\n"}</div>
+                    <div>{getDeviceName(device) + ": " + idx}</div>
                     <span>
-                      ({node.x}, {node.y}, {node.z})
+                      ({x.toFixed(3)}, {y.toFixed(3)}, {z.toFixed(3)})
                     </span>
                   </Html>
                 )}
@@ -175,7 +180,7 @@ export default function InputNodesViewer() {
           });
         })}
       </Canvas>
-      {/* HUD: Camera position & rotation */}
+
       {cam && (
         <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs text-white">
           <div>
@@ -188,7 +193,7 @@ export default function InputNodesViewer() {
           </div>
         </div>
       )}
-      {/* Reset camera button */}
+
       <button
         onClick={handleReset}
         className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"

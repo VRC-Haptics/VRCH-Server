@@ -1,81 +1,233 @@
+use arraydeque::{ArrayDeque, Wrapping};
 use glam::Vec3;
+use smallvec::SmallVec;
+use std::time::{Duration, Instant};
 
-use super::haptic_node::HapticNode;
-use super::NodeId;
+use crate::mapping::groups::NodeGroup;
+use crate::mapping::NodeKey;
+use crate::vrc::config::{InputLayer, InputType};
+
+const DEFAULT_NODE_SLOTS: usize = 2;
+
+/// Points to an input slot, within a node, within an interpolation layer.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+pub struct SlotKey {
+    pub node: NodeKey,
+    pub slot_idx: u8,
+}
+
+impl SlotKey {
+    pub fn new(node: NodeKey, idx: u8) -> Self {
+        SlotKey {
+            node,
+            slot_idx: idx,
+        }
+    }
+}
+
+const WINDOW: usize = 5;
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-/// All information needed to compute an OuputNode of any given location
-pub struct InputNode {
-    /// id Unique to this InputNode
-    id: NodeId,
-    /// Contains the standard location and NodeGroup tags for calculating outputs
-    pub haptic_node: HapticNode,
-    /// The feedback strength at this location
-    pub intensity: f32,
-    /// The radius that this node will impact
-    pub radius: f32,
-    /// used to identify/modify/remove groups of InputNodes. (tags are not NodeGroups)  
-    pub tags: Vec<String>,
-    /// how this input node should be interpreted
-    pub input_type: InputType,
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
+pub struct Slot {
+    pub muted: bool,
+    pub source: InputType,
+    pub layer: InputLayer,
+    pub weight: f32,
+    #[serde(skip)]
+    pub history: History,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-/// Describes how an `InputNode` should be used during interpolation.
+#[derive(serde::Serialize, Debug, Clone, Copy, Default)]
+pub struct HistoryView {
+    pub values: [f32; WINDOW],
+    pub len: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(into = "HistoryView")]
+pub struct History {
+    pub samples: ArrayDeque<(f32, Instant), WINDOW, Wrapping>,
+}
+
+impl PartialEq for History {
+    fn eq(&self, other: &Self) -> bool {
+        self.samples.len() == other.samples.len()
+            && self
+                .samples
+                .iter()
+                .zip(other.samples.iter())
+                .all(|(a, b)| a.0 == b.0)
+    }
+}
+
+impl Default for History {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<History> for HistoryView {
+    fn from(h: History) -> Self {
+        h.view()
+    }
+}
+
+/// Largest gap between two samples still treated as continuous motion.
+/// Anything wider is a dropped packet / new gesture and is not bridged.
+const MAX_SAMPLE_GAP: Duration = Duration::from_millis(250);
+/// How long after the newest sample velocity is still reported, fading to 0.
+const VELOCITY_HOLD: Duration = Duration::from_millis(150);
+const MIN_DT: f32 = 1e-4;
+
+impl History {
+    /// Average finite-difference velocity (units/second) over the recent window.
+    /// Take absolute value to get speed.
+    pub fn velocity_at(&self, now: Instant) -> f32 {
+        // front == newest (push_front)
+        let Some((_, newest_time)) = self.samples.front() else {
+            return 0.0;
+        };
+
+        // No fresh input: fade out rather than holding a stale reading.
+        let staleness = now.saturating_duration_since(*newest_time);
+        if staleness >= VELOCITY_HOLD {
+            return 0.0;
+        }
+        let decay = 1.0 - (staleness.as_secs_f32() / VELOCITY_HOLD.as_secs_f32());
+
+        let mut num = 0.0f32;
+        let mut denom = 0.0f32;
+        // iteration is newest-first, so `previous` is the *newer* half of each pair
+        let mut previous: Option<(f32, Instant)> = None;
+        for (value, time) in self.samples.iter().copied() {
+            if let Some((newer_val, newer_time)) = previous {
+                let gap = newer_time.saturating_duration_since(time);
+                if gap > MAX_SAMPLE_GAP {
+                    break;
+                }
+                let dt = gap.as_secs_f32();
+                if dt >= MIN_DT {
+                    num += (newer_val - value) / dt;
+                    denom += 1.0;
+                }
+            }
+            previous = Some((value, time));
+        }
+
+        if denom > 0.0 {
+            (num / denom) * decay
+        } else {
+            0.0
+        }
+    }
+
+    pub fn view(&self) -> HistoryView {
+        let mut values = [0.0f32; WINDOW];
+        for (i, (v, _)) in self.samples.iter().enumerate() {
+            values[i] = *v;
+        }
+        HistoryView {
+            values,
+            len: self.samples.len(),
+        }
+    }
+
+    pub fn new() -> Self {
+        Self {
+            samples: ArrayDeque::new(),
+        }
+    }
+
+    pub fn push_at(&mut self, value: f32, time: Instant) {
+        let _ = self.samples.push_front((value, time));
+    }
+
+    pub fn latest(&self) -> Option<f32> {
+        self.samples.front().map(|v| v.0)
+    }
+
+    /// Valid samples, newest-first. Each entry is (value, time).
+    pub fn history(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &(f32, Instant)> + ExactSizeIterator + '_ {
+        // newest were inserted via push_front, so front-to-back == newest-first
+        self.samples.iter()
+    }
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
+/// Represents information at a point in space that will go into computing outputs.
 ///
-/// Layers are ordered in processing order according to the enum, with the cumulative outputs being passed to the next step.
-pub enum InputType {
-    /// Default choice, which weights closer values exponentially more.
-    ///
-    /// Output will not be influenced easily by distant input nodes if there is one close to the output node.
-    INTERP,
-    /// Additive layers adds the nodes influence into the result of the `InputType::INTERP` step.
-    ///
-    /// Uses linear scaling based off of the `InputNode.radius`
-    ADDITIVE,
-    /// Subtractive layers subtracts the nodes influence into the result of the `InputType::INTERP` step.
-    ///
-    /// Uses linear scaling based off of the `InputNode.radius`
-    SUBTRACTIVE,
+/// To have a Greedy layer drive multiple devices it must have the ALL group tag present.
+pub struct InputNode {
+    pub muted: bool,
+    pub location: Vec3,
+    /// A slot is an single input value.
+    #[cfg_attr(feature = "specta", specta(type = Vec<Slot>))]
+    pub slots: SmallVec<[Slot; DEFAULT_NODE_SLOTS]>,
+    pub radius: f32,
+    /// purely for convenience, should be determined by the map.
+    pub interpolation_layer: InterpolationLayer,
+    pub groups: NodeGroup,
+    /// The most recently calculated output value of this node.
+    pub value: f32,
+}
+
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[repr(u8)]
+/// Describes how this node should affect the layers.
+pub enum InterpolationLayer {
+    /// Grabs any nodes within it's radius,forcefully drives it at this value.
+    Greedy,
+    /// Exponentially weights nodes within it's radius, nodes at 0 pull to zero.
+    #[default]
+    Default,
+    /// Weights nodes according to their proximity to this node
+    Linear,
+    /// Weights all outputs at  in its radius.
+    Area,
+    /// Drives **all** nodes exactly at output without regard to distance.
+    Global,
 }
 
 impl InputNode {
     /// Factory for creating InputNode's
-    ///
-    /// id: Unique id
-    ///
-    /// node: Fully generated HapticNode in standard space
-    ///
-    /// tags: Use these to find groups of InputNodes
-    ///
-    /// **NOTE:** Initializes intensity to 0.0, set the intensity using class functions
     pub fn new(
-        node: HapticNode,
-        tags: Vec<String>,
-        id: NodeId,
+        location: Vec3,
+        groups: NodeGroup,
+        layer: InterpolationLayer,
+        slots: SmallVec<[Slot; DEFAULT_NODE_SLOTS]>,
         radius: f32,
-        input_type: InputType,
     ) -> InputNode {
-        return InputNode {
-            id: id,
-            haptic_node: node,
-            intensity: 0.0,
-            radius: radius,
-            tags: tags,
-            input_type: input_type,
-        };
+        InputNode {
+            muted: false,
+            location,
+            slots,
+            radius,
+            interpolation_layer: layer,
+            groups,
+            value: 0.0,
+        }
     }
 
-    pub fn always_apply(&self) -> bool {
-        self.haptic_node.groups.contains(&super::NodeGroup::All)
+    pub const fn always_apply(&self) -> bool {
+        self.groups.intersects(NodeGroup::All)
     }
 
     pub fn set_position(&mut self, pos: Vec3) {
-        self.haptic_node.x = pos.x;
-        self.haptic_node.y = pos.y;
-        self.haptic_node.z = pos.z;
+        self.location.x = pos.x;
+        self.location.y = pos.y;
+        self.location.z = pos.z;
+    }
+
+    pub fn mute(&mut self, val: bool) {
+        self.muted = val;
     }
 
     pub fn set_radius(&mut self, radius: f32) {
@@ -84,20 +236,5 @@ impl InputNode {
 
     pub fn get_radius(&self) -> f32 {
         self.radius
-    }
-
-    /// sets the intensity of this node
-    pub fn set_intensity(&mut self, intensity: f32) {
-        self.intensity = intensity;
-    }
-
-    /// gets the intensity of this node
-    pub fn get_intensity(&self) -> f32 {
-        self.intensity
-    }
-
-    /// Gets our unique ID
-    pub fn get_id(&self) -> &NodeId {
-        &self.id
     }
 }

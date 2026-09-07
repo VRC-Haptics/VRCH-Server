@@ -1,89 +1,144 @@
-import { useEffect, useRef, useState } from "react";
-import { invoke } from '@tauri-apps/api/core';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { commands, type ConfNode, type NodeKeyDef, type AddrInfo } from "../../bindings";
 import { useMapContext } from "../../context/mapContext";
 import { useVrcContext } from "../../context/VrcContext";
 
+const stripPrefix = (p: string) => p.replace(/^\/avatar\/parameters\//, "");
+
+/** Pull the owning NodeKey out of a watched AddrInfo entry. */
+function addrNodeKey(info: AddrInfo): NodeKeyDef | null {
+  if ("Slot" in info && info.Slot) return info.Slot[0].node; // SlotKey.node
+  if ("Node" in info && info.Node) return info.Node[0];
+  return null;
+}
+
+const keyId = (k: NodeKeyDef) => `${k.idx}:${k.version}`;
+
 /**
  * Dropdown and sliders for editing VRC config node radii.
- * Uses the `set_node_radius` Tauri command to persist changes.
+ * Resolves OSC addresses → NodeKeys via vrcInfo.watched, then persists with
+ * the `set_nodes_radius` command.
  */
 export default function VrcConfigRadiusEditor() {
   const { vrcInfo } = useVrcContext();
   const { globalMap } = useMapContext();
-  const [selectedConfigIdx, setSelectedConfigIdx] = useState<number>(0);
+
+  const [selectedConfigIdx, setSelectedConfigIdx] = useState(0);
   const [radii, setRadii] = useState<number[]>([]);
-  const [saving, setSaving] = useState<boolean>(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [multiplier, setMultiplier] = useState<number>(1);
+  const [multiplier, setMultiplier] = useState(1);
+  const [baselineAvg, setBaselineAvg] = useState(0);
   const applyTimerRef = useRef<number | null>(null);
-  const [baselineAvg, setBaselineAvg] = useState<number>(0);
 
-  // Get configs from avatar
   const configs = vrcInfo?.avatar?.configs ?? [];
-  const configNames = configs.map((c: any, i: number) => c?.meta?.map_name || `Config ${i + 1}`);
-  const nodes = configs[selectedConfigIdx]?.nodes ?? [];
+  const confNodes: ConfNode[] = configs[selectedConfigIdx]?.nodes ?? [];
 
-  // Hoisted helper to avoid TDZ when the component early-returns.
-  function averageRadius(list: number[]) {
-    if (!list.length) return 0;
-    return list.reduce((a, b) => a + b, 0) / list.length;
-  }
+  // address (vrcPrefix + address) → NodeKey, rebuilt only when watched changes.
+  const addrToKey = useMemo(() => {
+    const m = new Map<string, NodeKeyDef>();
+    for (const [addr, info] of vrcInfo?.watched ?? []) {
+      const k = addrNodeKey(info);
+      if (k) m.set(addr, k);
+    }
+    return m;
+  }, [vrcInfo?.watched]);
 
-  // When switching configs: recompute baseline from VRC data, clear local overrides
-  // and reset multiplier. This avoids feedback and keeps baseline tied to VRC only
-  // on explicit config changes.
+  const confNodeKeys = (node: ConfNode): NodeKeyDef[] => {
+    const out: NodeKeyDef[] = [];
+    const seen = new Set<string>();
+    for (const input of node.inputs) {
+      const k = addrToKey.get(input.vrcPrefix + input.address);
+      if (!k || seen.has(keyId(k))) continue;
+      seen.add(keyId(k));
+      out.push(k);
+    }
+    return out;
+  };
+
+  // every resolved key in the selected config, deduped — for the global scale.
+  const allConfigKeys = useMemo(() => {
+    const out: NodeKeyDef[] = [];
+    const seen = new Set<string>();
+    for (const node of confNodes) {
+      for (const input of node.inputs) {
+        const k = addrToKey.get(input.vrcPrefix + input.address);
+        if (!k || seen.has(keyId(k))) continue;
+        seen.add(keyId(k));
+        out.push(k);
+      }
+    }
+    return out;
+  }, [configs, selectedConfigIdx, addrToKey]);
+
+  const averageRadius = (list: number[]) =>
+    list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0;
+
+  // On config switch: reset baseline (from config-defined radii), clear overrides.
   useEffect(() => {
-    const base = averageRadius(nodes.map((n: any) => n.radius));
-    setBaselineAvg(base);
+    setBaselineAvg(averageRadius(confNodes.map((n) => n.radius)));
     setRadii([]);
     setMultiplier(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConfigIdx]);
 
-  // When VRC info polls/updates: refresh baseline if it actually changed but do
-  // not reset multiplier or local overrides.
+  // On VRC poll: refresh baseline only if it actually moved; keep overrides.
   useEffect(() => {
-    const base = averageRadius(nodes.map((n: any) => n.radius));
-    if (Math.abs(base - baselineAvg) > 1e-6) {
-      setBaselineAvg(base);
-    }
+    const base = averageRadius(confNodes.map((n) => n.radius));
+    if (Math.abs(base - baselineAvg) > 1e-6) setBaselineAvg(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vrcInfo]);
 
-  const handleRadiusChange = async (nodeIdx: number, newRadius: number) => {
-    setRadii(r => r.map((val, i) => (i === nodeIdx ? newRadius : val)));
-    const node = nodes[nodeIdx];
-    if (!node) return;
+  if (!configs.length) return null;
+
+  // Live radius for a node from the running map, by slotmap index.
+  const liveRadius = (key: NodeKeyDef | undefined): number | undefined => {
+    if (!key) return undefined;
+    const slot: any = globalMap?.input_nodes?.nodes?.[key.idx];
+    if (slot == null) return undefined;
+    const node = "location" in slot ? slot : slot.value;
+    return node?.radius ?? undefined;
+  };
+
+  const currentRadius = (node: ConfNode, idx: number): number => {
+    const live = liveRadius(confNodeKeys(node)[0]);
+    const base = typeof live === "number" ? live : node.radius;
+    return radii[idx] ?? base;
+  };
+
+  const handleRadiusChange = async (idx: number, newRadius: number) => {
+    setRadii((r) => {
+      const next = r.slice();
+      next[idx] = newRadius;
+      return next;
+    });
+    const keys = confNodeKeys(confNodes[idx]);
+    if (!keys.length) {
+      setError("No live node mapped for this address yet");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await invoke("set_node_radius", {
-        id: node.address,
-        radius: newRadius,
-      });
+      const res = await commands.setNodesRadius(keys, newRadius);
+      if (res.status === "error") setError("Failed to set radius");
     } catch (e: any) {
-      console.error("Failed to set radius", e);
-      setError(e?.message || "Failed to set radius");
+      setError(e?.message ?? "Failed to set radius");
     } finally {
       setSaving(false);
     }
   };
 
-  if (!configs.length) return null;
-
-  const handleApplyAllDebounced = (tag: string, radius: number) => {
-    // clear any existing timer
-    if (applyTimerRef.current) {
-      clearTimeout(applyTimerRef.current);
-    }
-    // debounce to reduce invoke spam while sliding
+  const applyAllDebounced = (radius: number) => {
+    if (applyTimerRef.current) clearTimeout(applyTimerRef.current);
     applyTimerRef.current = window.setTimeout(async () => {
       setSaving(true);
       setError(null);
       try {
-        await invoke("set_tags_radius", { tag, radius });
+        const res = await commands.setNodesRadius(allConfigKeys, radius);
+        if (res.status === "error") setError("Failed to scale prefab");
       } catch (e: any) {
-        console.error("Failed to set tags radius", e);
-        setError(e?.message || "Failed to set tags radius");
+        setError(e?.message ?? "Failed to scale prefab");
       } finally {
         setSaving(false);
       }
@@ -92,19 +147,17 @@ export default function VrcConfigRadiusEditor() {
 
   const handleMultiplierChange = (m: number) => {
     setMultiplier(m);
-    const meta = configs[selectedConfigIdx]?.meta ?? {};
-    const tag = `${meta.map_author ?? ""}_${meta.map_name ?? ""}_${meta.map_version ?? ""}`;
-    // Use fixed baseline derived from VRC config radii to avoid feedback
     const newRadius = Number((baselineAvg * m).toFixed(6));
-    // Update UI immediately
-    setRadii(Array(nodes.length).fill(newRadius) as number[]);
-    // Apply to backend after debounce
-    if (tag && isFinite(newRadius)) handleApplyAllDebounced(tag, newRadius);
+    setRadii(Array(confNodes.length).fill(newRadius));
+    if (allConfigKeys.length && isFinite(newRadius)) applyAllDebounced(newRadius);
   };
+
+  const configNames = configs.map(
+    (c, i) => c?.identification?.mapName || `Config ${i + 1}`
+  );
 
   return (
     <div className="absolute top-2 left-2 bg-black/70 text-white p-4 rounded shadow max-w-xs z-10">
-      {/* Global multiplier based on average radius */}
       <div className="mb-2">
         <div className="mb-1 flex items-center justify-between text-xs">
           <span>Scale Entire Prefab</span>
@@ -128,6 +181,7 @@ export default function VrcConfigRadiusEditor() {
         <span>Edit Node Radii</span>
         {saving && <span className="text-xs animate-pulse">Saving…</span>}
       </div>
+
       <select
         className="mb-2 w-full text-black"
         value={selectedConfigIdx}
@@ -139,40 +193,43 @@ export default function VrcConfigRadiusEditor() {
           </option>
         ))}
       </select>
+
       <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-        {nodes.map((node: any, idx: number) => (
-          <div key={node.address} className="flex items-center gap-2">
-            <span className="truncate text-xs" title={node.address}>
-              {node.address}
-            </span>
-            <input
-              type="range"
-              min={0.01}
-              max={0.5}
-              step={0.001}
-              value={(
-                (() => {
-                  const id = node.address;
-                  const globalR = globalMap?.nodes.find((val) =>{ val.id === id})?.radius;
-                  const base = typeof globalR === "number" ? globalR : node.radius;
-                  return radii[idx] ?? base;
-                })()
-              )}
-              onChange={(e) => handleRadiusChange(idx, parseFloat(e.target.value))}
-              className="flex-1"
-            />
-            <span className="w-10 text-right tabular-nums text-xs">
-              {(() => {
-                const id = node.address as string;
-                const globalR = globalMap?.nodes.find((val) =>{ val.id === id})?.radius;
-                const base = typeof globalR === "number" ? globalR : node.radius;
-                const val = radii[idx] ?? base;
-                return (typeof val === "number" ? val : 0).toFixed(3);
-              })()}
-            </span>
-          </div>
-        ))}
+        {confNodes.map((node, idx) => {
+          const primary = node.inputs[0]
+            ? node.inputs[0].vrcPrefix + node.inputs[0].address
+            : node.parentBone;
+          const allAddrs = node.inputs
+            .map((i) => i.vrcPrefix + i.address)
+            .join("\n");
+          const val = currentRadius(node, idx);
+          const mapped = confNodeKeys(node).length > 0;
+          return (
+            <div key={`${selectedConfigIdx}-${idx}`} className="flex items-center gap-2">
+              <span
+                className={`truncate text-xs ${mapped ? "" : "opacity-40"}`}
+                title={allAddrs || node.parentBone}
+              >
+                {stripPrefix(primary)}
+              </span>
+              <input
+                type="range"
+                min={0.01}
+                max={0.5}
+                step={0.001}
+                value={val}
+                disabled={!mapped}
+                onChange={(e) => handleRadiusChange(idx, parseFloat(e.target.value))}
+                className="flex-1"
+              />
+              <span className="w-10 text-right tabular-nums text-xs">
+                {val.toFixed(3)}
+              </span>
+            </div>
+          );
+        })}
       </div>
+
       {error && <div className="mt-2 text-xs text-red-400">{error}</div>}
     </div>
   );

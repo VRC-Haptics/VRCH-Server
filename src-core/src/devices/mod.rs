@@ -2,9 +2,10 @@
 pub mod serial;
 //mod traits;
 pub mod bhaptics;
+pub mod internal;
 pub mod update;
+pub mod websocket;
 pub mod wifi;
-//pub mod device;
 
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
@@ -17,8 +18,14 @@ use tokio_util::sync::CancellationToken;
 use wifi::{WifiDevice, WifiDeviceInfo};
 
 use crate::{
-    devices::{bhaptics::{BhapticBle, BhapticInfo}, wifi::start_wifi_devices},
+    devices::{
+        bhaptics::{BhapticBle, BhapticInfo},
+        internal::{InternalDevice, InternalDeviceInfo},
+        websocket::{WebsocketDevice, WebsocketDeviceInfo},
+        wifi::start_wifi_devices,
+    },
     mapping::haptic_node::HapticNode,
+    state::get_config,
 };
 
 pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
@@ -26,57 +33,58 @@ pub type EditCallback<T> = dyn FnOnce(&HapticDevice) -> T;
 #[enum_dispatch]
 #[derive(Debug)]
 /// All Haptic Devices implement the `Device` trait
-/// and are not garunteed to provide anything else.
+/// and are not guaranteed to provide anything else.
 ///
 /// Individual exposed functions for each device type are prone to change,
 /// and are not stable in the least.
 pub enum HapticDevice {
     Wifi(WifiDevice),
     BhapticBle(BhapticBle),
+    Websocket(WebsocketDevice),
+    /// Intended for internal server usage, for testing mainly, possibly for UI experiments
+    Internal(InternalDevice),
 }
 
 /// Info container for each device type
-/// 
-/// An informattion that should be in all variants should be made so via the below impl.
+///
+/// An information that should be in all variants should be made so via the below impl.
 /// Don't manually dip into each variant please.
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(tag = "variant", content = "value")]
 pub enum DeviceInfo {
     Wifi(WifiDeviceInfo),
-    BhapticBle(BhapticInfo)
+    BhapticBle(BhapticInfo),
+    Websocket(WebsocketDeviceInfo),
+    Internal(InternalDeviceInfo),
 }
 
 impl DeviceInfo {
     pub fn get_nodes(&self) -> &Vec<HapticNode> {
         match self {
-            DeviceInfo::Wifi(inf) => {
-                return &inf.nodes;
-            },
-            DeviceInfo::BhapticBle(inf) => {
-                return &inf.nodes;
-            }
+            DeviceInfo::Wifi(inf) => &inf.nodes,
+            DeviceInfo::BhapticBle(inf) => &inf.nodes,
+            DeviceInfo::Websocket(inf) => &inf.nodes,
+            DeviceInfo::Internal(inf) => &inf.nodes,
         }
     }
 
-    /// updates the nodes on this info instance. Does not do anything like send them to teh device or update the configuration.
+    /// updates the nodes on this info instance. Does not send them to the device.
     pub fn set_nodes(&mut self, new: Vec<HapticNode>) {
         match self {
-            DeviceInfo::Wifi(ref mut inf) => {
-                inf.nodes = new;
-            },
-            DeviceInfo::BhapticBle(ref mut inf) => {
-                inf.nodes = new;
-            }
+            DeviceInfo::Wifi(inf) => inf.nodes = new,
+            DeviceInfo::BhapticBle(inf) => inf.nodes = new,
+            DeviceInfo::Websocket(inf) => inf.nodes = new,
+            DeviceInfo::Internal(inf) => inf.nodes = new,
         }
     }
 
     pub fn get_esp32(&self) -> ESP32Model {
         match self {
-            DeviceInfo::Wifi(wif) => {
-                wif.esp_model.clone()
-            },
+            DeviceInfo::Wifi(wif) => wif.esp_model.clone(),
             DeviceInfo::BhapticBle(_) => ESP32Model::Unknown,
+            DeviceInfo::Websocket(_) => ESP32Model::Unknown,
+            DeviceInfo::Internal(_) => ESP32Model::Unknown,
         }
     }
 }
@@ -86,7 +94,7 @@ impl DeviceInfo {
 pub trait Device {
     /// Returns device id that should be unique to this device
     ///
-    /// Since id is required to index it should be available at device initalization
+    /// Since id is required to index it should be available at device initialization
     fn get_id(&self) -> DeviceId;
     /// Returns the info related to this device.
     /// All info should not be required at device start and will be edited as the device lives on.
@@ -141,7 +149,6 @@ impl Clone for DeviceHandle {
 }
 
 impl DeviceHandle {
-
     /// checks if a device is still here.
     pub fn exists(&self, id: &DeviceId) -> bool {
         self.devices.contains_key(id)
@@ -171,7 +178,7 @@ impl DeviceHandle {
     ///
     /// ```
     /// let info = manager.with_device("mac address", |d| d.info());
-    ///  
+    ///
     /// ```
     pub fn with_device<T, F>(&self, id: &DeviceId, fun: F) -> Option<T>
     where
@@ -191,7 +198,7 @@ impl DeviceHandle {
 /// A thin, thread safe abstraction layer over physical devices,
 /// AFTER the `init_device_manager` has been called.
 ///
-/// # USE initialiaztion function at top of main.
+/// # USE initialization function at top of main.
 pub struct DeviceManager {
     // Requires Arc to keep fully asynchronus
     devices: Arc<DashMap<DeviceId, HapticDevice>>,
@@ -214,12 +221,16 @@ impl DeviceManager {
             device_receiver: Some(rx),
             device_sender: tx,
             subscribers: Arc::new(Mutex::new(vec![])),
-            shutdown: shutdown,
+            shutdown,
         }
     }
 
     pub fn get_handle(&self) -> DeviceHandle {
-        DeviceHandle { devices: Arc::clone(&self.devices), subscribers: Arc::clone(&self.subscribers), device_sender: self.device_sender.clone() }
+        DeviceHandle {
+            devices: Arc::clone(&self.devices),
+            subscribers: Arc::clone(&self.subscribers),
+            device_sender: self.device_sender.clone(),
+        }
     }
 
     pub async fn shutdown(&self) {
@@ -240,7 +251,12 @@ pub async fn init_device_manager(manager: &mut DeviceManager) {
     };
 
     // initialize our device listeners
-    start_wifi_devices(&mut manager.get_handle()).await;
+    let conf = get_config().server.load();
+    if conf.enable_wifi_vrch {
+        start_wifi_devices(&mut manager.get_handle()).await;
+    } else {
+        log::warn!("Skipping wifi devices, disabled from config");
+    }
 
     // spawn our channel manager
     let clone = manager.shutdown.clone();
@@ -294,7 +310,6 @@ fn handle_device_message(
     };
 }
 
-
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DeviceId(pub String);
@@ -329,7 +344,7 @@ pub enum ESP32Model {
     ESP32S2,
     /// ESP32-S2 with 16MB flash
     ESP32S2FH16,
-    /// ESP32-S2 with 32MB flash  
+    /// ESP32-S2 with 32MB flash
     ESP32S2FH32,
     ESP32S3,
     ESP32C3,
@@ -349,9 +364,9 @@ impl ESP32Model {
             | ESP32Model::ESP32C6
             | ESP32Model::ESP32S2FH16
             | ESP32Model::ESP32S2FH32
-            | ESP32Model::ESP32S3 => return 3232,
-            ESP32Model::ESP8266 => return 8266,
-            ESP32Model::Unknown => return 3232,
+            | ESP32Model::ESP32S3 => 3232,
+            ESP32Model::ESP8266 => 8266,
+            ESP32Model::Unknown => 3232,
         }
     }
 }

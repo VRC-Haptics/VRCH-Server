@@ -61,7 +61,7 @@ fn track_process_and_exit(process_name: &str, system: &mut System) {
 
     loop {
         // Refresh the list of processes.
-        system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&vec![pid]), true);
+        system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
         // Check if any running process has a name that matches process_name.
         let process_found = system.processes()
             .values()

@@ -16,10 +16,10 @@ where
         let out = serde_json::from_str(&s).map_err(de::Error::custom);
 
         if let Ok(success) = out {
-            return Ok(success);
+            Ok(success)
         } else {
             log::error!("Failed on: {}", s);
-            return out;
+            out
         }
     } else {
         // For non-string values, deserialize directly.

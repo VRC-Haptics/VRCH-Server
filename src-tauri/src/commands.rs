@@ -1,13 +1,13 @@
 // local modules
 use crate::{devices::{
     Device, DeviceHandle, DeviceId, DeviceInfo, ESP32Model, update::Firmware, //update::{Firmware, UpdateMethod}
-}, mapping::{MapHandle, MapInfo}, state::{self, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}, glam::Vec3};
-use crate::mapping::event::Event;
+}, mapping::MapHandle, state::{self, GitRepo, PerDevice, VrcSettings}, vrc::{VrcHandle, VrcInfo}, glam::Vec3};
 use crate::mapping::haptic_node::HapticNode;
 use crate::mapping::{InputEventMessage};
 use crate::log_err;
 
 use crate::vrc::{config::GameMap};
+use haptic_core::{mapping::{NodeField, NodeKey, Snapshot}, vrc::MsgToMainVrc};
 //standard imports
 use runas::Command;
 use std::sync::Arc;
@@ -22,7 +22,7 @@ pub fn get_device_esp_model(
     let Some(this) = devices.with_device(&id.into(), |d| d.info().get_esp32()) else {
         return Err("unable to find device with id".to_string());
     };
-    return Ok(this);
+    Ok(this)
 }
 
 
@@ -46,30 +46,16 @@ pub async fn start_device_update(
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_tags_radius(
-    tag: String,
+pub fn set_nodes_radius(
+    keys: Vec<NodeKey>,
     radius: f32,
     map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
-    map.has_tag_mut(&tag, |n| {
-        n.set_radius(radius);
-    });
+    for key in keys {
+        log_err!(map.send_event(InputEventMessage::UpdateNodeField { key, field: NodeField::Radius(radius)}));
+    };
 
     Ok(())
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn set_node_radius(
-    id: String,
-    radius: f32,
-    map: tauri::State<'_, MapHandle>,
-) -> Result<(), String> {
-    if map.with_node_mut(&id.into(), |n| n.set_radius(radius)).is_some() {
-        return Ok(());
-    } else {
-        return Err("Failed to get device".into());
-    }
 }
 
 const EPSILON: f32 = 0.001;
@@ -120,27 +106,20 @@ pub fn swap_conf_nodes(
 /// Plays the specified point for the duration in seconds at the power percentage of intensity.
 #[tauri::command]
 #[specta::specta]
-pub fn play_point(
-    feedback_location: (f32, f32, f32), // xyz location to insert point
-    power: f32,                         // the power percentage to play 1 = no change
-    duration: f32,                      // When should this point be removed.
+pub async fn play_point(
+    feedback_location: Vec3, // xyz location to insert point
+    power: f32,              // the power percentage to play 1 = no change
+    duration: f32,           // how long the point stays, in seconds
     map: tauri::State<'_, MapHandle>,
 ) -> Result<(), ()> {
-    let event = Event::new(
-        "Play Point".to_string(),
-        crate::mapping::event::EventEffectType::Location(Vec3 {
-            x: feedback_location.0,
-            y: feedback_location.1,
-            z: feedback_location.2,
-        }),
-        vec![power],
-        Duration::from_secs_f32(duration),
-        vec!["UI".to_string()],
-    )
-    .expect("unable to create play point event");
-
-    log_err!(map.send_event_blocking(InputEventMessage::StartEvent(event)));
-    return Ok(());
+    // The map ticks at 100 Hz, so one second is 100 ticks.
+    let ticks = (duration.max(0.0) * 100.0) as u64;
+    log_err!(map.send_event(InputEventMessage::QuickEvent {
+        duration: ticks,
+        power,
+        location: feedback_location,
+    }));
+    Ok(())
 }
 
 #[tauri::command]
@@ -184,16 +163,20 @@ pub fn get_device_list(dev: tauri::State<'_, DeviceHandle>) -> Vec<(DeviceId, Op
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> VrcInfo {
-    vrc.get_info()
+pub async fn get_vrc_info(vrc: tauri::State<'_, VrcHandle>) -> Result<Arc<VrcInfo>, ()> {
+    Ok(vrc.get_info().await)
 }
 
 #[tauri::command]
 #[specta::specta]
 /// sets all vrc relevant info. It is all behind an arcswap so it is the same cost to set all or one of them.
-pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
+pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration, vrc: tauri::State<'_, VrcHandle>) {
     let shared = &state::get_config().vrc_settings;
     let mut new = VrcSettings::clone(&shared.load());
+    
+    let should_refresh = (ratio - new.velocity_ratio).abs() > 0.001;
+
+    
     new.velocity_mult = mult;
     new.velocity_ratio = ratio;
     new.sample_cache = samples;
@@ -201,6 +184,14 @@ pub fn set_vrc(mult: f32, ratio: f32, samples: usize, smooth_s: Duration) {
 
     shared.swap(Arc::new(new));
     state::mark_dirty();
+
+    // velocity ratio get's rebuilt with avatar rebuild
+    if should_refresh {
+        vrc.send(MsgToMainVrc::RebuildAvatar);
+    }
+    // velocity mult is loaded from arcswap every map itteration
+    // smaple_cache isn't taken into account yet, since it is compiled in small vec
+    // smoothing time isn't implemented yet.
 }
 
 #[tauri::command]
@@ -213,8 +204,8 @@ pub fn set_device_info(dev: tauri::State<'_, DeviceHandle>, id: DeviceId, inf: D
 /// Gets the core haptics map that is used to drive feedback.
 #[tauri::command]
 #[specta::specta]
-pub fn get_core_map(map: tauri::State<'_, MapHandle>) -> MapInfo {
-    map.get_state()
+pub async fn get_core_map(map: tauri::State<'_, MapHandle>) -> Result<Snapshot, ()> {
+    Ok(map.get_state().await.as_ref().clone())
 }
 
 #[tauri::command]
@@ -234,7 +225,7 @@ pub async fn upload_device_map(
     let haptic_nodes: Vec<HapticNode> = upload
         .nodes
         .into_iter()
-        .map(|node| node.node_data)
+        .map(|node| HapticNode { loc: node.location, groups: node.interaction_tags })
         .collect();
 
     let res = device.with_device_mut(&id.clone().into(), |d| {
@@ -245,7 +236,7 @@ pub async fn upload_device_map(
 
     state::mark_dirty();
     if res.is_none() {
-        return Err(format!("No Device with id: {}", id))
+        Err(format!("No Device with id: {}", id))
     } else {
         Ok(())
     }

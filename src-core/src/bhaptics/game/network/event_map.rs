@@ -6,7 +6,6 @@ use strum::EnumIter;
 use crate::bhaptics::maps::{
     x40_vest::x40_vest_back, x40_vest::x40_vest_front, x6_head::x6_headset,
 };
-use crate::mapping::NodeId;
 use glam::Vec3;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -37,6 +36,7 @@ pub struct GameMapping {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+/// A singular vibration pattern
 pub struct HapticMapping {
     pub id: String,
     pub deploy_id: String,
@@ -95,11 +95,11 @@ impl PatternLocation {
             PatternLocation::Head => x6_headset().rows[index],
             PatternLocation::Unknown => {
                 log::error!("Unknown pattern location!");
-                return Vec3::new(0., 0., 0.);
+                Vec3::new(0., 0., 0.)
             }
             _ => {
                 log::error!("Unimplemented pattern location {}!", self.to_input_tag());
-                return Vec3::new(0., 0., 0.);
+                Vec3::new(0., 0., 0.)
             }
         }
     }
@@ -128,16 +128,6 @@ impl PatternLocation {
             Self::HandR => "Bhaptics_HandR",
             Self::Unknown => "Bhaptics_Unknown",
         }
-    }
-
-    /// gets the `InputNode` Id that is associated with this devices motor index.
-    /// Returns None when the motor_index is out of range for this device.
-    pub fn to_id(&self, motor_index: usize) -> Option<NodeId> {
-        if motor_index >= self.motor_count() {
-            return None;
-        }
-
-        return Some(NodeId(format!("{}_{}", self.to_input_tag(), motor_index)));
     }
 }
 

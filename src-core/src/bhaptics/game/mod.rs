@@ -3,11 +3,9 @@ pub mod network;
 mod v3;
 mod v2;
 
-use crate::mapping::{MapHandle, event::Event};
+use crate::mapping::MapHandle;
 
-use network::event_map::PatternLocation;
 use serde;
-use std::sync::{Arc, Mutex};
 use tokio_util::sync::CancellationToken;
 
 pub enum ApiVersion {

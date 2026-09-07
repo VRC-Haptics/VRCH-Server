@@ -1,8 +1,7 @@
-use crate::devices::{Device, DeviceInfo, HapticDevice, wifi::{WifiDeviceInfo, ota}};
+use crate::devices::{Device, DeviceInfo, HapticDevice, wifi::ota};
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::IpAddr,
     ops::{Deref, DerefMut},
-    str::FromStr,
 };
 
 /// Decides whether we have the capability of determining this devices eligibility.
@@ -10,6 +9,8 @@ pub fn is_updateable(dtype: &HapticDevice) -> bool {
     match dtype {
         HapticDevice::Wifi(_) => true,
         HapticDevice::BhapticBle(_) => false,
+        HapticDevice::Websocket(_) => false,
+        HapticDevice::Internal(_) => false,
     }
 }
 
@@ -28,9 +29,9 @@ pub struct Firmware {
 impl Firmware {
     pub fn new(bytes: Vec<u8>, method: UpdateMethod, id: String) -> Self {
         Firmware {
-            id: id,
-            method: method,
-            bytes: bytes,
+            id,
+            method,
+            bytes,
         }
     }
 

@@ -4,6 +4,10 @@
 // Keep Futures from being left un-awaited. Use crate::log_err for convenient handling.
 #![deny(unused_must_use)]
 
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 // make local modules available
 mod commands;
 
@@ -14,16 +18,16 @@ use haptic_core::*;
 //standard imports
 use commands::*;
 use std::panic::{set_hook, take_hook};
-use std::sync::{Arc, LazyLock};
-use tauri::{AppHandle, Manager, Window, WindowEvent};
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri::{Manager, Window, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 use specta_typescript::Typescript;
+#[cfg(feature = "profiling")]
+use tauri_plugin_profiling::ProfilingExt;
 
 fn close_app(window: &Window) {
     log::info!("Cleaning up and Shutting Down.");
     state::save_config();
-    
+
     log::trace!("Shutdown bhaptics server");
     let app = window.app_handle();
     if let Some(handle) = app.try_state::<BhapticHandle>() {
@@ -51,12 +55,22 @@ fn throw_vrc_notif(app: &AppHandle, vrc: Arc<Mutex<VrcGame>>) {
     }
 }*/
 
-
 #[tokio::main]
 async fn main() {
     tauri::async_runtime::set(tokio::runtime::Handle::current());
 
-    let builder = tauri_specta::Builder::<tauri::Wry>::new()
+    // Start heap profiling. Held until RunEvent::Exit (see below) because on
+    // Windows the event loop never returns to main, so a plain `_guard`
+    #[cfg(feature = "dhat-heap")]
+    let mut profiler = Some(
+        dhat::Profiler::builder()
+            // absolute path so you can actually find it from a Tauri cwd
+            .file_name("dhat-heap.json")
+            .build(),
+    );
+
+
+    let cmd_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::get_device_list,
             commands::get_vrc_info,
@@ -74,20 +88,26 @@ async fn main() {
             bhaptics_launch_vrch,
             commands::play_point,
             commands::swap_conf_nodes,
-            commands::set_tags_radius,
-            commands::set_node_radius,
+            commands::set_nodes_radius,
             commands::get_device_esp_model,
             commands::start_device_update,
         ]);
 
     #[cfg(debug_assertions)] // Only export on non-release builds
-    builder
+    cmd_builder
         .export(Typescript::default(), "../src/bindings.ts")
         .expect("Failed to export typescript bindings");
 
     // init logging and stuff first
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let app_builder = tauri::Builder::default();
+    #[cfg(feature = "profiling")]
+    let app_builder = {
+        let app_builder = app_builder.plugin(tauri_plugin_profiling::init());
+        println!("Profiling Started");
+        app_builder
+    };
+
+    let app = app_builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             println!("Instance already open, shutting down.");
             let _ = app
                 .get_webview_window("main")
@@ -108,19 +128,30 @@ async fn main() {
                     file_name: Some("logs".to_string()),
                 }))
                 .filter(|metadata| {
-                    !metadata.target().starts_with("mio")
+                    !metadata.target().starts_with("mio") // TODO: Fix this
                         && !metadata.target().starts_with("reqwest")
                         && !metadata.target().starts_with("btleplug")
+                        && !metadata.target().starts_with("hyper_util")
+                        && !metadata.target().starts_with("tokio_tungstenite")
+                        && !metadata.target().starts_with("tungstenite")
                 })
                 .max_file_size(500_000)
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(10))
                 .build(),
         )
-        .invoke_handler(builder.invoke_handler())
+        .invoke_handler(cmd_builder.invoke_handler())
         .setup(move |app: &mut tauri::App| {
-            builder.mount_events(app);
+            #[cfg(feature = "profiling")]
+            app.start_cpu_profile()?;
+
+            cmd_builder.mount_events(app);
 
             let handle = app.handle().clone();
+
+            let resources = app
+                .path()
+                .resource_dir()
+                .expect("unable to resolve the resource directory");
 
             let default_panic = take_hook();
             set_hook(Box::new(move |info| {
@@ -135,10 +166,14 @@ async fn main() {
                     log::error!("Unable to initialize app root");
                     panic!(); // TODO: This should be done better.
                 });
-                let (vrc, map, bh, device) = haptic_core::start_server(root).await;
-                handle.manage(vrc);
+                let (vrc, map, bh, device) = haptic_core::start_server(root, resources).await;
+                if let Some(vrc) = vrc {
+                    handle.manage(vrc);
+                }
+                if let Some(bh) =  bh {
+                    handle.manage(bh);
+                }
                 handle.manage(map);
-                handle.manage(bh);
                 handle.manage(device);
             });
 
@@ -149,7 +184,41 @@ async fn main() {
             if let WindowEvent::CloseRequested { .. } = event.to_owned() {
                 close_app(window);
             }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        }).build(tauri::generate_context!()).expect("Error building tauri application");
+
+    // Ctrl+C: request a normal Tauri exit so RunEvent::Exit fires on the main
+    // thread and drops the profiler there (the Profiler never leaves main, so
+    // no Send bound is needed). Reuses the existing write path below.
+    #[cfg(feature = "dhat-heap")]
+    {
+        let exit_handle = app.handle().clone();
+        tauri::async_runtime::spawn(async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                println!("dhat: Ctrl+C received, exiting to flush profile");
+                exit_handle.exit(0);
+            }
+        });
+    }
+
+    app.run(move |handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            #[cfg(feature = "profiling")]
+            {
+                match handle.stop_cpu_profile() {
+                    Ok(result) => println!("Stopping profiling: {:?}", result.flamegraph_path),
+                    Err(e) => log::error!("Failed to stop CPU profile: {e}"),
+                }
+            }
+
+            // Drop the profiler here so dhat actually writes dhat-heap.json,
+            // since the event loop won't unwind back into main on Windows.
+            #[cfg(feature = "dhat-heap")]
+            if let Some(p) = profiler.take() {
+                drop(p);
+                println!("dhat: wrote dhat-heap.json");
+            }
+
+            handle.exit(0);
+        }
+    });
 }

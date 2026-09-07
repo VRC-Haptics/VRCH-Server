@@ -16,9 +16,11 @@ export const VrcProvider = ({ children }: { children: ReactNode}) => {
     const fetchVrc = async () => {
       try {
         const newInfo = await commands.getVrcInfo();
-        setVrcInfo(newInfo);
+        if (newInfo.status === "ok") {
+          setVrcInfo(newInfo.data);
+        }
       } catch (error) {
-        console.error("Fa;iled to fetch devices:", error);
+        console.error("Failed to fetch vrc context:", error);
       }
     };
 
@@ -26,7 +28,7 @@ export const VrcProvider = ({ children }: { children: ReactNode}) => {
     fetchVrc();
 
     // Polling interval
-    const intervalId = setInterval(fetchVrc, 1000);
+    const intervalId = setInterval(fetchVrc, 500);
     return () => clearInterval(intervalId);
   }, []);
 
